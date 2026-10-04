@@ -12,16 +12,16 @@ outside the 24-hour customer-service window, so you must have:
      approved template has a different number of variables, adjust the
      `components` dict built in `send_whatsapp_reminder` below to match.
 
-Set MSG91_AUTH_KEY, MSG91_WHATSAPP_INTEGRATED_NUMBER, and
-MSG91_WHATSAPP_TEMPLATE_NAME in Backend/.env. Leaving MSG91_AUTH_KEY blank
-disables sending (reminders still work as local push notifications on the
-device either way).
+Set MSG91_AUTH_KEY, MSG91_WHATSAPP_INTEGRATED_NUMBER,
+MSG91_WHATSAPP_TEMPLATE_NAME, and MSG91_WHATSAPP_NAMESPACE in Backend/.env.
+Leaving MSG91_AUTH_KEY blank disables sending (reminders still work as local
+push notifications on the device either way).
 
-The request shape below was verified against a real MSG91 account/template
-(2026-09-30): `namespace` is not required, but `payload.to` (a plain string,
-sibling of `payload.template`) is required in addition to the per-recipient
-`to` inside `to_and_components` — omitting the top-level one fails with
-"recipient number not found in request, 'to' key is expected in payload".
+The request shape below was confirmed delivering real WhatsApp messages
+(2026-10-04), copied directly from MSG91's own auto-generated sample code
+for this account's approved template — `namespace` IS required (MSG91's
+dashboard shows it per-template under Templates → Code{JSON}), and the
+`/bulk/` endpoint is the one that actually works, not the non-bulk one.
 """
 
 import httpx
@@ -29,14 +29,20 @@ import httpx
 from app.core.config import (
     MSG91_AUTH_KEY,
     MSG91_WHATSAPP_INTEGRATED_NUMBER,
+    MSG91_WHATSAPP_NAMESPACE,
     MSG91_WHATSAPP_TEMPLATE_NAME,
 )
 
-MSG91_WHATSAPP_URL = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/"
+MSG91_WHATSAPP_URL = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/"
 
 
 def is_configured() -> bool:
-    return bool(MSG91_AUTH_KEY and MSG91_WHATSAPP_INTEGRATED_NUMBER and MSG91_WHATSAPP_TEMPLATE_NAME)
+    return bool(
+        MSG91_AUTH_KEY
+        and MSG91_WHATSAPP_INTEGRATED_NUMBER
+        and MSG91_WHATSAPP_TEMPLATE_NAME
+        and MSG91_WHATSAPP_NAMESPACE
+    )
 
 
 def send_whatsapp_reminder(to_number: str, message: str) -> bool:
@@ -53,11 +59,11 @@ def send_whatsapp_reminder(to_number: str, message: str) -> bool:
         "content_type": "template",
         "payload": {
             "messaging_product": "whatsapp",
-            "to": bare_number,
             "type": "template",
             "template": {
                 "name": MSG91_WHATSAPP_TEMPLATE_NAME,
                 "language": {"code": "en", "policy": "deterministic"},
+                "namespace": MSG91_WHATSAPP_NAMESPACE,
                 "to_and_components": [
                     {
                         "to": [bare_number],

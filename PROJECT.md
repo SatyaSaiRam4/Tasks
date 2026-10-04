@@ -110,15 +110,15 @@ npx react-native run-android  # in a second terminal
 - ✅ Exact-alarm permission handling (prompts to enable "Alarms & reminders"
   on Android when needed)
 - ✅ Admin panel (user list, non-admins correctly blocked)
+- ✅ WhatsApp reminder messages — confirmed delivering to real phone numbers
+  via MSG91, after MSG91 support fixed a registration issue on their end and
+  we corrected the request format to include the per-template `namespace`
+  and use the `/bulk/` endpoint (see `Backend/app/integrations/msg91.py`).
 
-## 5. What's not finished yet
+## 5. Known quirks
 
-- ⏳ **WhatsApp messages aren't actually being delivered yet.** The backend
-  correctly calls MSG91's API and gets a success response every time, but
-  every test message gets stuck on the recipient's phone showing "Waiting
-  for this message, this may take a while" and never resolves. This points
-  to the WhatsApp Business number (`916304909776`) not having completed its
-  encryption/registration step properly on MSG91's side — not something
-  fixable from our code. **A support ticket is open with MSG91** about this;
-  once they confirm it's fixed, the WhatsApp side-channel should work
-  immediately with no code changes needed.
+- A WhatsApp number that's linked to the same account/device as the sending
+  business number (`916304909776`) won't receive messages from it — this
+  appears to be a Meta-side restriction on a number messaging something tied
+  to its own identity, not a bug. It doesn't affect real app users sending
+  reminders to other people's numbers.

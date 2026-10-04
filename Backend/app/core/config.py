@@ -101,6 +101,7 @@ REDIS_URL = os.getenv("REDIS_URL", "")  # e.g. redis://default:password@host:por
 MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY", "").strip()
 MSG91_WHATSAPP_INTEGRATED_NUMBER = os.getenv("MSG91_WHATSAPP_INTEGRATED_NUMBER", "").strip()
 MSG91_WHATSAPP_TEMPLATE_NAME = os.getenv("MSG91_WHATSAPP_TEMPLATE_NAME", "").strip()
+MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
 
 # How often the reminder worker polls for due WhatsApp sends.
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
