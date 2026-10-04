@@ -1,24 +1,25 @@
-"""Polls for reminders whose WhatsApp side-channel is due and sends them.
+"""Background jobs, run in-process on a single APScheduler instance.
 
-The local push notification (scheduled on-device via react-native-notify-kit)
-is independent of this worker and fires with or without a backend connection.
-This worker only handles the optional WhatsApp message, since that has to be
-sent from a server. Runs as a simple in-process polling loop rather than a
-separate worker process — fine at this scale (see the project's "start
-simple" philosophy); split it into its own process behind Celery/Redis if
-reminder volume ever grows enough to matter.
+  * WhatsApp side-channel for due reminders (every REMINDER_POLL_SECONDS).
+  * Streak finalization for every user (every STREAK_FINALIZE_MINUTES), so
+    ended days, Track bonuses and achievements are settled even for users who
+    don't open the app. Request handlers also finalize lazily, so this job is a
+    safety net, not a correctness requirement.
+
+The local push notification (scheduled on-device) is independent of all of this.
 """
 
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy import select
 
-from app.core.config import REMINDER_POLL_SECONDS
+from app.core.config import REMINDER_POLL_SECONDS, STREAK_FINALIZE_MINUTES
 from app.db.session import SessionLocal
 from app.integrations.msg91 import is_configured, send_whatsapp_reminder
 from app.modules.reminders import service as reminders_service
 
-logger = logging.getLogger("reminder_worker")
+logger = logging.getLogger("workers")
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -40,12 +41,34 @@ def _poll_due_reminders() -> None:
         db.close()
 
 
+def _finalize_all_streaks() -> None:
+    from app.modules.auth.models import User
+    from app.modules.streaks.engine import finalize_user
+
+    db = SessionLocal()
+    try:
+        user_ids = db.scalars(select(User.id).where(User.is_active.is_(True))).all()
+        for user_id in user_ids:
+            try:
+                user = db.get(User, user_id)
+                if user is not None:
+                    finalize_user(db, user)
+            except Exception:  # one user's failure must not stop the rest
+                db.rollback()
+                logger.exception("Streak finalization failed for user %s", user_id)
+    finally:
+        db.close()
+
+
 def start_reminder_worker() -> None:
     global _scheduler
     if _scheduler is not None:
         return
     _scheduler = BackgroundScheduler(timezone="UTC")
     _scheduler.add_job(_poll_due_reminders, "interval", seconds=REMINDER_POLL_SECONDS, id="reminder_whatsapp_poll")
+    _scheduler.add_job(
+        _finalize_all_streaks, "interval", minutes=STREAK_FINALIZE_MINUTES, id="streak_finalize", max_instances=1
+    )
     _scheduler.start()
 
 

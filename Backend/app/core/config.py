@@ -105,3 +105,38 @@ MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
 
 # How often the reminder worker polls for due WhatsApp sends.
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
+
+
+# ---------------------------------------------------------------------------
+# Vault encryption. Comma-separated Fernet keys: the first encrypts, all of
+# them can decrypt (so keys can be rotated without re-encrypting at once).
+# Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Losing every key means losing every Vault entry — back it up somewhere other
+# than the database.
+# ---------------------------------------------------------------------------
+VAULT_ENCRYPTION_KEYS = [k.strip() for k in os.getenv("VAULT_ENCRYPTION_KEYS", "").split(",") if k.strip()]
+# Upper bound on an unlocked Vault session, even with auto-lock set to "Never".
+VAULT_SESSION_MAX_MINUTES = int(os.getenv("VAULT_SESSION_MAX_MINUTES", "720"))
+VAULT_MAX_FAILED_ATTEMPTS = int(os.getenv("VAULT_MAX_FAILED_ATTEMPTS", "5"))
+VAULT_LOCKOUT_MINUTES = int(os.getenv("VAULT_LOCKOUT_MINUTES", "5"))
+
+
+# ---------------------------------------------------------------------------
+# Streaks & Track completion bonus. The bonus is normalized by duration so a
+# long perfect Track is worth more than a short one, and very short Tracks earn
+# nothing (so the bonus can't be farmed with 1-day Tracks).
+#   bonus = floor(duration_days * TRACK_BONUS_PER_DAY * difficulty)
+#   difficulty = 1 + min(avg required actions per day - 1, TRACK_BONUS_DIFFICULTY_CAP) * TRACK_BONUS_DIFFICULTY_STEP
+# ---------------------------------------------------------------------------
+TRACK_BONUS_MIN_DAYS = int(os.getenv("TRACK_BONUS_MIN_DAYS", "7"))
+TRACK_BONUS_PER_DAY = float(os.getenv("TRACK_BONUS_PER_DAY", "1.0"))
+TRACK_BONUS_DIFFICULTY_STEP = float(os.getenv("TRACK_BONUS_DIFFICULTY_STEP", "0.1"))
+TRACK_BONUS_DIFFICULTY_CAP = int(os.getenv("TRACK_BONUS_DIFFICULTY_CAP", "4"))
+# Only perfect Tracks earn a bonus unless this is turned off, in which case a
+# Track at or above TRACK_BONUS_MIN_COMPLETION earns a proportionally smaller one.
+TRACK_BONUS_REQUIRE_PERFECT = os.getenv("TRACK_BONUS_REQUIRE_PERFECT", "true").lower() in ("1", "true", "yes")
+TRACK_BONUS_MIN_COMPLETION = float(os.getenv("TRACK_BONUS_MIN_COMPLETION", "0.9"))
+
+# How often the background job finalizes ended days for all users.
+STREAK_FINALIZE_MINUTES = int(os.getenv("STREAK_FINALIZE_MINUTES", "15"))

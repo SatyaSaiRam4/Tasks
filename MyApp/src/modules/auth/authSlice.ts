@@ -10,6 +10,10 @@ export interface AuthUser {
   role: UserRole;
   is_active: boolean;
   created_at: string;
+  public_id: string;
+  avatar: string | null;
+  timezone: string;
+  onboarding_completed: boolean;
 }
 
 export interface Credentials {

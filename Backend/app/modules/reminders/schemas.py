@@ -1,7 +1,11 @@
 from datetime import datetime
 from uuid import UUID
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+Priority = Literal["LOW", "NORMAL", "HIGH"]
 
 from .models import ReminderStatus, WhatsAppStatus
 
@@ -19,9 +23,11 @@ def _normalize_whatsapp_number(value: str | None) -> str | None:
 
 class ReminderCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=2000)
     remind_at: datetime
     whatsapp_number: str | None = None
+    priority: Priority = "NORMAL"
+    track_id: UUID | None = None
 
     @field_validator("whatsapp_number")
     @classmethod
@@ -31,10 +37,13 @@ class ReminderCreate(BaseModel):
 
 class ReminderUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=2000)
     remind_at: datetime | None = None
     whatsapp_number: str | None = None
     clear_whatsapp_number: bool = False
+    priority: Priority | None = None
+    track_id: UUID | None = None
+    clear_track: bool = False
 
     @field_validator("whatsapp_number")
     @classmethod
@@ -52,5 +61,12 @@ class ReminderOut(BaseModel):
     status: ReminderStatus
     whatsapp_number: str | None
     whatsapp_status: WhatsAppStatus
+    priority: str
+    track_id: UUID | None
+    completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class SnoozeRequest(BaseModel):
+    minutes: int = Field(default=10, ge=1, le=24 * 60)

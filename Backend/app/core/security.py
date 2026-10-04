@@ -35,6 +35,14 @@ def create_access_token(subject: str, role: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def create_vault_token(user_id: str, minutes: int) -> tuple[str, datetime]:
+    """A short-lived token proving the Vault PIN was entered, separate from the login token."""
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(minutes=minutes)
+    payload = {"sub": user_id, "type": "vault", "iat": now, "exp": expires}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), expires
+
+
 def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])

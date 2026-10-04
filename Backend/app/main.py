@@ -7,14 +7,14 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import FRONTEND_ORIGIN
-from app.db.session import SessionLocal, create_tables, test_connection
+from app.db.session import SessionLocal, test_connection
 from app.modules.auth.service import seed_admin
 from app.workers.reminder_worker import start_reminder_worker, stop_reminder_worker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_tables()
+    # Schema is managed by Alembic (`alembic upgrade head`), not created here.
     db = SessionLocal()
     try:
         seed_admin(db)
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     stop_reminder_worker()
 
 
-app = FastAPI(title="Rememberly API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Rememberly API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

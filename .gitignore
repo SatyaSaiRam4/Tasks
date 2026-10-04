@@ -78,3 +78,6 @@ yarn-error.log
 
 # Old git history kept aside, not for tracking
 MyApp/.git.old-unused/
+
+# Local database backups (contain user data)
+db_backups/

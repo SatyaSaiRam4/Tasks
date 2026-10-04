@@ -1,121 +1,113 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from '@ant-design/react-native/lib/toast';
+import React, { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ScreenContainer } from '../../../components/ScreenContainer';
-import { LabeledInput } from '../../../components/LabeledInput';
-import { AppButton } from '../../../components/AppButton';
-import { colors, fontSize, spacing, typography } from '../../../theme';
-import { useRegisterMutation } from '../authApi';
+import { colors } from '../../../theme';
+import { TextField } from '../../../components/TextField';
+import { Button } from '../../../components/Button';
 import { getErrorMessage } from '../../../utils/apiError';
+import { useRegisterMutation } from '../authApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
+import { AuthLayout } from './AuthLayout';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Register'>;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function RegisterScreen() {
   const navigation = useNavigation<Nav>();
-  const [displayName, setDisplayName] = useState('');
+  const [register, { isLoading }] = useRegisterMutation();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [register, { isLoading }] = useRegisterMutation();
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const emailRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  const canSubmit =
-    displayName.trim().length > 0 && email.trim().length > 0 && password.length >= 8 && !isLoading;
+  const emailError = touched && email && !EMAIL.test(email.trim()) ? 'That email doesn’t look right.' : null;
+  const passwordError = touched && password && password.length < 8 ? 'Use at least 8 characters.' : null;
+  const canSubmit = name.trim() && EMAIL.test(email.trim()) && password.length >= 8 && !isLoading;
 
-  const handleSubmit = async () => {
+  const submit = async () => {
+    setTouched(true);
     if (!canSubmit) return;
+    setError(null);
     try {
-      await register({ email: email.trim(), password, display_name: displayName.trim() }).unwrap();
+      // On success the navigator moves to Satya's first-time tour automatically.
+      await register({ display_name: name.trim(), email: email.trim().toLowerCase(), password }).unwrap();
     } catch (err) {
-      Toast.fail(getErrorMessage(err, 'Could not create your account.'));
+      setError(getErrorMessage(err, 'Could not create your account.'));
     }
   };
 
   return (
-    <ScreenContainer scroll edges={['top', 'bottom']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <View style={styles.hero}>
-          <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.tagline}>A few seconds, then your memory assistant is ready.</Text>
-        </View>
-
-        <View style={styles.form}>
-          <LabeledInput
-            label="Display name"
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Ada"
-          />
-          <LabeledInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-          />
-          <LabeledInput
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="At least 8 characters"
-            type="password"
-          />
-
-          <AppButton
-            label={isLoading ? 'Creating account…' : 'Create account'}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            loading={isLoading}
-            style={styles.submitButton}
-          />
-
-          <TouchableOpacity style={styles.loginLink} onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginLinkText}>
-              Already have an account? <Text style={styles.loginLinkTextStrong}>Sign in</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+    <AuthLayout
+      title="Start your streak"
+      subtitle="Plan small actions, confirm them honestly, and watch consistency compound."
+      back
+      footer={
+        <Pressable onPress={() => navigation.navigate('Login')} accessibilityRole="link">
+          <Text style={styles.footerText}>
+            Already have an account? <Text style={styles.link}>Sign in</Text>
+          </Text>
+        </Pressable>
+      }
+    >
+      <TextField
+        label="Your name"
+        icon="user"
+        value={name}
+        onChangeText={setName}
+        placeholder="Alex"
+        autoComplete="name"
+        textContentType="name"
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <TextField
+        ref={emailRef}
+        label="Email"
+        icon="message"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onBlur={() => setTouched(true)}
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        error={emailError}
+      />
+      <TextField
+        ref={passwordRef}
+        label="Password"
+        icon="key"
+        value={password}
+        onChangeText={setPassword}
+        placeholder="At least 8 characters"
+        secureTextEntry
+        secureToggle
+        autoComplete="password-new"
+        textContentType="newPassword"
+        returnKeyType="go"
+        onSubmitEditing={submit}
+        error={passwordError ?? error}
+      />
+      <Button label="Create account" onPress={submit} disabled={!canSubmit} loading={isLoading} size="lg" iconRight="arrow-right" />
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  hero: {
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-  },
-  title: {
-    ...typography.h1,
-  },
-  tagline: {
-    marginTop: spacing.xs,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  form: {
-    paddingHorizontal: spacing.xl,
-  },
-  submitButton: {
-    marginTop: spacing.sm,
-  },
-  loginLink: {
-    marginTop: spacing.xl,
-    alignItems: 'center',
-  },
-  loginLinkText: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-  loginLinkTextStrong: {
+  link: {
     color: colors.primary,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  footerText: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
 });

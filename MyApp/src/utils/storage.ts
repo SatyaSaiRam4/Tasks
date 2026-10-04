@@ -45,3 +45,6 @@ export async function loadSession(): Promise<StoredSession | null> {
 export async function clearSession(): Promise<void> {
   await AsyncStorage.removeMany([KEYS.ACCESS_TOKEN, KEYS.REFRESH_TOKEN, KEYS.USER]);
 }
+
+/** The chosen accent name; read at startup before any styles are created. */
+export const ACCENT_STORAGE_KEY = '@rememberly/accent';

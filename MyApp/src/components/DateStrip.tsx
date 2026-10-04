@@ -1,82 +1,73 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { border, colors, fontSize, radius, spacing } from '../theme';
-import { isSameDay } from '../utils/date';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors, radius, spacing } from '../theme';
+import { addDays, toDateKey, WEEKDAY_SHORT } from '../utils/date';
 
-const WEEKDAY = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const CELL_WIDTH = 56;
-
-export interface DayCompletion {
-  total: number;
-  done: number;
+export interface DayMark {
+  required: number;
+  completed: number;
+  status: string;
 }
 
-interface DateStripProps {
-  selectedDate: Date;
-  onSelect: (date: Date) => void;
-  /** How many days before/after today to show. */
-  daysPast?: number;
-  daysFuture?: number;
-  /** Optional per-day task completion, keyed by yyyy-mm-dd, to show a small progress dot. */
-  completionByDate?: Record<string, DayCompletion>;
-}
+const CELL = 52;
 
-function dateKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-/**
- * A horizontal scrollable strip of day tabs — "on the top as like tabs" from
- * the category flow, letting the user jump to today or look back at any
- * previous day's checklist completion at a glance (a filled dot = all done,
- * a half dot = partially done).
- */
-export function DateStrip({ selectedDate, onSelect, daysPast = 14, daysFuture = 7, completionByDate }: DateStripProps) {
-  const today = useMemo(() => new Date(), []);
-
+/** Horizontally scrolling day tabs with a completion dot under each day. */
+export function DateStrip({
+  selected,
+  today,
+  onSelect,
+  marks,
+  daysBack = 14,
+  daysForward = 7,
+}: {
+  selected: string;
+  today: string;
+  onSelect: (dateKey: string) => void;
+  marks?: Record<string, DayMark>;
+  daysBack?: number;
+  daysForward?: number;
+}) {
   const days = useMemo(() => {
-    const list: Date[] = [];
-    for (let i = -daysPast; i <= daysFuture; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      list.push(d);
-    }
-    return list;
-  }, [today, daysPast, daysFuture]);
+    const base = new Date(`${today}T00:00:00`);
+    return Array.from({ length: daysBack + daysForward + 1 }, (_, i) => addDays(base, i - daysBack));
+  }, [today, daysBack, daysForward]);
 
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.strip}
       contentContainerStyle={styles.content}
-      contentOffset={{ x: daysPast * (CELL_WIDTH + spacing.sm), y: 0 }}
+      contentOffset={{ x: Math.max(0, (daysBack - 2) * (CELL + spacing.sm)), y: 0 }}
     >
-      {days.map(day => {
-        const isSelected = isSameDay(day, selectedDate);
-        const isToday = isSameDay(day, today);
-        const completion = completionByDate?.[dateKey(day)];
-
+      {days.map(d => {
+        const key = toDateKey(d);
+        const isSelected = key === selected;
+        const isToday = key === today;
+        const mark = marks?.[key];
+        const dot =
+          mark && mark.required > 0
+            ? mark.status === 'SUCCESS'
+              ? colors.success
+              : mark.status === 'FAILED'
+                ? colors.danger
+                : mark.completed > 0
+                  ? colors.streak
+                  : colors.textTertiary
+            : null;
         return (
-          <TouchableOpacity
-            key={day.toISOString()}
+          <Pressable
+            key={key}
+            onPress={() => onSelect(key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isSelected }}
+            accessibilityLabel={`${isToday ? 'Today, ' : ''}${WEEKDAY_SHORT[d.getDay()]} ${d.getDate()}${mark ? `, ${mark.completed} of ${mark.required} done` : ''}`}
             style={[styles.cell, isSelected && styles.cellSelected, !isSelected && isToday && styles.cellToday]}
-            onPress={() => onSelect(day)}
-            activeOpacity={0.8}
           >
-            <Text style={[styles.weekday, isSelected && styles.textSelected]}>{WEEKDAY[day.getDay()]}</Text>
-            <Text style={[styles.dayNumber, isSelected && styles.textSelected]}>{day.getDate()}</Text>
-            {completion && completion.total > 0 ? (
-              <View
-                style={[
-                  styles.dot,
-                  completion.done >= completion.total ? styles.dotDone : styles.dotPartial,
-                  isSelected && styles.dotSelected,
-                ]}
-              />
-            ) : (
-              <View style={styles.dotSpacer} />
-            )}
-          </TouchableOpacity>
+            <Text style={[styles.weekday, isSelected && styles.textSelected]}>{WEEKDAY_SHORT[d.getDay()].toUpperCase()}</Text>
+            <Text style={[styles.day, isSelected && styles.textSelected]}>{d.getDate()}</Text>
+            <View style={[styles.dot, { backgroundColor: dot ?? 'transparent' }, isSelected && dot ? styles.dotSelected : null]} />
+          </Pressable>
         );
       })}
     </ScrollView>
@@ -84,38 +75,43 @@ export function DateStrip({ selectedDate, onSelect, daysPast = 14, daysFuture = 
 }
 
 const styles = StyleSheet.create({
+  // ScrollView defaults to flexGrow: 1; inside a growing screen that would
+  // stretch the day tiles to fill the leftover height.
+  strip: {
+    flexGrow: 0,
+  },
   content: {
-    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
+    paddingHorizontal: 20,
   },
   cell: {
-    width: CELL_WIDTH,
+    width: CELL,
+    paddingVertical: spacing.sm + 2,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    marginRight: spacing.sm,
     borderRadius: radius.md,
-    borderWidth: border.thin,
-    borderColor: colors.ink,
     backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   cellSelected: {
     backgroundColor: colors.primary,
-    borderWidth: border.thick,
+    borderColor: colors.primary,
   },
   cellToday: {
-    borderColor: colors.accentBlue,
-    borderWidth: border.thick,
+    borderColor: colors.primary,
+    borderWidth: 1,
   },
   weekday: {
     fontSize: 10,
-    fontWeight: '800',
-    color: colors.textMuted,
-    letterSpacing: 0.4,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.6,
   },
-  dayNumber: {
-    fontSize: fontSize.lg,
-    fontWeight: '900',
-    color: colors.ink,
+  day: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
     marginTop: 2,
   },
   textSelected: {
@@ -124,19 +120,9 @@ const styles = StyleSheet.create({
   dot: {
     width: 6,
     height: 6,
-    borderRadius: radius.pill,
-    marginTop: 4,
-  },
-  dotSpacer: {
-    width: 6,
-    height: 6,
-    marginTop: 4,
-  },
-  dotDone: {
-    backgroundColor: colors.success,
-  },
-  dotPartial: {
-    backgroundColor: colors.accentOrange,
+    borderRadius: 3,
+    overflow: 'hidden', // keeps it round on Android when the color changes after mount
+    marginTop: 5,
   },
   dotSelected: {
     backgroundColor: colors.white,

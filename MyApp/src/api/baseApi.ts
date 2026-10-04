@@ -8,6 +8,7 @@ import {
 import type { RootState } from '../app/store';
 import { API_BASE_URL } from '../config/env';
 import { credentialsSet, loggedOut, type AuthUser } from '../modules/auth/authSlice';
+import { vaultLocked } from '../modules/vault/vaultSlice';
 import { saveSession, clearSession } from '../utils/storage';
 
 /** Shape returned by /auth/login, /auth/register and /auth/refresh. */
@@ -21,9 +22,14 @@ export interface TokenResponse {
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.accessToken;
+    const state = getState() as RootState;
+    const token = state.auth.accessToken;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
+    }
+    // The Vault session token is a second, short-lived credential, held in memory only.
+    if (state.vault.token) {
+      headers.set('x-vault-token', state.vault.token);
     }
     headers.set('content-type', 'application/json');
     return headers;
@@ -33,7 +39,7 @@ const rawBaseQuery = fetchBaseQuery({
 type RawResult = Awaited<ReturnType<typeof rawBaseQuery>>;
 
 // Endpoints that never need — and must never trigger — a token refresh.
-const AUTH_FREE_URLS = ['/auth/login', '/auth/register', '/auth/refresh'];
+const AUTH_FREE_URLS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
 
 function requestUrl(args: string | FetchArgs): string {
   return typeof args === 'string' ? args : args.url;
@@ -55,6 +61,11 @@ export const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, Fetch
   extraOptions,
 ) => {
   let result = await rawBaseQuery(args, api, extraOptions);
+
+  // The server locked the Vault (session expired/invalid): drop our copy too.
+  if (result.error?.status === 403 && result.meta?.response?.headers.get('x-vault-locked')) {
+    api.dispatch(vaultLocked());
+  }
 
   if (result.error && result.error.status === 401 && !AUTH_FREE_URLS.includes(requestUrl(args))) {
     const state = api.getState() as RootState;
@@ -109,14 +120,20 @@ export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   tagTypes: [
-    'Category',
-    'Task',
-    'TaskType',
-    'Note',
+    'Me',
+    'Profile',
+    'Settings',
+    'Dashboard',
+    'Track',
+    'Action',
+    'Agenda',
+    'Streak',
+    'Achievement',
     'Reminder',
+    'VaultStatus',
+    'VaultEntry',
     'AdminUser',
     'AdminDashboard',
-    'Me',
   ],
   endpoints: () => ({}),
 });

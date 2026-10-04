@@ -1,6 +1,8 @@
 import { baseApi, type TokenResponse } from '../../api/baseApi';
-import { credentialsSet, loggedOut, type AuthUser } from './authSlice';
+import { credentialsSet, loggedOut } from './authSlice';
 import { saveSession, clearSession } from '../../utils/storage';
+import { deviceTimezone } from '../../utils/date';
+import { cancelAllScheduled } from '../../notifications';
 
 export interface RegisterRequest {
   email: string;
@@ -13,44 +15,40 @@ export interface LoginRequest {
   password: string;
 }
 
+async function persist(dispatch: (a: unknown) => unknown, data: TokenResponse) {
+  dispatch(credentialsSet({ user: data.user, accessToken: data.access_token, refreshToken: data.refresh_token }));
+  await saveSession({ user: data.user, accessToken: data.access_token, refreshToken: data.refresh_token });
+}
+
+async function signOutLocally(dispatch: (a: unknown) => unknown) {
+  dispatch(loggedOut());
+  await clearSession().catch(() => undefined);
+  await cancelAllScheduled().catch(() => undefined);
+}
+
 export const authApi = baseApi.injectEndpoints({
   endpoints: builder => ({
     register: builder.mutation<TokenResponse, RegisterRequest>({
-      query: body => ({ url: '/auth/register', method: 'POST', body }),
-      invalidatesTags: ['Me'],
+      // The device's timezone decides what "today" means for streaks.
+      query: body => ({ url: '/auth/register', method: 'POST', body: { ...body, timezone: deviceTimezone() } }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          dispatch(
-            credentialsSet({ user: data.user, accessToken: data.access_token, refreshToken: data.refresh_token }),
-          );
-          await saveSession({
-            user: data.user,
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-          });
+          await persist(dispatch, data);
         } catch {
-          // handled by the caller via the mutation's error state
+          // surfaced by the caller
         }
       },
     }),
 
     login: builder.mutation<TokenResponse, LoginRequest>({
-      query: body => ({ url: '/auth/login', method: 'POST', body }),
-      invalidatesTags: ['Me'],
+      query: body => ({ url: '/auth/login', method: 'POST', body: { ...body, timezone: deviceTimezone() } }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          dispatch(
-            credentialsSet({ user: data.user, accessToken: data.access_token, refreshToken: data.refresh_token }),
-          );
-          await saveSession({
-            user: data.user,
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-          });
+          await persist(dispatch, data);
         } catch {
-          // handled by the caller via the mutation's error state
+          // surfaced by the caller
         }
       },
     }),
@@ -61,8 +59,7 @@ export const authApi = baseApi.injectEndpoints({
         try {
           await queryFulfilled;
         } finally {
-          dispatch(loggedOut());
-          await clearSession();
+          await signOutLocally(dispatch);
         }
       },
     }),
@@ -73,15 +70,21 @@ export const authApi = baseApi.injectEndpoints({
         try {
           await queryFulfilled;
         } finally {
-          dispatch(loggedOut());
-          await clearSession();
+          await signOutLocally(dispatch);
         }
       },
     }),
 
-    me: builder.query<AuthUser, void>({
-      query: () => '/auth/me',
-      providesTags: ['Me'],
+    forgotPassword: builder.mutation<{ message: string }, { email: string }>({
+      query: body => ({ url: '/auth/forgot-password', method: 'POST', body }),
+    }),
+
+    resetPassword: builder.mutation<void, { email: string; code: string; new_password: string }>({
+      query: body => ({ url: '/auth/reset-password', method: 'POST', body }),
+    }),
+
+    changePassword: builder.mutation<void, { current_password: string; new_password: string }>({
+      query: body => ({ url: '/auth/change-password', method: 'POST', body }),
     }),
   }),
 });
@@ -91,5 +94,7 @@ export const {
   useLoginMutation,
   useLogoutMutation,
   useLogoutAllMutation,
-  useMeQuery,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useChangePasswordMutation,
 } = authApi;

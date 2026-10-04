@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      model-viewer {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        --poster-color: transparent;
+        --progress-bar-color: transparent;
+        opacity: 0;
+        transform: scale(0.82) translateY(16px);
+        transition-property: opacity, transform;
+        transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      model-viewer.ready {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+      model-viewer.float {
+        animation: float 4.5s ease-in-out infinite;
+      }
+      @keyframes float {
+        0%,
+        100% {
+          translate: 0 0;
+        }
+        50% {
+          translate: 0 -8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Satya. The model file is MyApp/assets/models/model.glb; replace it with
+      any GLB (ideally rigged, with an "Idle" animation) and rebuild the app.
+      Embedded animations play automatically, preferring one named "idle".
+    -->
+    <model-viewer
+      id="mv"
+      alt="Satya, your guide"
+      autoplay
+      loading="eager"
+      reveal="auto"
+      interaction-prompt="none"
+      disable-zoom
+      disable-pan
+      disable-tap
+      tone-mapping="aces"
+      exposure="1.05"
+      shadow-intensity="0.9"
+      shadow-softness="1"
+      environment-image="neutral"
+      camera-orbit="0deg 78deg 105%"
+      field-of-view="28deg"
+    ></model-viewer>
+    <script src="model-viewer-umd.min.js"></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var reduced = params.get('motion') === 'reduced';
+        var longIntro = params.get('intro') === 'long';
+        var mv = document.getElementById('mv');
+
+        function post(msg) {
+          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+        }
+
+        // No WebGL, no 3D: let the app show its fallback immediately.
+        try {
+          var c = document.createElement('canvas');
+          if (!(c.getContext('webgl2') || c.getContext('webgl'))) {
+            post('nowebgl');
+            return;
+          }
+        } catch (e) {
+          post('nowebgl');
+          return;
+        }
+
+        mv.style.transitionDuration = reduced ? '0ms' : longIntro ? '1100ms' : '450ms';
+        if (!reduced) {
+          mv.setAttribute('auto-rotate', '');
+          mv.setAttribute('auto-rotate-delay', '0');
+          mv.setAttribute('rotation-per-second', '10deg');
+        }
+
+        mv.addEventListener('load', function () {
+          var clips = mv.availableAnimations || [];
+          if (clips.length) {
+            var idle = clips.filter(function (n) {
+              return /idle|breath/i.test(n);
+            })[0];
+            mv.animationName = idle || clips[0];
+            if (!reduced) mv.play();
+          }
+          requestAnimationFrame(function () {
+            mv.classList.add('ready');
+            if (!reduced) mv.classList.add('float');
+          });
+          post('loaded');
+        });
+        mv.addEventListener('error', function () {
+          post('error');
+        });
+
+        // model-viewer loads with fetch(), which Chromium refuses for file://
+        // URLs. XHR is allowed (the WebView enables file access), so read the
+        // bundled GLB here and hand model-viewer a blob: URL instead.
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '../../models/model.glb');
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function () {
+          if (!xhr.response || !xhr.response.byteLength) {
+            post('error');
+            return;
+          }
+          var blob = new Blob([xhr.response], { type: 'model/gltf-binary' });
+          mv.src = URL.createObjectURL(blob);
+        };
+        xhr.onerror = function () {
+          post('error');
+        };
+        xhr.send();
+      })();
+    </script>
+  </body>
+</html>

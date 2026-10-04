@@ -1,135 +1,97 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from '@ant-design/react-native/lib/toast';
+import React, { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ScreenContainer } from '../../../components/ScreenContainer';
-import { LabeledInput } from '../../../components/LabeledInput';
-import { AppButton } from '../../../components/AppButton';
-import { border, colors, fontSize, radius, spacing, typography } from '../../../theme';
-import { useLoginMutation } from '../authApi';
+import { colors, spacing } from '../../../theme';
+import { TextField } from '../../../components/TextField';
+import { Button } from '../../../components/Button';
 import { getErrorMessage } from '../../../utils/apiError';
+import { useLoginMutation } from '../authApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
+import { AuthLayout } from './AuthLayout';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function LoginScreen() {
   const navigation = useNavigation<Nav>();
+  const [login, { isLoading }] = useLoginMutation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [login, { isLoading }] = useLoginMutation();
+  const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !isLoading;
+  const canSubmit = email.trim().length > 3 && password.length > 0 && !isLoading;
 
-  const handleSubmit = async () => {
+  const submit = async () => {
     if (!canSubmit) return;
+    setError(null);
     try {
-      await login({ email: email.trim(), password }).unwrap();
+      await login({ email: email.trim().toLowerCase(), password }).unwrap();
     } catch (err) {
-      Toast.fail(getErrorMessage(err, 'Could not sign in. Check your credentials.'));
+      setError(getErrorMessage(err, 'Could not sign you in.'));
     }
   };
 
   return (
-    <ScreenContainer scroll edges={['top', 'bottom']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <View style={styles.hero}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeGlyph}>◈</Text>
-          </View>
-          <Text style={styles.appName}>Rememberly</Text>
-          <Text style={styles.tagline}>Your memory assistant — tasks, notes, and context in one place.</Text>
-        </View>
-
-        <View style={styles.form}>
-          <LabeledInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-          />
-          <LabeledInput
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            type="password"
-          />
-
-          <AppButton
-            label={isLoading ? 'Signing in…' : 'Sign in'}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            loading={isLoading}
-            style={styles.submitButton}
-          />
-
-          <TouchableOpacity style={styles.registerLink} onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.registerLinkText}>
-              New here? <Text style={styles.registerLinkTextStrong}>Create an account</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Pick up where you left off. Your streak is waiting."
+      footer={
+        <Pressable onPress={() => navigation.navigate('Register')} accessibilityRole="link">
+          <Text style={styles.footerText}>
+            New here? <Text style={styles.link}>Create an account</Text>
+          </Text>
+        </Pressable>
+      }
+    >
+      <TextField
+        label="Email"
+        icon="message"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <TextField
+        ref={passwordRef}
+        label="Password"
+        icon="key"
+        value={password}
+        onChangeText={setPassword}
+        placeholder="Your password"
+        secureTextEntry
+        secureToggle
+        autoComplete="password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={submit}
+        error={error}
+      />
+      <Pressable onPress={() => navigation.navigate('ForgotPassword')} accessibilityRole="link" style={styles.forgot}>
+        <Text style={styles.link}>Forgot password?</Text>
+      </Pressable>
+      <Button label="Sign in" onPress={submit} disabled={!canSubmit} loading={isLoading} size="lg" iconRight="arrow-right" />
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  hero: {
-    alignItems: 'center',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xl,
   },
-  badge: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primary,
-    borderWidth: border.thick,
-    borderColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-    transform: [{ rotate: '-4deg' }],
-  },
-  badgeGlyph: {
-    color: colors.white,
-    fontSize: 32,
-  },
-  appName: {
-    ...typography.display,
-  },
-  tagline: {
-    marginTop: spacing.xs,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  form: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.lg,
-  },
-  submitButton: {
-    marginTop: spacing.md,
-  },
-  registerLink: {
-    marginTop: spacing.xl,
-    alignItems: 'center',
-  },
-  registerLinkText: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-  registerLinkTextStrong: {
+  link: {
     color: colors.primary,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  footerText: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
 });

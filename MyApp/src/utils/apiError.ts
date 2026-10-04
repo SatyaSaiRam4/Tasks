@@ -44,7 +44,7 @@ export function getErrorMessage(
     if (detailMessage) return detailMessage;
 
     if (error.status === 'FETCH_ERROR') {
-      return 'Cannot reach the server. Check your connection and the API URL in src/config/env.ts.';
+      return "Can't reach Rememberly right now. Check your connection and try again.";
     }
     if (error.status === 'TIMEOUT_ERROR') {
       return 'The request timed out. Please try again.';
@@ -52,8 +52,14 @@ export function getErrorMessage(
     if (error.status === 'PARSING_ERROR') {
       return 'Received an unexpected response from the server.';
     }
+    if (error.status === 429) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (typeof error.status === 'number' && error.status >= 500) {
+      return 'Something went wrong on our side. Please try again in a moment.';
+    }
     if (typeof error.status === 'number') {
-      return `Request failed (${error.status}).`;
+      return fallback;
     }
   }
 
@@ -62,4 +68,9 @@ export function getErrorMessage(
   }
 
   return fallback;
+}
+
+/** HTTP status of an RTK Query error, if any. */
+export function errorStatus(error: unknown): number | null {
+  return isFetchBaseQueryError(error) && typeof error.status === 'number' ? error.status : null;
 }

@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ScreenContainer } from '../../../components/ScreenContainer';
-import { LoadingView } from '../../../components/LoadingView';
-import { ErrorState } from '../../../components/ErrorState';
-import { StatCard } from '../../../components/StatCard';
-import { AppButton } from '../../../components/AppButton';
-import { colors, spacing, typography } from '../../../theme';
+import { colors, spacing, type as t } from '../../../theme';
+import { Screen } from '../../../components/Screen';
+import { ScreenHeader } from '../../../components/ScreenHeader';
+import { Card } from '../../../components/Card';
+import { SectionHeader } from '../../../components/Controls';
+import { Button } from '../../../components/Button';
+import { AnimatedNumber } from '../../../components/Progress';
+import { ErrorState, SkeletonList } from '../../../components/Feedback';
+import { Icon, type IconName } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
 import { useGetAdminDashboardQuery } from '../adminApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
@@ -16,80 +19,102 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
-  const { data, isLoading, isError, error, refetch } = useGetAdminDashboardQuery();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
-
-  let body: React.ReactNode;
-  if (isLoading) {
-    body = <LoadingView label="Loading dashboard…" />;
-  } else if (isError || !data) {
-    body = <ErrorState message={getErrorMessage(error, 'Could not load the dashboard.')} onRetry={refetch} />;
-  } else {
-    const completionRate = data.total_tasks > 0 ? Math.round((data.completed_tasks / data.total_tasks) * 100) : 0;
-    body = (
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-      >
-        <View style={styles.grid}>
-          <StatCard label="Total users" value={data.total_users} accentColor={colors.primary} glyph="👥" />
-          <StatCard label="Active users" value={data.active_users} accentColor={colors.success} glyph="✅" />
-          <StatCard label="Admins" value={data.admin_users} accentColor={colors.warning} glyph="🛡️" />
-          <StatCard label="Categories" value={data.total_categories} accentColor={colors.info} glyph="🗂️" />
-          <StatCard label="Total tasks" value={data.total_tasks} accentColor={colors.primary} glyph="📝" />
-          <StatCard label="Completed tasks" value={data.completed_tasks} accentColor={colors.success} glyph="🎯" />
-          <StatCard label="Notes" value={data.total_notes} accentColor="#B23CF0" glyph="🧠" />
-          <StatCard label="Completion rate" value={`${completionRate}%`} accentColor={colors.warning} glyph="📈" />
-        </View>
-
-        <AppButton label="Manage users ›" variant="secondary" onPress={() => navigation.navigate('AdminUsers')} style={styles.usersButton} />
-      </ScrollView>
-    );
-  }
+  const { data, isLoading, isError, error, refetch, isFetching } = useGetAdminDashboardQuery();
 
   return (
-    <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Admin</Text>
-        <Text style={styles.headerSubtitle}>Rememberly at a glance</Text>
-      </View>
-      {body}
-    </ScreenContainer>
+    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
+      <ScreenHeader title="Admin" subtitle="System overview" />
+      {isLoading ? (
+        <SkeletonList count={6} height={80} />
+      ) : isError || !data ? (
+        <ErrorState message={getErrorMessage(error, 'Could not load admin stats.')} onRetry={refetch} />
+      ) : (
+        <>
+          <SectionHeader title="Users" style={styles.first} />
+          <View style={styles.grid}>
+            <Tile icon="users" label="Total users" value={data.total_users} color={colors.primary} />
+            <Tile icon="check-circle" label="Active" value={data.active_users} color={colors.success} />
+            <Tile icon="shield" label="Admins" value={data.admin_users} color={colors.warning} />
+          </View>
+
+          <SectionHeader title="Consistency" />
+          <View style={styles.grid}>
+            <Tile icon="target" label="Tracks" value={data.total_tracks} color={colors.info} />
+            <Tile icon="list" label="Actions" value={data.total_actions} color={colors.primary} />
+            <Tile icon="zap" label="Completions (24h)" value={data.completions_today} color={colors.success} />
+            <Tile icon="check" label="All completions" value={data.total_completions} color={colors.success} />
+            <Tile icon="flame" label="Avg. streak" value={Math.round(data.avg_current_streak)} color={colors.streak} />
+            <Tile icon="trophy" label="Top best streak" value={data.max_best_streak} color={colors.streakGold} />
+          </View>
+
+          <SectionHeader title="Reminder delivery" />
+          <View style={styles.grid}>
+            <Tile icon="bell" label="Active reminders" value={data.reminders_active} color={colors.primary} />
+            <Tile icon="message" label="WhatsApp sent" value={data.whatsapp_sent} color={colors.success} />
+            <Tile icon="alert" label="WhatsApp failed" value={data.whatsapp_failed} color={colors.danger} />
+            <Tile icon="clock" label="WhatsApp queued" value={data.whatsapp_pending} color={colors.info} />
+          </View>
+
+          <Card style={styles.vault}>
+            <View style={styles.row}>
+              <Icon name="lock" size={18} color={colors.textSecondary} />
+              <Text style={[t.caption, styles.flex]}>
+                {data.vault_entries} Vault entries exist. Admins can see this count only. Vault content is encrypted and never
+                available here.
+              </Text>
+            </View>
+          </Card>
+
+          <Button label="Manage users" icon="users" iconRight="chevron-right" onPress={() => navigation.navigate('AdminUsers')} style={styles.cta} />
+        </>
+      )}
+    </Screen>
+  );
+}
+
+function Tile({ icon, label, value, color }: { icon: IconName; label: string; value: number; color: string }) {
+  return (
+    <Card style={styles.tile} contentStyle={styles.tileContent}>
+      <Icon name={icon} size={16} color={color} />
+      <AnimatedNumber value={value} style={styles.value} />
+      <Text style={t.caption}>{label}</Text>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+  flex: {
+    flex: 1,
   },
-  headerTitle: {
-    ...typography.h1,
+  first: {
+    marginTop: spacing.sm,
   },
-  headerSubtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 40,
+  row: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
+    gap: spacing.md,
   },
-  usersButton: {
-    marginTop: spacing.sm,
+  tile: {
+    width: '30.5%',
+    flexGrow: 1,
+  },
+  tileContent: {
+    padding: spacing.md,
+    gap: 4,
+  },
+  value: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  vault: {
+    marginTop: spacing.xl,
+  },
+  cta: {
+    marginTop: spacing.xl,
   },
 });

@@ -12,6 +12,7 @@ class AdminUserOut(BaseModel):
     id: UUID
     email: str
     display_name: str
+    public_id: str
     role: UserRole
     is_active: bool
     created_at: datetime
@@ -25,7 +26,14 @@ class DashboardStats(BaseModel):
     total_users: int
     active_users: int
     admin_users: int
-    total_categories: int
-    total_tasks: int
-    completed_tasks: int
-    total_notes: int
+    total_tracks: int
+    total_actions: int
+    completions_today: int
+    total_completions: int
+    vault_entries: int  # a count only; admins never see Vault content
+    avg_current_streak: float
+    max_best_streak: int
+    reminders_active: int
+    whatsapp_sent: int
+    whatsapp_failed: int
+    whatsapp_pending: int

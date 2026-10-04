@@ -1,15 +1,28 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { combineReducers, configureStore, type UnknownAction } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import authReducer from '../modules/auth/authSlice';
+import authReducer, { loggedOut } from '../modules/auth/authSlice';
+import vaultReducer from '../modules/vault/vaultSlice';
+import preferencesReducer from './preferencesSlice';
 import { baseApi } from '../api/baseApi';
 
+const appReducer = combineReducers({
+  auth: authReducer,
+  vault: vaultReducer,
+  preferences: preferencesReducer,
+  [baseApi.reducerPath]: baseApi.reducer,
+});
+
+/** On logout, every slice (including the API cache and Vault session) resets. */
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: UnknownAction) => {
+  if (loggedOut.match(action)) {
+    return appReducer({ auth: { ...state!.auth, user: null, accessToken: null, refreshToken: null } } as never, action);
+  }
+  return appReducer(state, action);
+};
+
 export const store = configureStore({
-  reducer: {
-    auth: authReducer,
-    [baseApi.reducerPath]: baseApi.reducer,
-  },
-  middleware: getDefaultMiddleware =>
-    getDefaultMiddleware().concat(baseApi.middleware),
+  reducer: rootReducer,
+  middleware: getDefaultMiddleware => getDefaultMiddleware().concat(baseApi.middleware),
 });
 
 // Enables refetchOnFocus/refetchOnReconnect behavior for RTK Query.

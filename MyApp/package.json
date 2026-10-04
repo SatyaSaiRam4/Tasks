@@ -13,6 +13,7 @@
     "@ant-design/icons-react-native": "^2.3.2",
     "@ant-design/react-native": "^5.4.3",
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-community/netinfo": "^12.0.1",
     "@react-native/new-app-screen": "0.87.1",
     "@react-navigation/bottom-tabs": "^7.19.2",
     "@react-navigation/native": "^7.4.1",
@@ -23,6 +24,8 @@
     "react-native-notify-kit": "^10.8.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.28.0",
+    "react-native-svg": "^15.15.5",
+    "react-native-webview": "^14.0.1",
     "react-redux": "^9.3.0"
   },
   "devDependencies": {

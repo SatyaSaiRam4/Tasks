@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Modal from '@ant-design/react-native/lib/modal';
-import SearchBar from '@ant-design/react-native/lib/search-bar';
+import { StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
-import { ScreenContainer } from '../../../components/ScreenContainer';
-import { LoadingView } from '../../../components/LoadingView';
-import { EmptyState } from '../../../components/EmptyState';
-import { ErrorState } from '../../../components/ErrorState';
-import { Panel } from '../../../components/Panel';
-import { border, colors, fontSize, radius, spacing } from '../../../theme';
+import { useAppSelector } from '../../../app/hooks';
+import { colors, spacing, type as t } from '../../../theme';
+import { Screen } from '../../../components/Screen';
+import { ScreenHeader } from '../../../components/ScreenHeader';
+import { Card } from '../../../components/Card';
+import { Avatar, Pill } from '../../../components/Controls';
+import { TextField } from '../../../components/TextField';
+import { Button } from '../../../components/Button';
+import { ConfirmSheet } from '../../../components/Sheet';
+import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
 import { getErrorMessage } from '../../../utils/apiError';
+import { formatFullDate } from '../../../utils/date';
+import { selectCurrentUser } from '../../auth/authSlice';
 import {
   useDisableAdminUserMutation,
   useEnableAdminUserMutation,
@@ -18,214 +22,110 @@ import {
   type AdminUserOut,
 } from '../adminApi';
 
-function UserRow({
-  user,
-  onToggleActive,
-  onToggleRole,
-}: {
-  user: AdminUserOut;
-  onToggleActive: () => void;
-  onToggleRole: () => void;
-}) {
-  return (
-    <Panel style={styles.rowWrap} contentStyle={styles.row} shadowOffset={4}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{user.display_name.slice(0, 1).toUpperCase()}</Text>
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={styles.rowName} numberOfLines={1}>
-          {user.display_name}
-        </Text>
-        <Text style={styles.rowEmail} numberOfLines={1}>
-          {user.email}
-        </Text>
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, user.role === 'ADMIN' ? styles.badgeAdmin : styles.badgeUser]}>
-            <Text style={styles.badgeText}>{user.role}</Text>
-          </View>
-          <View style={[styles.badge, user.is_active ? styles.badgeActive : styles.badgeInactive]}>
-            <Text style={styles.badgeText}>{user.is_active ? 'Active' : 'Disabled'}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={onToggleRole}>
-          <Text style={styles.actionButtonText}>{user.role === 'ADMIN' ? 'Make user' : 'Make admin'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={onToggleActive}>
-          <Text style={[styles.actionButtonText, user.is_active && styles.actionButtonTextDanger]}>
-            {user.is_active ? 'Disable' : 'Enable'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </Panel>
-  );
-}
+type Pending = { kind: 'role' | 'active'; user: AdminUserOut } | null;
 
 export function AdminUsersScreen() {
+  const me = useAppSelector(selectCurrentUser);
   const [search, setSearch] = useState('');
-  const { data, isLoading, isError, error, refetch } = useListAdminUsersQuery({ search: search || undefined });
-  const [disableUser] = useDisableAdminUserMutation();
-  const [enableUser] = useEnableAdminUserMutation();
-  const [updateRole] = useUpdateAdminUserRoleMutation();
+  const { data, isLoading, isError, error, refetch, isFetching } = useListAdminUsersQuery({ search: search.trim() || undefined });
+  const [disable] = useDisableAdminUserMutation();
+  const [enable] = useEnableAdminUserMutation();
+  const [setRole] = useUpdateAdminUserRoleMutation();
+  const [pending, setPending] = useState<Pending>(null);
 
-  const handleToggleActive = (user: AdminUserOut) => {
-    const willDisable = user.is_active;
-    Modal.alert(
-      willDisable ? 'Disable user' : 'Enable user',
-      `${willDisable ? 'Disable' : 'Enable'} ${user.display_name}?`,
-      [
-        { text: 'Cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              if (willDisable) {
-                await disableUser(user.id).unwrap();
-              } else {
-                await enableUser(user.id).unwrap();
-              }
-            } catch (err) {
-              Toast.fail(getErrorMessage(err, 'Could not update user.'));
-            }
-          },
-        },
-      ],
-    );
+  const confirm = async () => {
+    if (!pending) return;
+    const u = pending.user;
+    try {
+      if (pending.kind === 'role') await setRole({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' }).unwrap();
+      else if (u.is_active) await disable(u.id).unwrap();
+      else await enable(u.id).unwrap();
+      setPending(null);
+    } catch (err) {
+      Toast.fail(getErrorMessage(err), 2);
+    }
   };
-
-  const handleToggleRole = (user: AdminUserOut) => {
-    const nextRole = user.role === 'ADMIN' ? 'USER' : 'ADMIN';
-    Modal.alert('Change role', `Set ${user.display_name}'s role to ${nextRole}?`, [
-      { text: 'Cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          try {
-            await updateRole({ id: user.id, role: nextRole }).unwrap();
-          } catch (err) {
-            Toast.fail(getErrorMessage(err, 'Could not update role.'));
-          }
-        },
-      },
-    ]);
-  };
-
-  let body: React.ReactNode;
-  if (isLoading) {
-    body = <LoadingView label="Loading users…" />;
-  } else if (isError) {
-    body = <ErrorState message={getErrorMessage(error, 'Could not load users.')} onRetry={refetch} />;
-  } else if (!data || data.length === 0) {
-    body = <EmptyState glyph="🔍" title="No users found" subtitle="Try a different search." />;
-  } else {
-    body = (
-      <FlatList
-        data={data}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <UserRow
-            user={item}
-            onToggleActive={() => handleToggleActive(item)}
-            onToggleRole={() => handleToggleRole(item)}
-          />
-        )}
-      />
-    );
-  }
 
   return (
-    <ScreenContainer edges={['bottom']}>
-      <View style={styles.searchWrap}>
-        <SearchBar placeholder="Search by name or email" value={search} onChange={setSearch} onSubmit={setSearch} />
-      </View>
-      {body}
-    </ScreenContainer>
+    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
+      <ScreenHeader title="Users" subtitle={data ? `${data.length} accounts` : undefined} />
+      <TextField icon="search" value={search} onChangeText={setSearch} placeholder="Search name, email or User ID" autoCapitalize="none" />
+      {isLoading ? (
+        <SkeletonList count={5} height={110} />
+      ) : isError ? (
+        <ErrorState message={getErrorMessage(error)} onRetry={refetch} />
+      ) : !data?.length ? (
+        <EmptyState icon="users" title="No users found" />
+      ) : (
+        data.map(u => {
+          const self = u.id === me?.id;
+          return (
+            <Card key={u.id} style={styles.card}>
+              <View style={styles.row}>
+                <Avatar name={u.display_name} size={42} />
+                <View style={styles.flex}>
+                  <Text style={t.bodyStrong}>
+                    {u.display_name}
+                    {self ? ' (you)' : ''}
+                  </Text>
+                  <Text style={t.caption}>{u.email}</Text>
+                  <Text style={t.caption}>
+                    {u.public_id} · Joined {formatFullDate(u.created_at)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.pills}>
+                <Pill label={u.role} color={u.role === 'ADMIN' ? colors.warning : colors.textSecondary} background={u.role === 'ADMIN' ? colors.warningSoft : colors.surfaceHigh} />
+                <Pill label={u.is_active ? 'Active' : 'Disabled'} color={u.is_active ? colors.success : colors.danger} background={u.is_active ? colors.successSoft : colors.dangerSoft} />
+              </View>
+              {!self ? (
+                <View style={styles.actions}>
+                  <Button size="sm" variant="secondary" label={u.role === 'ADMIN' ? 'Make user' : 'Make admin'} onPress={() => setPending({ kind: 'role', user: u })} style={styles.flex} />
+                  <Button size="sm" variant={u.is_active ? 'danger' : 'secondary'} label={u.is_active ? 'Disable' : 'Enable'} onPress={() => setPending({ kind: 'active', user: u })} style={styles.flex} />
+                </View>
+              ) : null}
+            </Card>
+          );
+        })
+      )}
+      <ConfirmSheet
+        visible={Boolean(pending)}
+        icon={pending?.kind === 'role' ? 'shield' : 'user'}
+        destructive={pending?.kind === 'active' && pending.user.is_active}
+        title={
+          pending?.kind === 'role'
+            ? `${pending.user.role === 'ADMIN' ? 'Remove admin rights from' : 'Make'} ${pending.user.display_name}${pending.user.role === 'ADMIN' ? '?' : ' an admin?'}`
+            : `${pending?.user.is_active ? 'Disable' : 'Enable'} ${pending?.user.display_name}?`
+        }
+        message={pending?.kind === 'active' && pending.user.is_active ? 'They will be signed out and unable to sign in.' : undefined}
+        confirmLabel="Confirm"
+        onConfirm={confirm}
+        onCancel={() => setPending(null)}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  searchWrap: {
-    paddingTop: spacing.sm,
+  flex: {
+    flex: 1,
   },
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 40,
-  },
-  rowWrap: {
+  card: {
     marginBottom: spacing.md,
   },
   row: {
     flexDirection: 'row',
-    padding: spacing.md,
-  },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.pill,
-    backgroundColor: colors.accentYellowSoft,
-    borderWidth: border.thin,
-    borderColor: colors.ink,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
+    gap: spacing.md,
   },
-  avatarText: {
-    color: colors.ink,
-    fontWeight: '900',
-    fontSize: fontSize.md,
-  },
-  rowBody: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  rowName: {
-    fontSize: fontSize.md,
-    fontWeight: '800',
-    color: colors.ink,
-  },
-  rowEmail: {
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
-    marginTop: 1,
-  },
-  badgeRow: {
+  pills: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
-  },
-  badge: {
-    borderRadius: radius.pill,
-    borderWidth: border.thin,
-    borderColor: colors.ink,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    marginRight: spacing.xs,
-  },
-  badgeAdmin: { backgroundColor: colors.accentOrange },
-  badgeUser: { backgroundColor: colors.surfaceAlt },
-  badgeActive: { backgroundColor: colors.successSoft },
-  badgeInactive: { backgroundColor: colors.dangerSoft },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.ink,
-    textTransform: 'uppercase',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   actions: {
-    justifyContent: 'center',
-  },
-  actionButton: {
-    paddingVertical: 4,
-  },
-  actionButtonText: {
-    fontSize: fontSize.xs,
-    color: colors.primary,
-    fontWeight: '800',
-    textAlign: 'right',
-    textTransform: 'uppercase',
-  },
-  actionButtonTextDanger: {
-    color: colors.danger,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
 });

@@ -46,6 +46,13 @@ class Reminder(Base):
         default=WhatsAppStatus.NOT_REQUESTED,
         nullable=False,
     )
+    # LOW / NORMAL / HIGH
+    priority: Mapped[str] = mapped_column(String(8), default="NORMAL", server_default="NORMAL", nullable=False)
+    track_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tracks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Set when the user marks the reminder done; null means not completed.
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False

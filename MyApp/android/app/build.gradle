@@ -78,6 +78,14 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.myapp"
+    // Satya's 3D guide: MyApp/assets/models/*.glb and the bundled
+    // <model-viewer> page (MyApp/assets/web/satya) ship as Android assets,
+    // so the model renders offline from file:///android_asset/.
+    sourceSets {
+        main {
+            assets.srcDirs += ["$rootDir/../assets"]
+        }
+    }
     defaultConfig {
         applicationId "com.myapp"
         minSdkVersion rootProject.ext.minSdkVersion

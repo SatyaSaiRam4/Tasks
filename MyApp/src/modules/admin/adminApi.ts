@@ -6,16 +6,24 @@ export interface AdminDashboardOut {
   total_users: number;
   active_users: number;
   admin_users: number;
-  total_categories: number;
-  total_tasks: number;
-  completed_tasks: number;
-  total_notes: number;
+  total_tracks: number;
+  total_actions: number;
+  completions_today: number;
+  total_completions: number;
+  vault_entries: number;
+  avg_current_streak: number;
+  max_best_streak: number;
+  reminders_active: number;
+  whatsapp_sent: number;
+  whatsapp_failed: number;
+  whatsapp_pending: number;
 }
 
 export interface AdminUserOut {
   id: string;
   email: string;
   display_name: string;
+  public_id: string;
   role: UserRole;
   is_active: boolean;
   created_at: string;
