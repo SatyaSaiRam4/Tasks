@@ -267,3 +267,23 @@ def test_users_cannot_touch_each_others_tracks(client, auth):
     other, _ = register(client, email="other@example.com", name="Other")
     assert client.get(f"{API}/tracks/{track['id']}", headers=other).status_code == 404
     assert client.post(f"{API}/tracks/{track['id']}/actions", json={"title": "x"}, headers=other).status_code == 404
+
+
+def test_category_grid_marks_each_task_per_day(client, auth, clock):
+    today = clock.now.date()
+    track = make_track(client, auth, start_date=str(today), end_date=str(today + timedelta(days=6)))
+    walk = make_action(client, auth, track["id"], title="Walk")
+    read = make_action(client, auth, track["id"], title="Read")
+    complete(client, auth, walk["id"])
+
+    grid = client.get(f"{API}/tracks/{track['id']}/grid", headers=auth).json()
+    assert len(grid["days"]) == 7 and grid["days"][0] == str(today) and grid["today"] == str(today)
+    cells = {row["title"]: row["cells"] for row in grid["rows"]}
+    assert cells["Walk"][:2] == ["DONE", "FUTURE"]
+    assert cells["Read"][:2] == ["TODO", "FUTURE"]
+
+    next_day(clock)  # yesterday is now judged: done stays done, not done becomes missed
+    grid = client.get(f"{API}/tracks/{track['id']}/grid", headers=auth).json()
+    cells = {row["title"]: row["cells"] for row in grid["rows"]}
+    assert cells["Walk"][:2] == ["DONE", "TODO"]
+    assert cells["Read"][:2] == ["MISSED", "TODO"]

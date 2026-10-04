@@ -1,5 +1,5 @@
 /**
- * Rememberly — root app component.
+ * Memo — root app component.
  *
  * Wires up Redux, the ant-design/react-native provider (recolored to the
  * premium dark theme), safe areas, session rehydration, and the app-wide
@@ -64,7 +64,7 @@ function AppContent() {
 
   if (!isBootstrapped) {
     return (
-      <View style={styles.splash} accessibilityLabel="Loading Rememberly">
+      <View style={styles.splash} accessibilityLabel="Loading Memo">
         <SatyaOrb size={96} />
       </View>
     );

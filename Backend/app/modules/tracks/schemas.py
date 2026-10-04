@@ -63,3 +63,17 @@ class TrackDayOut(BaseModel):
     required: int
     completed: int
     status: str  # SUCCESS | FAILED | NO_ACTIONS | PENDING | FUTURE
+
+
+class TrackGridRowOut(BaseModel):
+    action_id: UUID
+    title: str
+    # One mark per entry in TrackGridOut.days:
+    # DONE | MISSED | TODO (due today, not done yet) | FUTURE | NONE (not scheduled that day)
+    cells: list[str]
+
+
+class TrackGridOut(BaseModel):
+    today: _dt.date
+    days: list[_dt.date]
+    rows: list[TrackGridRowOut]

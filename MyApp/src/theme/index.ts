@@ -1,5 +1,5 @@
 /**
- * Rememberly design tokens — a premium, dark-first system.
+ * Memo design tokens — a premium, dark-first system.
  *
  * Deep near-black surfaces, one accent color (configurable), green for
  * completion, orange/gold for streaks, red only for destructive actions.

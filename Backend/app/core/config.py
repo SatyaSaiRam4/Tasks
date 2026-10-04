@@ -57,10 +57,10 @@ SMTP_USER = os.getenv("SMTP_USER", "").strip()
 # be used without spaces. Strip all whitespace to be safe.
 SMTP_PASSWORD = "".join(os.getenv("SMTP_PASSWORD", "").split())
 SMTP_FROM = (os.getenv("SMTP_FROM") or SMTP_USER or "no-reply@rememberly.app").strip()
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Rememberly")
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Memo")
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
-RESEND_FROM = (os.getenv("RESEND_FROM") or "Rememberly <onboarding@resend.dev>").strip()
+RESEND_FROM = (os.getenv("RESEND_FROM") or "Memo <onboarding@resend.dev>").strip()
 
 EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "auto").strip().lower()
 # When true, OTP/reset codes are printed to the console instead of emailed.

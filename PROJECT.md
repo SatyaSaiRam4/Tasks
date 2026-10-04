@@ -1,8 +1,10 @@
-# Rememberly — Consistency, Reminders & a Private Vault
+# Memo — Daily Tasks, Streaks, Reminders & a Private Vault
 
-A personal app that helps you **stay consistent with your goals**, **never
-forget time-based things**, and **keep private notes safe**. It has a premium
-dark design and a guide character called **Satya**.
+A personal app that helps you **do your daily tasks**, **keep a streak going**,
+**never forget time-based things**, and **keep private notes safe**. The
+design is premium and dark, and every screen is kept **simple on purpose**:
+only what's needed, nothing extra. A small guide character, **Satya**, shows
+new users around.
 
 It has two parts that run separately:
 - **Backend**: a FastAPI server. It stores everything in a PostgreSQL database,
@@ -10,75 +12,63 @@ It has two parts that run separately:
 - **MyApp**: a React Native app for Android. This is the app people use on
   their phone.
 
+> In the code, a Category is called a **Track** and a Task an **Action**
+> (`tracks/`, `actions/`). The app only shows the words Category and Task.
+
 ---
 
 ## 1. The main features
 
-### Routines: Tracks and Actions
-- A **Track** is a goal with a start and end date, e.g. "Gym, Oct 1 → Oct 30".
-- Inside a Track you add **Actions**, the things you actually do, e.g.
-  "Morning workout at 7:00 AM". An Action can repeat daily, weekly, every few
-  days or once. It also has a priority, can be **required** or **optional**,
-  and can send a reminder notification at its time.
-- A date strip lets you look at any day. Only **today** can be completed:
-  past days are locked and future days are preview-only, so nobody can
-  back-fill or pre-fill.
-- Completing an Action asks **"Did you actually complete this?"** before it
-  counts. There's an optional "quick" mode in Settings that skips the question.
+### Categories and tasks
+- A **category** is a goal with a period, e.g. "Gym, 4 Oct → 2 Nov".
+  Creating one asks for just a **name** and the **dates**.
+- Inside it you add **tasks** by name only (e.g. "Workout"). Every task gets a
+  box to tick every day.
+- Each category shows a **table with borders**: tasks down the side, days
+  across the top (scrolls sideways, opens at today). Only **today's** box can
+  be ticked; past days show ✓ or ✗ and are locked, future days are empty.
+- Ticking asks **"Did you do it today?"** so streaks stay honest. A "quick"
+  mode in Settings ticks straight away.
+- Tap a task's name to rename or delete it.
 
-### Streaks: the honest part
-- A day is **successful** when every *required* Action due that day is
-  confirmed. Optional Actions never break a streak. A day with nothing
-  required is a rest day: it neither extends nor breaks the streak.
-- The **server** decides streaks, in the user's own timezone. The phone only
-  displays them, so changing the phone's clock doesn't help.
-- Once a day ends it is **finalized** and never rewritten. Editing or deleting
-  an Action later doesn't change history.
-- Finishing a whole Track perfectly earns **bonus points**. Longer Tracks
-  earn more (configurable in `.env`).
-- Missing a day resets the streak, with gentle wording ("start again
-  tomorrow"), not guilt.
-- Extras: a contribution-style **heatmap**, **achievements** (first step,
-  3/7/14/30/100-day streaks, comeback, track finisher…), and a
-  "streak at risk" warning in the evening.
+### Streaks
+- A day counts when **all of that day's tasks** are ticked. A day with no tasks
+  neither extends nor breaks the streak.
+- The **server** decides streaks, in the user's own timezone, so changing the
+  phone's clock doesn't help. Finished days are never rewritten.
+- Missing a day resets the streak, with gentle wording, not guilt.
+- Extras: a calendar of done/missed days, badges, an evening "streak at risk"
+  notification, and bonus points for finishing a whole category perfectly.
 
 ### Reminders
-- Anything with a date and time, later today or months away.
-- A real push notification fires on the phone at that time, even if the app
-  is closed.
-- Optionally the backend also sends a **WhatsApp** message through MSG91.
-- The list is grouped by date, with filters (Today / Tomorrow / This week…),
-  search, complete, snooze and reschedule. A reminder can be linked to a
-  Track.
+- Pick a **day** from a strip of days (or any date from the calendar button)
+  and see that day's reminders.
+- A reminder is just **what**, **which day** and **what time**, with an
+  optional **WhatsApp** message (through MSG91) besides the push notification.
+- Tick to complete; ••• to snooze (1 hour / tomorrow) or delete.
 
 ### Vault: private notes
-- Secrets, credentials and personal notes, **encrypted** in the database.
-- Has its own **4-digit PIN**, separate from the login password. After
-  5 wrong PINs it locks for 5 minutes. It also locks itself automatically
-  (the delay is configurable).
-- Folders, tags, favorites, pinning, archive and trash.
-- Vault data **never** appears on the dashboard, in notifications or on a
-  public profile.
+- Notes with a title and text, **encrypted** in the database, behind their own
+  **4-digit PIN**. After 5 wrong PINs it locks for 5 minutes, and it locks
+  itself when you leave the app.
+- Search, add, edit, delete. Deleted notes can be restored from
+  "Deleted notes" or erased for good.
+- Vault notes **never** appear on Home, in notifications or on a profile.
 
 ### Everything else
-- **Dashboard**: greeting, Satya, streak, today's progress ring, pending
-  actions, active Tracks, upcoming reminders and the heatmap.
-- **Satya**: a 3D character (a `.glb` model) on the onboarding tour and
-  dashboard, with short contextual messages. If 3D can't load, a glowing
-  "S" orb is shown instead.
-- **Onboarding tour**: 9 short steps, shown once after sign-up. It can be
-  skipped, and replayed from Settings.
-- **Profile & Discover**: every user has a **User ID** (e.g. `ALEX_31372`).
-  Others can look you up by it, but **only if you make your profile public**,
-  and they only see what you allow (streak, best streak, achievements).
-  Profiles are private by default.
-- **Settings**: name, password, sign out (or sign out everywhere), accent
-  color, animations and reduced motion, notifications, confirmation mode,
-  privacy toggles, Vault auto-lock and PIN change, Satya on/off, replay tour.
-- **Auth**: login, register, forgot password (a 6-digit code by email),
-  reset password, change password.
-- **Admin panel** (admin account only): user list and app-wide stats. It
-  never shows Vault content.
+- **Home**: "Good evening, Name" in the header, one short tip from Satya, the
+  streak card, then two tabs: **Categories** and **Reminders**.
+- **Satya's tour**: shown once after sign-up (replay it from Settings). The
+  real app stays visible but dimmed and untouchable, while a small Satya at
+  the bottom explains each tab in a speech bubble, like a game tutorial.
+- **Profile**: name, User ID, day streak, best streak, days done and badges.
+- **Find friends**: search a friend's **User ID** to see their streak. Nobody
+  can find you unless you turn on **"Let friends find me"** (off by default).
+- **Settings**: account, accent color, motion, notifications, privacy, Vault
+  PIN and auto-lock, Satya on/off, replay tour.
+- **Auth**: login, register, forgot/reset password, change password.
+- **Admin panel** (admin account only): users and app-wide stats. It never
+  shows Vault content.
 
 ---
 
@@ -106,7 +96,7 @@ It has two parts that run separately:
 - **Background jobs** (`app/workers/reminder_worker.py`):
   - Sends due WhatsApp reminders.
   - Finalizes streaks every 15 minutes.
-- **Tests**: `Backend/tests/` (35 tests: streak rules, anti-cheat, privacy,
+- **Tests**: `Backend/tests/` (36 tests: streak rules, the category table, anti-cheat, privacy,
   Vault security, password reset, reminders).
 
 ### Frontend (`MyApp/`)
@@ -151,7 +141,7 @@ important ones:
 - `MSG91_*`: optional. Without them, reminders still work as push
   notifications, just without WhatsApp.
 - `SMTP_*` or `RESEND_*`: optional. Needed to email password-reset codes.
-- `TRACK_BONUS_*`: tune the Track completion bonus.
+- `TRACK_BONUS_*`: tune the bonus for finishing a whole category.
 
 Run the tests with `./myenv/bin/python -m pytest`. They need a separate test
 database (see `tests/conftest.py`).
@@ -175,21 +165,20 @@ the app. The current file is a placeholder cartoon figure.
 ## 4. What's verified
 
 Tested live on an Android emulator:
-- ✅ Register → Satya tour → dashboard (also replay tour, and skip tour)
-- ✅ Satya's 3D model loads, with the orb fallback while loading
-- ✅ Create a Track → add an Action → confirm completion → "streak started"
-  celebration → dashboard, profile and history all update
-- ✅ Reminders: create, list grouped by day, complete
-- ✅ Vault: PIN setup with confirmation, encrypted entry, lock/unlock,
-  wrong-PIN message with attempts left
-- ✅ Discover: a private profile can't be found
-- ✅ Settings, accent colors, consistency heatmap
-- ✅ The existing database was migrated with all data kept: old categories
-  became Tracks, tasks became Actions, notes moved into the Vault
-- ✅ WhatsApp reminders through MSG91 (from before the redesign, unchanged)
+- ✅ Home: header greeting, Satya tip, streak card, Categories / Reminders tabs
+- ✅ Category table: add a task, tick today → "Did you do it today?" →
+  celebration; the table, Home and Profile all update
+- ✅ New category form (name + dates)
+- ✅ Reminders: day strip with dots, add for another day, list per day
+- ✅ Vault lock screen; Find friends search (a private ID isn't found)
+- ✅ Profile, streak history calendar
+- ✅ Satya's tour over the dimmed app (moves through the tabs; Skip / Done)
+- ✅ Earlier: register flow, Vault PIN setup/unlock, encrypted notes,
+  WhatsApp reminders through MSG91, migration with all data kept
 
-Not yet re-tested since the redesign: Admin panel screens, password reset
-by email, snooze/reschedule, Vault folders/archive/trash on the device.
+Not yet tested on the device after the simplification: the unlocked Vault
+list and note editor, renaming/deleting a task, Admin screens, password reset
+by email.
 
 ## 5. Known quirks
 

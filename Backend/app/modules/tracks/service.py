@@ -6,11 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.timeutil import local_today, utc_now
+from app.modules.actions.models import Action
+from app.modules.actions.scheduling import is_due
 from app.modules.auth.models import User
 from app.modules.streaks import engine
 
 from .models import Track
-from .schemas import TrackDayOut, TrackOut
+from .schemas import TrackDayOut, TrackGridOut, TrackGridRowOut, TrackOut
 
 MAX_DAYS_RANGE = 120
 
@@ -180,3 +182,33 @@ def track_days(db: Session, user: User, track_id: UUID, start: date, end: date) 
         out.append(TrackDayOut(date=day, required=required, completed=completed, status=status_))
         day += timedelta(days=1)
     return out
+
+
+def track_grid(db: Session, user: User, track_id: UUID, start: date, end: date) -> TrackGridOut:
+    """The category table: one row per task, one column per day, a mark in each cell."""
+    if end < start or (end - start).days > MAX_DAYS_RANGE:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Choose a range of at most {MAX_DAYS_RANGE} days.")
+    track = get_owned_track(db, user.id, track_id)
+    today = local_today(user.timezone)
+    actions = db.scalars(
+        select(Action)
+        .where(Action.track_id == track.id, Action.deleted_at.is_(None))
+        .order_by(Action.sort_order, Action.created_at)
+    ).all()
+    completions = engine.load_completions(db, user.id, start, min(end, today))
+
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    rows = []
+    for action in actions:
+        cells = []
+        for day in days:
+            if not is_due(action, track, day):
+                cells.append("NONE")
+            elif day > today:
+                cells.append("FUTURE")
+            elif (action.id, day) in completions:
+                cells.append("DONE")
+            else:
+                cells.append("TODO" if day == today else "MISSED")
+        rows.append(TrackGridRowOut(action_id=action.id, title=action.title, cells=cells))
+    return TrackGridOut(today=today, days=days, rows=rows)

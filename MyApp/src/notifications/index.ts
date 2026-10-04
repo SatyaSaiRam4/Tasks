@@ -18,7 +18,7 @@ import notifee, {
 
 const CHANNELS = {
   reminders: { id: 'reminders', name: 'Reminders', importance: AndroidImportance.HIGH },
-  actions: { id: 'actions', name: 'Planned actions', importance: AndroidImportance.DEFAULT },
+  actions: { id: 'actions', name: 'Tasks', importance: AndroidImportance.DEFAULT },
   streak: { id: 'streak', name: 'Streak warnings', importance: AndroidImportance.HIGH },
 };
 
@@ -96,7 +96,7 @@ export async function syncStreakWarning(opts: { dateKey: string; streak: number;
   if (!opts.enabled || opts.remaining <= 0 || opts.streak <= 0) return;
   const [y, m, d] = opts.dateKey.split('-').map(Number);
   const at = new Date(y, m - 1, d, STREAK_WARNING_HOUR, 0);
-  const plural = opts.remaining === 1 ? 'action' : 'actions';
+  const plural = opts.remaining === 1 ? 'task' : 'tasks';
   await schedule(
     `${STREAK_PREFIX}${opts.dateKey}`,
     CHANNELS.streak.id,

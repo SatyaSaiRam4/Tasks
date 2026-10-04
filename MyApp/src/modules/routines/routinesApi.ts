@@ -35,6 +35,15 @@ export interface TrackDay {
   status: string;
 }
 
+/** The category table: rows are tasks, columns are days. */
+export type GridCell = 'DONE' | 'MISSED' | 'TODO' | 'FUTURE' | 'NONE';
+
+export interface TrackGrid {
+  today: string;
+  days: string[];
+  rows: { action_id: string; title: string; cells: GridCell[] }[];
+}
+
 export interface ActionStep {
   id: string;
   title: string;
@@ -152,6 +161,10 @@ export const routinesApi = baseApi.injectEndpoints({
       query: ({ id, from, to }) => ({ url: `/tracks/${id}/days`, params: cleanParams({ from, to }) }),
       providesTags: ['Track'],
     }),
+    trackGrid: builder.query<TrackGrid, string>({
+      query: id => `/tracks/${id}/grid`,
+      providesTags: ['Track', 'Action'],
+    }),
     createTrack: builder.mutation<Track, TrackInput>({
       query: body => ({ url: '/tracks', method: 'POST', body }),
       invalidatesTags: [...DEFINITION_TAGS],
@@ -209,6 +222,7 @@ export const {
   useListTracksQuery,
   useGetTrackQuery,
   useTrackDaysQuery,
+  useTrackGridQuery,
   useCreateTrackMutation,
   useUpdateTrackMutation,
   useArchiveTrackMutation,

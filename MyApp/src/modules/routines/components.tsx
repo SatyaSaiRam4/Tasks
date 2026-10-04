@@ -1,132 +1,174 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, type as t } from '../../theme';
 import { Card } from '../../components/Card';
-import { Checkbox } from '../../components/Checkbox';
-import { Pill } from '../../components/Controls';
 import { Icon } from '../../components/Icon';
-import { ProgressBar } from '../../components/Progress';
-import { formatClock, formatDayMonth, WEEKDAYS_MON_FIRST } from '../../utils/date';
-import type { Action, AgendaItem, Track } from './routinesApi';
-import { useCompletion } from './CompletionProvider';
+import { formatDayMonth, fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
+import type { GridCell, Track, TrackGrid } from './routinesApi';
 
-export function trackColor(color: string | null | undefined): string {
-  return color || colors.primary;
+/** "04 Oct – 02 Nov · Day 3 of 30" */
+export function periodLabel(track: Track): string {
+  const range = `${formatDayMonth(track.start_date)} – ${track.end_date ? formatDayMonth(track.end_date) : 'ongoing'}`;
+  if (track.status === 'UPCOMING') return `${range} · Starts soon`;
+  if (track.status === 'ENDED') return `${range} · Ended`;
+  if (track.day_number && track.total_days) return `${range} · Day ${track.day_number} of ${track.total_days}`;
+  return range;
 }
 
-export function repeatLabel(a: Pick<Action, 'repeat_type' | 'repeat_weekdays' | 'repeat_interval_days'>): string {
-  switch (a.repeat_type) {
-    case 'DAILY':
-      return 'Every day';
-    case 'WEEKLY':
-      return (a.repeat_weekdays ?? []).map(d => WEEKDAYS_MON_FIRST[d]).join(', ') || 'Weekly';
-    case 'CUSTOM':
-      return `Every ${a.repeat_interval_days} days`;
-    default:
-      return 'Once';
-  }
-}
-
-/**
- * One Action on a given day. Today's items open the confirmation flow;
- * past and future days are read-only.
- */
-export function ActionRow({
-  item,
-  trackName,
-  trackColorValue,
-  editable,
-  onLongPress,
-  showTrack = false,
-}: {
-  item: AgendaItem;
-  trackName: string;
-  trackColorValue: string;
-  editable: boolean;
-  onLongPress?: () => void;
-  showTrack?: boolean;
-}) {
-  const { request } = useCompletion();
-  const { action, is_completed } = item;
-  const time = action.time_of_day ? formatClock(action.time_of_day) : 'Any time';
-  const open = () => editable && request({ action, trackName, isCompleted: is_completed });
-
+/** One category in a list: its name, period and today's progress. */
+export function CategoryCard({ track, onPress }: { track: Track; onPress: () => void }) {
+  const allDone = track.today_required > 0 && track.today_completed >= track.today_required;
   return (
-    <Pressable
-      onPress={open}
-      onLongPress={onLongPress}
-      disabled={!editable && !onLongPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${action.title}, ${time}, ${is_completed ? 'completed' : 'not completed'}${action.is_required ? '' : ', optional'}`}
-      accessibilityHint={editable ? (is_completed ? 'Opens undo' : 'Opens completion confirmation') : undefined}
-      style={({ pressed }) => [styles.row, is_completed && styles.rowDone, pressed && styles.pressed]}
-    >
-      <View style={styles.timeCol}>
-        <Text style={[styles.time, is_completed && styles.textDone]}>{time}</Text>
-      </View>
-      <View style={[styles.rail, { backgroundColor: is_completed ? colors.success : trackColorValue }]} />
-      <View style={styles.body}>
-        <Text style={[t.bodyStrong, is_completed && styles.textDone]} numberOfLines={2}>
-          {action.title}
-        </Text>
-        <View style={styles.metaRow}>
-          {showTrack ? <Text style={[t.caption, { color: trackColorValue }]}>{trackName}</Text> : null}
-          {!action.is_required ? <Pill label="Optional" /> : null}
-          {action.priority === 'HIGH' ? <Pill label="High" color={colors.danger} background={colors.dangerSoft} /> : null}
-          {action.steps.length ? <Text style={t.caption}>{action.steps.length} steps</Text> : null}
-        </View>
-      </View>
-      <Checkbox
-        checked={is_completed}
-        onPress={editable ? open : undefined}
-        disabled={!editable}
-        color={trackColorValue}
-        accessibilityLabel={`Complete ${action.title}`}
-      />
-    </Pressable>
-  );
-}
-
-export function TrackCard({ track, onPress }: { track: Track; onPress: () => void }) {
-  const color = trackColor(track.color);
-  const range = `${formatDayMonth(track.start_date)} → ${track.end_date ? formatDayMonth(track.end_date) : 'Ongoing'}`;
-  const progress = track.total_days && track.day_number ? track.day_number / track.total_days : track.completion_rate;
-  const statusLabel =
-    track.status === 'UPCOMING' ? 'Starts soon' : track.status === 'ENDED' ? 'Completed period' : track.status === 'ARCHIVED' ? 'Archived' : null;
-
-  return (
-    <Card onPress={onPress} accent={color} accessibilityLabel={`${track.name} track`} style={styles.trackCard}>
-      <View style={styles.trackHeader}>
-        <View style={[styles.trackIcon, { backgroundColor: `${color}22` }]}>
-          <Text style={styles.trackEmoji}>{track.icon || track.name.slice(0, 1).toUpperCase()}</Text>
-        </View>
+    <Card onPress={onPress} style={styles.card} accessibilityLabel={`${track.name}, ${track.today_completed} of ${track.today_required} done today`}>
+      <View style={styles.cardRow}>
         <View style={styles.flex}>
           <Text style={t.subtitle} numberOfLines={1}>
             {track.name}
           </Text>
-          <Text style={t.caption}>{range}</Text>
+          <Text style={[t.caption, styles.cardMeta]}>{periodLabel(track)}</Text>
         </View>
-        {track.streak > 0 ? (
-          <View style={styles.streakBadge}>
-            <Icon name="flame" size={14} color={colors.streak} />
-            <Text style={styles.streakText}>{track.streak}</Text>
+        {track.today_required > 0 ? (
+          <View style={[styles.today, allDone && styles.todayDone]}>
+            {allDone ? <Icon name="check" size={14} color={colors.success} strokeWidth={3} /> : null}
+            <Text style={[styles.todayText, allDone && { color: colors.success }]}>
+              {track.today_completed}/{track.today_required}
+            </Text>
           </View>
         ) : null}
+        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
       </View>
-      <View style={styles.trackStats}>
-        <Text style={t.caption}>
-          {track.day_number && track.total_days
-            ? `Day ${track.day_number} of ${track.total_days}`
-            : track.day_number
-              ? `Day ${track.day_number}`
-              : statusLabel ?? 'Not started'}
-        </Text>
-        <Text style={t.caption}>
-          {track.today_required > 0 ? `${track.today_completed}/${track.today_required} today` : `${track.action_count} ${track.action_count === 1 ? 'action' : 'actions'}`}
-        </Text>
-      </View>
-      <ProgressBar progress={progress} height={6} colorsPair={[color, color]} />
     </Card>
+  );
+}
+
+// ---- The category table ---------------------------------------------------------
+
+const NAME_W = 124;
+const COL_W = 52;
+const ROW_H = 52;
+
+/**
+ * Tasks down the side, days across the top, a box in every cell. Only
+ * today's boxes can be ticked; past days show what happened, future days are
+ * empty. Opens scrolled so today is in view.
+ */
+export function CategoryTable({
+  grid,
+  onToggle,
+  onTaskPress,
+}: {
+  grid: TrackGrid;
+  onToggle: (row: TrackGrid['rows'][number], isDone: boolean) => void;
+  onTaskPress: (row: TrackGrid['rows'][number]) => void;
+}) {
+  const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const todayIndex = grid.days.indexOf(grid.today);
+
+  return (
+    <View style={styles.table}>
+      {/* Fixed first column: task names */}
+      <View style={styles.nameCol}>
+        <View style={[styles.headerCell, styles.nameCell, styles.bottomLine]}>
+          <Text style={t.micro}>Task</Text>
+        </View>
+        {grid.rows.map((row, i) => (
+          <Pressable
+            key={row.action_id}
+            onPress={() => onTaskPress(row)}
+            style={({ pressed }) => [styles.bodyCell, styles.nameCell, i < grid.rows.length - 1 && styles.bottomLine, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`${row.title}. Tap to rename or delete.`}
+          >
+            <Text style={styles.taskName} numberOfLines={2}>
+              {row.title}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Days, scrolling sideways */}
+      <ScrollView
+        ref={scroll}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (todayIndex > 1) scroll.current?.scrollTo({ x: (todayIndex - 1) * COL_W, animated: false });
+        }}
+      >
+        <View>
+          <View style={[styles.row, styles.bottomLine]}>
+            {grid.days.map((day, di) => {
+              const isToday = di === todayIndex;
+              const d = fromDateKey(day);
+              return (
+                <View key={day} style={[styles.headerCell, styles.dayCell, di > 0 && styles.leftLine, isToday && styles.todayCol]}>
+                  <Text style={[styles.weekday, isToday && styles.todayText2]}>{isToday ? 'Today' : WEEKDAY_SHORT[d.getDay()]}</Text>
+                  <Text style={[styles.dayNum, isToday && styles.todayText2]}>{d.getDate()}</Text>
+                </View>
+              );
+            })}
+          </View>
+          {grid.rows.map((row, ri) => (
+            <View key={row.action_id} style={[styles.row, ri < grid.rows.length - 1 && styles.bottomLine]}>
+              {row.cells.map((cell, di) => (
+                <View key={grid.days[di]} style={[styles.bodyCell, styles.dayCell, di > 0 && styles.leftLine, di === todayIndex && styles.todayCol]}>
+                  <Mark
+                    cell={cell}
+                    label={`${row.title}, ${grid.days[di]}`}
+                    onPress={di === todayIndex && cell !== 'NONE' ? () => onToggle(row, cell === 'DONE') : undefined}
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const MARK_LABEL: Record<GridCell, string> = {
+  DONE: 'done',
+  MISSED: 'missed',
+  TODO: 'not done yet',
+  FUTURE: 'upcoming',
+  NONE: 'not scheduled',
+};
+
+function Mark({ cell, label, onPress }: { cell: GridCell; label: string; onPress?: () => void }) {
+  const box =
+    cell === 'DONE' ? (
+      <View style={[styles.box, styles.boxDone]}>
+        <Icon name="check" size={16} color={colors.white} strokeWidth={3} />
+      </View>
+    ) : cell === 'MISSED' ? (
+      <Icon name="x" size={16} color={colors.danger} strokeWidth={2.5} />
+    ) : cell === 'TODO' ? (
+      <View style={[styles.box, styles.boxTodo]} />
+    ) : cell === 'FUTURE' ? (
+      <View style={[styles.box, styles.boxFuture]} />
+    ) : (
+      <Text style={styles.none}>–</Text>
+    );
+
+  if (!onPress) {
+    return (
+      <View accessible accessibilityLabel={`${label}: ${MARK_LABEL[cell]}`}>
+        {box}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: cell === 'DONE' }}
+      accessibilityLabel={`${label}: ${MARK_LABEL[cell]}`}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
+      {box}
+    </Pressable>
   );
 }
 
@@ -135,89 +177,118 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.6,
+  },
+  card: {
+    marginBottom: spacing.md,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  cardMeta: {
+    marginTop: 4,
+  },
+  today: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  todayDone: {
+    backgroundColor: colors.successSoft,
+  },
+  todayText: {
+    color: colors.primary,
+    fontWeight: '800',
+  },
+
+  table: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  nameCol: {
+    width: NAME_W,
+    borderRightWidth: 1,
+    borderRightColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
+  },
+  headerCell: {
+    height: ROW_H,
+    justifyContent: 'center',
+  },
+  bodyCell: {
+    height: ROW_H,
+    justifyContent: 'center',
+  },
+  nameCell: {
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-    minHeight: 64,
   },
-  rowDone: {
-    backgroundColor: colors.backgroundRaised,
+  dayCell: {
+    width: COL_W,
+    alignItems: 'center',
   },
-  timeCol: {
-    width: 62,
+  bottomLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderStrong,
   },
-  time: {
-    color: colors.textSecondary,
-    fontSize: 12,
+  leftLine: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.borderStrong,
+  },
+  todayCol: {
+    backgroundColor: colors.primarySoft,
+  },
+  taskName: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+  weekday: {
+    fontSize: 10,
     fontWeight: '700',
-  },
-  rail: {
-    width: 3,
-    alignSelf: 'stretch',
-    borderRadius: 2,
-  },
-  body: {
-    flex: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: 4,
-  },
-  textDone: {
     color: colors.textTertiary,
-    textDecorationLine: 'line-through',
+    textTransform: 'uppercase',
   },
-  trackCard: {
-    marginBottom: spacing.md,
+  dayNum: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 1,
   },
-  trackHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  todayText2: {
+    color: colors.primary,
   },
-  trackIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
+  box: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trackEmoji: {
-    fontSize: 20,
-    color: colors.text,
-    fontWeight: '800',
+  boxDone: {
+    backgroundColor: colors.success,
   },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.streakSoft,
+  boxTodo: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
   },
-  streakText: {
-    color: colors.streak,
-    fontWeight: '800',
-    fontSize: 13,
+  boxFuture: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  trackStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+  none: {
+    color: colors.textTertiary,
   },
 });

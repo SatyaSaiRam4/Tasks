@@ -6,7 +6,6 @@ import { useAppSelector } from '../../../app/hooks';
 import { colors, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
-import { Chip, IconButton } from '../../../components/Controls';
 import { Button } from '../../../components/Button';
 import { ConfirmSheet } from '../../../components/Sheet';
 import { ErrorState, Skeleton } from '../../../components/Feedback';
@@ -18,32 +17,25 @@ import {
   useDeleteVaultEntryMutation,
   useFlagVaultEntryMutation,
   useGetVaultEntryQuery,
-  useListVaultFoldersQuery,
   useUpdateVaultEntryMutation,
 } from '../vaultApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
-const DEFAULT_FOLDERS = ['Personal', 'Important', 'Credentials', 'Ideas'];
-
+/** A private note: a title and the text. Deleted notes can be restored. */
 export function VaultEntryScreen() {
   const navigation = useNavigation();
   const params = useRoute<RouteProp<RootStackParamList, 'VaultEntry'>>().params;
   const entryId = params?.entryId;
   const unlocked = useAppSelector(selectVaultUnlocked);
   const existing = useGetVaultEntryQuery(entryId ?? '', { skip: !entryId || !unlocked });
-  const folders = useListVaultFoldersQuery(undefined, { skip: !unlocked });
   const [create, { isLoading: creating }] = useCreateVaultEntryMutation();
   const [update, { isLoading: updating }] = useUpdateVaultEntryMutation();
-  const [flag] = useFlagVaultEntryMutation();
-  const [remove, { isLoading: deleting }] = useDeleteVaultEntryMutation();
+  const [flag, { isLoading: flagging }] = useFlagVaultEntryMutation();
+  const [remove, { isLoading: erasing }] = useDeleteVaultEntryMutation();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [folder, setFolder] = useState<string | null>(params?.folder ?? null);
-  const [customFolder, setCustomFolder] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagDraft, setTagDraft] = useState('');
-  const [confirm, setConfirm] = useState<'trash' | 'delete' | null>(null);
+  const [confirm, setConfirm] = useState<'delete' | 'erase' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // If the Vault locks while this screen is open, leave it.
@@ -56,38 +48,39 @@ export function VaultEntryScreen() {
     if (!e) return;
     setTitle(e.title ?? '');
     setContent(e.content);
-    setFolder(e.folder);
-    setTags(e.tags);
   }, [existing.data]);
 
-  const e = existing.data;
-  const inTrash = Boolean(e?.deleted_at);
-  const folderChoices = Array.from(new Set([...DEFAULT_FOLDERS, ...(folders.data ?? []).map(f => f.name).filter(n => n !== 'Unsorted')]));
-
-  const addTag = () => {
-    const tag = tagDraft.trim().replace(/^#/, '');
-    if (tag && !tags.includes(tag) && tags.length < 10) setTags([...tags, tag.slice(0, 24)]);
-    setTagDraft('');
-  };
+  const deleted = Boolean(existing.data?.deleted_at);
 
   const save = async () => {
     setError(null);
-    if (!content.trim()) return setError('Write something to keep.');
-    const body = { title: title.trim() || null, content, folder: (customFolder.trim() || folder) ?? null, tags };
+    if (!content.trim() && !title.trim()) return setError('Write something to save.');
+    const body = { title: title.trim() || null, content: content || title.trim() };
     try {
       if (entryId) await update({ id: entryId, ...body }).unwrap();
       else await create(body).unwrap();
-      Toast.success('Saved to Vault.', 1);
+      Toast.success('Saved.', 1);
       navigation.goBack();
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save.'));
     }
   };
 
-  const setFlag = async (f: Parameters<typeof flag>[0]['flag']) => {
-    if (!entryId) return;
+  const moveToDeleted = async (restore: boolean) => {
     try {
-      await flag({ id: entryId, flag: f }).unwrap();
+      await flag({ id: entryId!, flag: restore ? 'restore' : 'trash' }).unwrap();
+      setConfirm(null);
+      navigation.goBack();
+    } catch (err) {
+      Toast.fail(getErrorMessage(err), 2);
+    }
+  };
+
+  const erase = async () => {
+    try {
+      await remove(entryId!).unwrap();
+      setConfirm(null);
+      navigation.goBack();
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
     }
@@ -105,28 +98,7 @@ export function VaultEntryScreen() {
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
       <Screen edges={['top', 'bottom']} glowColor="#6B4BFF">
-        <ScreenHeader
-          title={entryId ? (inTrash ? 'In Trash' : 'Vault entry') : 'New secret'}
-          close
-          right={
-            e && !inTrash ? (
-              <>
-                <IconButton
-                  icon="star"
-                  color={e.is_favorite ? colors.streakGold : colors.textSecondary}
-                  accessibilityLabel={e.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-                  onPress={() => setFlag(e.is_favorite ? 'unfavorite' : 'favorite')}
-                />
-                <IconButton
-                  icon="pin"
-                  color={e.pinned ? colors.primary : colors.textSecondary}
-                  accessibilityLabel={e.pinned ? 'Unpin' : 'Pin'}
-                  onPress={() => setFlag(e.pinned ? 'unpin' : 'pin')}
-                />
-              </>
-            ) : null
-          }
-        />
+        <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} close />
         {entryId && existing.isLoading ? (
           <Skeleton height={300} rounded={radius.lg} />
         ) : (
@@ -139,110 +111,55 @@ export function VaultEntryScreen() {
               style={styles.title}
               maxLength={160}
               accessibilityLabel="Title"
-              editable={!inTrash}
+              editable={!deleted}
             />
             <TextInput
               value={content}
               onChangeText={setContent}
-              placeholder="Write anything private: account details, recovery codes, thoughts…"
+              placeholder="Write your private note…"
               placeholderTextColor={colors.textTertiary}
               style={styles.content}
               multiline
               textAlignVertical="top"
-              accessibilityLabel="Content"
+              accessibilityLabel="Note"
               autoCorrect={false}
-              editable={!inTrash}
-            />
-
-            <Text style={styles.label}>Folder</Text>
-            <View style={styles.wrap}>
-              {folderChoices.map(f => (
-                <Chip key={f} label={f} icon="folder" selected={folder === f && !customFolder} onPress={() => { setFolder(cur => (cur === f ? null : f)); setCustomFolder(''); }} />
-              ))}
-            </View>
-            <TextInput
-              value={customFolder}
-              onChangeText={setCustomFolder}
-              placeholder="Or create a new folder"
-              placeholderTextColor={colors.textTertiary}
-              style={styles.input}
-              maxLength={40}
-              accessibilityLabel="New folder name"
-            />
-
-            <Text style={styles.label}>Tags</Text>
-            <View style={styles.wrap}>
-              {tags.map(tag => (
-                <Chip key={tag} label={`#${tag}`} icon="x" onPress={() => setTags(tags.filter(x => x !== tag))} />
-              ))}
-            </View>
-            <TextInput
-              value={tagDraft}
-              onChangeText={setTagDraft}
-              onSubmitEditing={addTag}
-              placeholder="Add a tag and press enter"
-              placeholderTextColor={colors.textTertiary}
-              style={styles.input}
-              returnKeyType="done"
-              accessibilityLabel="New tag"
+              editable={!deleted}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {inTrash ? (
+            {deleted ? (
               <View style={styles.actions}>
-                <Button label="Restore" icon="refresh" variant="secondary" onPress={() => setFlag('restore')} />
-                <Button label="Delete forever" icon="trash" variant="danger" onPress={() => setConfirm('delete')} />
+                <Button label="Restore" variant="secondary" onPress={() => moveToDeleted(true)} loading={flagging} />
+                <Button label="Delete forever" variant="ghost" onPress={() => setConfirm('erase')} />
               </View>
             ) : (
               <View style={styles.actions}>
-                <Button label="Save" icon="check" size="lg" onPress={save} loading={creating || updating} />
-                {e ? (
-                  <View style={styles.row}>
-                    <Button
-                      label={e.is_archived ? 'Unarchive' : 'Archive'}
-                      icon="archive"
-                      variant="secondary"
-                      style={styles.flex}
-                      onPress={() => setFlag(e.is_archived ? 'unarchive' : 'archive')}
-                    />
-                    <Button label="Move to Trash" icon="trash" variant="danger" style={styles.flex} onPress={() => setConfirm('trash')} />
-                  </View>
-                ) : null}
+                <Button label="Save" size="lg" onPress={save} loading={creating || updating} />
+                {entryId ? <Button label="Delete" variant="ghost" onPress={() => setConfirm('delete')} /> : null}
               </View>
             )}
           </>
         )}
         <ConfirmSheet
-          visible={confirm === 'trash'}
-          icon="trash"
-          destructive
-          title="Move to Trash?"
-          message="You can restore it from Trash until you empty it."
-          confirmLabel="Move to Trash"
-          onConfirm={async () => {
-            setConfirm(null);
-            await setFlag('trash');
-            navigation.goBack();
-          }}
-          onCancel={() => setConfirm(null)}
-        />
-        <ConfirmSheet
           visible={confirm === 'delete'}
           icon="trash"
           destructive
+          title="Delete this note?"
+          message="You can still restore it from Deleted notes."
+          confirmLabel="Delete"
+          loading={flagging}
+          onConfirm={() => moveToDeleted(false)}
+          onCancel={() => setConfirm(null)}
+        />
+        <ConfirmSheet
+          visible={confirm === 'erase'}
+          icon="trash"
+          destructive
           title="Delete forever?"
-          message="This permanently erases the entry. This can’t be undone."
+          message="This can’t be undone."
           confirmLabel="Delete forever"
-          loading={deleting}
-          onConfirm={async () => {
-            try {
-              await remove(entryId!).unwrap();
-              setConfirm(null);
-              navigation.goBack();
-            } catch (err) {
-              Toast.fail(getErrorMessage(err), 2);
-            }
-          }}
+          loading={erasing}
+          onConfirm={erase}
           onCancel={() => setConfirm(null)}
         />
       </Screen>
@@ -254,17 +171,13 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
   title: {
     ...t.title,
     paddingVertical: spacing.sm,
   },
   content: {
     ...t.body,
-    minHeight: 220,
+    minHeight: 260,
     padding: spacing.lg,
     marginTop: spacing.sm,
     marginBottom: spacing.xl,
@@ -272,27 +185,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
-    fontFamily: undefined,
-  },
-  label: {
-    ...t.micro,
-    marginBottom: spacing.sm,
-  },
-  wrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    height: 46,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    marginBottom: spacing.xl,
   },
   actions: {
     gap: spacing.sm,

@@ -44,7 +44,7 @@ export function getErrorMessage(
     if (detailMessage) return detailMessage;
 
     if (error.status === 'FETCH_ERROR') {
-      return "Can't reach Rememberly right now. Check your connection and try again.";
+      return "Can't reach Memo right now. Check your connection and try again.";
     }
     if (error.status === 'TIMEOUT_ERROR') {
       return 'The request timed out. Please try again.';

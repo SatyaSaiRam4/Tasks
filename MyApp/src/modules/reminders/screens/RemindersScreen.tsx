@@ -1,23 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
+import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
-import { Chip, ChipRow, Fab, IconButton, Pill } from '../../../components/Controls';
+import { Fab, IconButton } from '../../../components/Controls';
 import { Checkbox } from '../../../components/Checkbox';
-import { EmptyState, ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
+import { DateStrip, type DayMark } from '../../../components/DateStrip';
+import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
 import { ConfirmSheet, Sheet } from '../../../components/Sheet';
 import { Button } from '../../../components/Button';
 import { Icon } from '../../../components/Icon';
-import { DateField } from '../../../components/PickerFields';
 import { getErrorMessage } from '../../../utils/apiError';
-import { diffDays, formatClock, relativeDayLabel, toDateKey } from '../../../utils/date';
+import { formatClock, formatFullDate, fromDateKey, relativeDayLabel, toDateKey } from '../../../utils/date';
 import { cancelReminderNotification, scheduleReminderNotification } from '../../../notifications';
 import {
-  useCancelReminderMutation,
   useDeleteReminderMutation,
   useListRemindersQuery,
   useSetReminderCompletedMutation,
@@ -27,120 +27,45 @@ import {
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Filter = 'all' | 'today' | 'tomorrow' | 'week' | 'upcoming' | 'overdue' | 'completed' | 'cancelled' | 'whatsapp' | 'push' | 'date';
-type Sort = 'asc' | 'desc' | 'created';
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'today', label: 'Today' },
-  { key: 'tomorrow', label: 'Tomorrow' },
-  { key: 'week', label: 'This week' },
-  { key: 'upcoming', label: 'Upcoming' },
-  { key: 'overdue', label: 'Overdue' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'cancelled', label: 'Cancelled' },
-  { key: 'whatsapp', label: 'WhatsApp' },
-  { key: 'push', label: 'Push only' },
-  { key: 'date', label: 'Pick a date' },
-];
+const dayOf = (r: Reminder) => toDateKey(new Date(r.remind_at));
 
-function isOpen(r: Reminder) {
-  return r.status === 'ACTIVE' && !r.completed_at;
-}
-
-function matches(r: Reminder, filter: Filter, todayKey: string, now: number, customDay: string | null): boolean {
-  const key = toDateKey(new Date(r.remind_at));
-  const at = new Date(r.remind_at).getTime();
-  const d = diffDays(key, todayKey);
-  switch (filter) {
-    case 'today':
-      return d === 0 && r.status === 'ACTIVE';
-    case 'tomorrow':
-      return d === 1 && r.status === 'ACTIVE';
-    case 'week':
-      return d >= 0 && d < 7 && r.status === 'ACTIVE';
-    case 'upcoming':
-      return isOpen(r) && at >= now;
-    case 'overdue':
-      return isOpen(r) && at < now;
-    case 'completed':
-      return Boolean(r.completed_at);
-    case 'cancelled':
-      return r.status === 'CANCELLED';
-    case 'whatsapp':
-      return Boolean(r.whatsapp_number) && r.status === 'ACTIVE';
-    case 'push':
-      return !r.whatsapp_number && r.status === 'ACTIVE';
-    case 'date':
-      return customDay ? key === customDay : true;
-    default:
-      return r.status === 'ACTIVE';
-  }
-}
-
-function sectionLabel(key: string, todayKey: string): string {
-  const d = diffDays(key, todayKey);
-  if (d < 0) return d === -1 ? 'Yesterday' : 'Earlier';
-  if (d > 30) return 'Later';
-  return relativeDayLabel(key, todayKey);
-}
-
+/** Reminders: pick a day (strip or calendar), see that day's reminders. */
 export function RemindersScreen() {
   const navigation = useNavigation<Nav>();
-  const { data, isLoading, isError, error, refetch, isFetching } = useListRemindersQuery({ include_cancelled: true });
-  const [filter, setFilter] = useState<Filter>('all');
-  const [customDay, setCustomDay] = useState<string | null>(null);
-  const [sort, setSort] = useState<Sort>('asc');
-  const [query, setQuery] = useState('');
-  const [searching, setSearching] = useState(false);
+  const { data, isLoading, isError, error, refetch, isFetching } = useListRemindersQuery();
+  const todayKey = toDateKey(new Date());
+  const [day, setDay] = useState(todayKey);
   const [menuFor, setMenuFor] = useState<Reminder | null>(null);
-  const [confirm, setConfirm] = useState<{ kind: 'cancel' | 'delete'; reminder: Reminder } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Reminder | null>(null);
   const [setCompleted] = useSetReminderCompletedMutation();
-  const [snooze, { isLoading: snoozing }] = useSnoozeReminderMutation();
-  const [cancel, { isLoading: cancelling }] = useCancelReminderMutation();
+  const [snooze] = useSnoozeReminderMutation();
   const [remove, { isLoading: deleting }] = useDeleteReminderMutation();
 
-  const todayKey = toDateKey(new Date());
-  const now = Date.now();
-
-  const sections = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = (data ?? [])
-      .filter(r => matches(r, filter, todayKey, now, customDay))
-      .filter(r => !q || r.title.toLowerCase().includes(q) || (r.note ?? '').toLowerCase().includes(q))
-      .sort((a, b) =>
-        sort === 'created'
-          ? b.created_at.localeCompare(a.created_at)
-          : sort === 'desc'
-            ? b.remind_at.localeCompare(a.remind_at)
-            : a.remind_at.localeCompare(b.remind_at),
-      );
-    const out: { title: string; items: Reminder[] }[] = [];
-    for (const r of list) {
-      const label = sort === 'created' ? 'Recently created' : sectionLabel(toDateKey(new Date(r.remind_at)), todayKey);
-      const last = out[out.length - 1];
-      if (last && last.title === label) last.items.push(r);
-      else out.push({ title: label, items: [r] });
+  // A dot under every day that has a reminder (green once they're all done).
+  const marks = useMemo(() => {
+    const out: Record<string, DayMark> = {};
+    for (const r of data ?? []) {
+      const key = dayOf(r);
+      const m = out[key] ?? { required: 0, completed: 0, status: 'PENDING' };
+      m.required += 1;
+      if (r.completed_at) m.completed += 1;
+      m.status = m.completed === m.required ? 'SUCCESS' : 'PENDING';
+      out[key] = m;
     }
     return out;
-    // `now` intentionally re-evaluated each render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, filter, sort, query, todayKey, customDay]);
+  }, [data]);
 
-  const counts = useMemo(() => {
-    const c: Partial<Record<Filter, number>> = {};
-    for (const f of FILTERS) c[f.key] = (data ?? []).filter(r => matches(r, f.key, todayKey, now, null)).length;
-    return c;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, todayKey]);
+  const items = useMemo(
+    () => (data ?? []).filter(r => dayOf(r) === day).sort((a, b) => a.remind_at.localeCompare(b.remind_at)),
+    [data, day],
+  );
 
   const toggleDone = async (r: Reminder) => {
     try {
       const updated = await setCompleted({ id: r.id, completed: !r.completed_at }).unwrap();
-      if (updated.completed_at) {
-        cancelReminderNotification(r.id).catch(() => undefined);
-        Toast.success('Reminder completed.', 1);
-      } else if (new Date(updated.remind_at).getTime() > Date.now()) {
+      if (updated.completed_at) cancelReminderNotification(r.id).catch(() => undefined);
+      else if (new Date(updated.remind_at).getTime() > Date.now()) {
         scheduleReminderNotification(r.id, r.title, r.note || r.title, new Date(updated.remind_at)).catch(() => undefined);
       }
     } catch (err) {
@@ -149,297 +74,211 @@ export function RemindersScreen() {
   };
 
   const doSnooze = async (r: Reminder, minutes: number) => {
+    setMenuFor(null);
     try {
       const updated = await snooze({ id: r.id, minutes }).unwrap();
       await scheduleReminderNotification(r.id, r.title, r.note || r.title, new Date(updated.remind_at));
-      setMenuFor(null);
-      Toast.success(`Snoozed to ${formatClock(updated.remind_at)}.`, 1.4);
+      Toast.success(`Moved to ${formatClock(updated.remind_at)}.`, 1.4);
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
     }
   };
 
-  const doConfirm = async () => {
-    if (!confirm) return;
+  const doDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      if (confirm.kind === 'cancel') await cancel(confirm.reminder.id).unwrap();
-      else await remove(confirm.reminder.id).unwrap();
-      await cancelReminderNotification(confirm.reminder.id);
-      setConfirm(null);
-      Toast.success(confirm.kind === 'cancel' ? 'Reminder cancelled.' : 'Reminder deleted.', 1.2);
+      await remove(confirmDelete.id).unwrap();
+      await cancelReminderNotification(confirmDelete.id);
+      setConfirmDelete(null);
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
     }
   };
+
+  const dayTitle = Math.abs(fromDateKey(day).getTime() - fromDateKey(todayKey).getTime()) <= 6 * 86400000
+    ? relativeDayLabel(day, todayKey)
+    : formatFullDate(day);
 
   return (
     <Screen
       padded={false}
       onRefresh={refetch}
       refreshing={isFetching && !isLoading}
-      footer={<Fab accessibilityLabel="Add reminder" onPress={() => navigation.navigate('ReminderEditor')} />}
+      footer={<Fab accessibilityLabel="Add reminder" onPress={() => navigation.navigate('ReminderEditor', { date: day })} />}
     >
       <View style={styles.pad}>
         <LargeTitle
-          eyebrow="Never forget what matters"
           title="Reminders"
           right={
-            <>
-              <IconButton icon="search" accessibilityLabel="Search reminders" onPress={() => setSearching(s => !s)} />
-              <IconButton
-                icon="sliders"
-                accessibilityLabel={`Sort: ${sort === 'asc' ? 'soonest first' : sort === 'desc' ? 'latest first' : 'recently created'}`}
-                onPress={() => setSort(s => (s === 'asc' ? 'desc' : s === 'desc' ? 'created' : 'asc'))}
-              />
-            </>
+            <DatePicker
+              value={fromDateKey(day)}
+              precision="day"
+              minDate={new Date(2020, 0, 1)}
+              maxDate={new Date(2035, 11, 31)}
+              onChange={(d: Date) => setDay(toDateKey(d))}
+              title="Pick a day"
+            >
+              <CalendarButton />
+            </DatePicker>
           }
         />
-        {searching ? (
-          <View style={styles.search}>
-            <Icon name="search" size={18} color={colors.textTertiary} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search reminders"
-              placeholderTextColor={colors.textTertiary}
-              style={styles.searchInput}
-              autoFocus
-              accessibilityLabel="Search reminders"
-            />
-            {query ? <IconButton icon="x" variant="plain" size={16} accessibilityLabel="Clear search" onPress={() => setQuery('')} /> : null}
-          </View>
-        ) : null}
       </View>
-      <ChipRow style={styles.chips}>
-        {FILTERS.map(f => (
-          <Chip
-            key={f.key}
-            label={f.label}
-            count={f.key !== 'date' && f.key !== 'all' ? counts[f.key] : undefined}
-            selected={filter === f.key}
-            onPress={() => setFilter(f.key)}
-          />
-        ))}
-      </ChipRow>
+
+      <DateStrip selected={day} today={todayKey} onSelect={setDay} marks={marks} daysBack={3} daysForward={30} />
+
       <View style={styles.pad}>
-        {filter === 'date' ? <DateField value={customDay} onChange={setCustomDay} placeholder="Choose a day" /> : null}
-        <Text style={[t.caption, styles.sortHint]}>
-          {sort === 'asc' ? 'Soonest first' : sort === 'desc' ? 'Latest first' : 'Recently created'}
-        </Text>
+        <View style={styles.dayHead}>
+          <Text style={t.heading}>{dayTitle}</Text>
+          {day !== todayKey ? (
+            <Pressable onPress={() => setDay(todayKey)} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.link}>Today</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         {isLoading ? (
-          <SkeletonList count={4} height={72} />
+          <SkeletonList count={3} height={64} />
         ) : isError ? (
           <ErrorState message={getErrorMessage(error, 'Could not load reminders.')} onRetry={refetch} />
-        ) : sections.length === 0 ? (
+        ) : items.length === 0 ? (
           <EmptyState
+            compact
             icon="bell"
-            title={filter === 'all' && !query ? 'Your schedule is clear' : 'Nothing matches'}
-            message={filter === 'all' && !query ? "Add a reminder so you don't have to remember everything." : 'Try a different filter or search.'}
-            actionLabel={filter === 'all' && !query ? 'Add reminder' : undefined}
-            onAction={() => navigation.navigate('ReminderEditor')}
+            title="No reminders this day"
+            actionLabel="Add reminder"
+            onAction={() => navigation.navigate('ReminderEditor', { date: day })}
           />
         ) : (
-          sections.map((section, si) => (
-            <FadeIn key={section.title} index={si}>
-              <View style={styles.sectionHead}>
-                <Text style={[t.micro, { color: section.title === 'Today' ? colors.primary : colors.textTertiary }]}>{section.title}</Text>
-                <View style={styles.sectionRule} />
-              </View>
-              {section.items.map(r => (
-                <ReminderRow
-                  key={r.id}
-                  reminder={r}
-                  onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
-                  onToggle={() => toggleDone(r)}
-                  onMore={() => setMenuFor(r)}
-                />
-              ))}
-            </FadeIn>
+          items.map(r => (
+            <ReminderRow
+              key={r.id}
+              reminder={r}
+              onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
+              onToggle={() => toggleDone(r)}
+              onMore={() => setMenuFor(r)}
+            />
           ))
         )}
       </View>
 
-      <Sheet visible={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.title} subtitle={menuFor ? `${relativeDayLabel(toDateKey(new Date(menuFor.remind_at)), todayKey)}, ${formatClock(menuFor.remind_at)}` : undefined}>
-        {menuFor && menuFor.status === 'ACTIVE' ? (
+      <Sheet visible={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.title}>
+        {menuFor && !menuFor.completed_at ? (
           <>
-            <Text style={styles.menuLabel}>Snooze</Text>
-            <View style={styles.snoozeRow}>
-              {[
-                [10, '10 min'],
-                [60, '1 hour'],
-                [180, '3 hours'],
-                [24 * 60, 'Tomorrow'],
-              ].map(([m, label]) => (
-                <Chip key={label} label={String(label)} icon="snooze" onPress={() => doSnooze(menuFor, Number(m))} />
-              ))}
-            </View>
-            {snoozing ? <Text style={t.caption}>Snoozing…</Text> : null}
+            <Button label="Remind me in 1 hour" icon="snooze" variant="secondary" onPress={() => doSnooze(menuFor, 60)} />
+            <Button label="Remind me tomorrow" icon="snooze" variant="secondary" onPress={() => doSnooze(menuFor, 24 * 60)} style={styles.mtSm} />
           </>
         ) : null}
-        <View style={styles.menuActions}>
-          <Button label="Reschedule or edit" icon="edit" variant="secondary" onPress={() => { const r = menuFor; setMenuFor(null); if (r) navigation.navigate('ReminderEditor', { reminderId: r.id }); }} />
-          {menuFor?.status === 'ACTIVE' ? (
-            <Button label="Cancel reminder" icon="x" variant="secondary" onPress={() => { const r = menuFor!; setMenuFor(null); setConfirm({ kind: 'cancel', reminder: r }); }} />
-          ) : null}
-          <Button label="Delete" icon="trash" variant="danger" onPress={() => { const r = menuFor!; setMenuFor(null); setConfirm({ kind: 'delete', reminder: r }); }} />
-        </View>
+        <Button
+          label="Delete"
+          icon="trash"
+          variant="ghost"
+          onPress={() => {
+            setConfirmDelete(menuFor);
+            setMenuFor(null);
+          }}
+          style={styles.mtSm}
+        />
       </Sheet>
 
       <ConfirmSheet
-        visible={Boolean(confirm)}
-        icon={confirm?.kind === 'delete' ? 'trash' : 'x'}
-        destructive={confirm?.kind === 'delete'}
-        title={confirm?.kind === 'delete' ? 'Delete this reminder?' : 'Cancel this reminder?'}
-        message={
-          confirm?.kind === 'delete'
-            ? 'This permanently removes it. This can’t be undone.'
-            : 'It won’t notify you, but you’ll still see it under Cancelled.'
-        }
-        confirmLabel={confirm?.kind === 'delete' ? 'Delete' : 'Cancel reminder'}
+        visible={Boolean(confirmDelete)}
+        icon="trash"
+        destructive
+        title="Delete this reminder?"
+        confirmLabel="Delete"
         cancelLabel="Keep it"
-        loading={cancelling || deleting}
-        onConfirm={doConfirm}
-        onCancel={() => setConfirm(null)}
+        loading={deleting}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDelete(null)}
       />
     </Screen>
   );
 }
 
-function ReminderRow({ reminder: r, onPress, onToggle, onMore }: { reminder: Reminder; onPress: () => void; onToggle: () => void; onMore: () => void }) {
-  const overdue = isOpen(r) && new Date(r.remind_at).getTime() < Date.now();
-  const done = Boolean(r.completed_at);
-  const cancelled = r.status === 'CANCELLED';
-  const whatsapp =
-    r.whatsapp_status === 'SENT' ? { label: 'WhatsApp sent', color: colors.success } :
-    r.whatsapp_status === 'FAILED' ? { label: 'WhatsApp failed', color: colors.danger } :
-    r.whatsapp_status === 'PENDING' ? { label: 'WhatsApp queued', color: colors.info } : null;
+/** The calendar button that opens the date picker (it injects onPress). */
+function CalendarButton({ onPress }: { onPress?: () => void }) {
+  return <IconButton icon="calendar" accessibilityLabel="Pick a day from the calendar" onPress={() => onPress?.()} />;
+}
 
+function ReminderRow({ reminder: r, onPress, onToggle, onMore }: { reminder: Reminder; onPress: () => void; onToggle: () => void; onMore: () => void }) {
+  const done = Boolean(r.completed_at);
+  const late = !done && new Date(r.remind_at).getTime() < Date.now();
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onMore}
       accessibilityRole="button"
-      accessibilityLabel={`${r.title}, ${formatClock(r.remind_at)}${done ? ', completed' : ''}${overdue ? ', overdue' : ''}`}
-      style={({ pressed }) => [styles.row, (done || cancelled) && styles.rowMuted, pressed && { opacity: 0.75 }]}
+      accessibilityLabel={`${r.title}, ${formatClock(r.remind_at)}${done ? ', done' : ''}`}
+      style={({ pressed }) => [styles.row, done && styles.rowDone, pressed && styles.pressed]}
     >
-      <View style={styles.timeCol}>
-        <Text style={[styles.time, overdue && { color: colors.danger }]}>{formatClock(r.remind_at)}</Text>
-        {r.priority === 'HIGH' ? <View style={styles.priority} /> : null}
-      </View>
-      <View style={styles.body}>
-        <Text style={[t.bodyStrong, (done || cancelled) && styles.strike]} numberOfLines={2}>
+      <Text style={[styles.time, late && { color: colors.danger }]}>{formatClock(r.remind_at)}</Text>
+      <View style={styles.flex}>
+        <Text style={[t.bodyStrong, done && styles.strike]} numberOfLines={2}>
           {r.title}
         </Text>
-        {r.note ? <Text style={t.caption} numberOfLines={1}>{r.note}</Text> : null}
-        <View style={styles.pills}>
-          <Pill icon="bell" label="Push" />
-          {whatsapp ? <Pill icon="message" label={whatsapp.label} color={whatsapp.color} background={`${whatsapp.color}1F`} /> : null}
-          {overdue ? <Pill label="Overdue" color={colors.danger} background={colors.dangerSoft} /> : null}
-          {cancelled ? <Pill label="Cancelled" /> : null}
-        </View>
+        {r.whatsapp_number ? (
+          <View style={styles.whatsapp}>
+            <Icon name="message" size={12} color={colors.textTertiary} />
+            <Text style={t.caption}>WhatsApp too</Text>
+          </View>
+        ) : null}
       </View>
-      {!cancelled ? <Checkbox checked={done} onPress={onToggle} size={24} accessibilityLabel={`Mark ${r.title} ${done ? 'not done' : 'done'}`} /> : null}
-      <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel={`More options for ${r.title}`} onPress={onMore} />
+      <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel="More options" onPress={onMore} />
+      <Checkbox checked={done} onPress={onToggle} accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   pad: {
     paddingHorizontal: 20,
   },
-  chips: {
-    paddingHorizontal: 20,
+  pressed: {
+    opacity: 0.75,
   },
-  search: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    height: 48,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  searchInput: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 15,
-  },
-  sortHint: {
+  mtSm: {
     marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-    color: colors.textTertiary,
   },
-  sectionHead: {
+  dayHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.xl,
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
-  sectionRule: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
+  link: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    marginBottom: spacing.sm,
   },
-  rowMuted: {
-    backgroundColor: colors.backgroundRaised,
-  },
-  timeCol: {
-    width: 64,
-    gap: 6,
+  rowDone: {
+    opacity: 0.55,
   },
   time: {
+    width: 72,
     color: colors.text,
     fontWeight: '700',
-    fontSize: 13,
-  },
-  priority: {
-    width: 18,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.danger,
-  },
-  body: {
-    flex: 1,
-    gap: 2,
   },
   strike: {
-    color: colors.textTertiary,
     textDecorationLine: 'line-through',
   },
-  pills: {
+  whatsapp: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  menuLabel: {
-    ...t.micro,
-    marginBottom: spacing.sm,
-  },
-  snoozeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  menuActions: {
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
   },
 });

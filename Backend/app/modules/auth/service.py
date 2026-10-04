@@ -91,7 +91,7 @@ def request_password_reset(db: Session, email: str) -> None:
     db.commit()
     send_email(
         user.email,
-        "Your Rememberly reset code",
+        "Your Memo reset code",
         f"Hi {user.display_name},\n\nYour password reset code is {code}. "
         f"It expires in {RESET_CODE_TTL_MINUTES} minutes.\n\n"
         "If you didn't ask for this, you can ignore this email.",

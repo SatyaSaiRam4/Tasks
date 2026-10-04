@@ -14,7 +14,6 @@ import { Gradient } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
 import { ListGroup, ListRow } from '../../../components/ListRow';
 import { getErrorMessage } from '../../../utils/apiError';
-import { formatFullDate } from '../../../utils/date';
 import { selectIsAdmin } from '../../auth/authSlice';
 import { useGetMyProfileQuery } from '../../users/usersApi';
 import { achievementIcon } from '../../streaks/screens/AchievementsScreen';
@@ -51,7 +50,7 @@ export function ProfileScreen() {
                   size={16}
                   color={colors.textSecondary}
                   accessibilityLabel="Share your User ID"
-                  onPress={() => Share.share({ message: `Find me on Rememberly: ${data.me.public_id}` })}
+                  onPress={() => Share.share({ message: `Find me on Memo: ${data.me.public_id}` })}
                 />
               </View>
               <Pill
@@ -66,31 +65,13 @@ export function ProfileScreen() {
           <FadeIn index={1} style={styles.grid}>
             <Stat icon="flame" color={colors.streak} label="Day streak" value={data.stats.current_streak} />
             <Stat icon="trophy" color={colors.streakGold} label="Best streak" value={data.stats.best_streak} />
-            <Stat icon="flag" color={colors.info} label="Completed tracks" value={data.stats.completed_tracks} />
-            <Stat icon="zap" color={colors.success} label="Consistency" value={Math.round(data.stats.consistency_pct)} suffix="%" />
+            <Stat icon="check-circle" color={colors.success} label="Days done" value={data.stats.total_success_days} />
           </FadeIn>
-          <Card style={styles.mtMd}>
-            <View style={styles.scoreRow}>
-              <View style={styles.flex}>
-                <Text style={t.micro}>Consistency score</Text>
-                <AnimatedNumber value={data.stats.consistency_score} style={styles.score} />
-              </View>
-              <View style={styles.flex}>
-                <Text style={t.caption}>
-                  {data.stats.total_completed_actions} {data.stats.total_completed_actions === 1 ? 'action' : 'actions'} completed
-                </Text>
-                <Text style={t.caption}>
-                  {data.stats.perfect_tracks} perfect {data.stats.perfect_tracks === 1 ? 'track' : 'tracks'}
-                </Text>
-                <Text style={t.caption}>Since {formatFullDate(data.stats.tracking_started_on)}</Text>
-              </View>
-            </View>
-          </Card>
 
-          <SectionHeader title="Achievements" action="See all" onAction={() => navigation.navigate('Achievements')} />
+          <SectionHeader title="Badges" action="See all" onAction={() => navigation.navigate('Achievements')} />
           {data.achievements.length === 0 ? (
             <Card onPress={() => navigation.navigate('Achievements')}>
-              <Text style={[t.body, { color: colors.textSecondary }]}>Complete your first full day to earn “First Step”.</Text>
+              <Text style={[t.body, { color: colors.textSecondary }]}>Badges show up here as you keep your streak going. Your first one comes after your first full day.</Text>
             </Card>
           ) : (
             <View style={styles.badges}>
@@ -109,8 +90,8 @@ export function ProfileScreen() {
 
           <SectionHeader title="More" />
           <ListGroup>
-            <ListRow icon="calendar" title="Consistency history" onPress={() => navigation.navigate('Consistency')} />
-            <ListRow icon="users" title="Discover people" subtitle="Find a friend by User ID" onPress={() => navigation.navigate('Discover')} />
+            <ListRow icon="calendar" title="Streak history" onPress={() => navigation.navigate('Consistency')} />
+            <ListRow icon="users" title="Find friends" subtitle="See a friend’s streak by their User ID" onPress={() => navigation.navigate('Discover')} />
             <ListRow icon="settings" title="Settings" onPress={() => navigation.navigate('Settings')} last={!isAdmin} />
             {isAdmin ? <ListRow icon="shield" title="Admin panel" onPress={() => navigation.navigate('AdminDashboard')} last /> : null}
           </ListGroup>
@@ -120,11 +101,11 @@ export function ProfileScreen() {
   );
 }
 
-function Stat({ icon, color, label, value, suffix }: { icon: 'flame' | 'trophy' | 'flag' | 'zap'; color: string; label: string; value: number; suffix?: string }) {
+function Stat({ icon, color, label, value }: { icon: 'flame' | 'trophy' | 'check-circle'; color: string; label: string; value: number }) {
   return (
     <Card style={styles.stat} contentStyle={styles.statContent}>
       <Icon name={icon} size={18} color={color} />
-      <AnimatedNumber value={value} suffix={suffix} style={styles.statValue} />
+      <AnimatedNumber value={value} style={styles.statValue} />
       <Text style={t.caption}>{label}</Text>
     </Card>
   );
@@ -136,9 +117,6 @@ const styles = StyleSheet.create({
   },
   mtLg: {
     marginTop: spacing.lg,
-  },
-  mtMd: {
-    marginTop: spacing.md,
   },
   hero: {
     alignItems: 'center',
@@ -166,8 +144,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   stat: {
-    width: '47.5%',
-    flexGrow: 1,
+    flex: 1,
   },
   statContent: {
     padding: spacing.md,
@@ -177,16 +154,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: colors.text,
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  score: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: colors.primary,
   },
   badges: {
     flexDirection: 'row',

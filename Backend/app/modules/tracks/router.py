@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.modules.auth.models import User
 
 from . import service
-from .schemas import TrackCreate, TrackDayOut, TrackOut, TrackUpdate
+from .schemas import TrackCreate, TrackDayOut, TrackGridOut, TrackOut, TrackUpdate
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
@@ -66,3 +66,20 @@ def track_days(
     start = from_ or today - timedelta(days=14)
     end = to or today + timedelta(days=7)
     return service.track_days(db, current_user, track_id, start, end)
+
+
+@router.get("/{track_id}/grid", response_model=TrackGridOut)
+def track_grid(
+    track_id: UUID,
+    from_: date | None = Query(default=None, alias="from"),
+    to: date | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Defaults to the whole category period, capped to the allowed range.
+    track = service.get_owned_track(db, current_user.id, track_id)
+    today = local_today(current_user.timezone)
+    start = from_ or track.start_date
+    end = to or track.end_date or max(today, start) + timedelta(days=6)
+    end = min(end, start + timedelta(days=service.MAX_DAYS_RANGE))
+    return service.track_grid(db, current_user, track_id, start, end)

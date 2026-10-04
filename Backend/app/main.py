@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     stop_reminder_worker()
 
 
-app = FastAPI(title="Rememberly API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Memo API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

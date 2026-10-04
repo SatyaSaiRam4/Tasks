@@ -16,11 +16,11 @@ CATALOG: tuple[AchievementDef, ...] = (
     AchievementDef("STREAK_14", "Two Weeks Strong", "Maintain a 14-day streak.", "flame"),
     AchievementDef("STREAK_30", "30 Day Consistency", "Maintain a 30-day streak.", "trophy"),
     AchievementDef("STREAK_100", "Centurion", "Maintain a 100-day streak.", "crown"),
-    AchievementDef("ACTIONS_100", "Hundred Actions", "Complete 100 actions.", "check-circle"),
-    AchievementDef("EARLY_STARTER", "Early Starter", "Complete 10 actions before 9 AM.", "sunrise"),
+    AchievementDef("ACTIONS_100", "Hundred Tasks", "Complete 100 tasks.", "check-circle"),
+    AchievementDef("EARLY_STARTER", "Early Starter", "Complete 10 tasks before 9 AM.", "sunrise"),
     AchievementDef("COMEBACK", "Comeback", "Have a full day again after losing a streak.", "refresh"),
-    AchievementDef("TRACK_FINISHER", "Track Finisher", "Finish a Track with at least 80% of actions done.", "flag"),
-    AchievementDef("PERFECT_TRACK", "Perfect Track", "Complete an entire Track without missing a day.", "award"),
+    AchievementDef("TRACK_FINISHER", "Category Finisher", "Finish a category with at least 80% of its tasks done.", "flag"),
+    AchievementDef("PERFECT_TRACK", "Perfect Category", "Finish a whole category without missing a day.", "award"),
 )
 
 BY_CODE = {a.code: a for a in CATALOG}

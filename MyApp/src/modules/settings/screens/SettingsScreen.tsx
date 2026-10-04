@@ -121,7 +121,7 @@ export function SettingsScreen() {
 
       <SectionHeader title="Appearance" />
       <ListGroup>
-        <ListRow icon="moon" title="Dark theme" subtitle="Rememberly is designed dark-first" right={<Text style={t.caption}>Always on</Text>} />
+        <ListRow icon="moon" title="Dark theme" subtitle="Memo is designed dark-first" right={<Text style={t.caption}>Always on</Text>} />
         <View style={styles.accentRow}>
           <Text style={t.bodyStrong}>Accent color</Text>
           <View style={styles.swatches}>
@@ -145,9 +145,8 @@ export function SettingsScreen() {
 
       <SectionHeader title="Notifications" />
       <ListGroup>
-        {toggle('notify_actions', 'Action reminders', 'For actions with “Remind me” on', false, 'target')}
         {toggle('notify_reminders', 'Reminders', 'Your date & time reminders', false, 'bell')}
-        {toggle('notify_streak_warnings', 'Streak warnings', 'At 8 PM if today isn’t secured yet', false, 'flame')}
+        {toggle('notify_streak_warnings', 'Streak warnings', 'At 8 PM if today’s tasks aren’t done', false, 'flame')}
         {toggle('notify_achievements', 'Achievements', 'When you unlock something', false, 'award')}
         <ListRow icon="clock" title="Exact alarms" subtitle="Allow on-time delivery on Android 12+" onPress={() => openExactAlarmSettings().catch(() => undefined)} last />
       </ListGroup>
@@ -174,7 +173,7 @@ export function SettingsScreen() {
             ))}
           </View>
         </View>
-        <ListRow icon="info" title="Streak rules" subtitle="Every required action, every day it’s due" onPress={() => navigation.navigate('Consistency')} last />
+        <ListRow icon="info" title="Streak rules" subtitle="Tick all of a day’s tasks to keep it going" onPress={() => navigation.navigate('Consistency')} last />
       </ListGroup>
 
       <SectionHeader title="Privacy" />
@@ -188,7 +187,7 @@ export function SettingsScreen() {
           </>
         ) : null}
       </ListGroup>
-      <Text style={[t.caption, styles.note]}>Your Vault, reminders and action details are never shown to anyone.</Text>
+      <Text style={[t.caption, styles.note]}>Your Vault, reminders and tasks are never shown to anyone.</Text>
 
       <SectionHeader title="Vault" />
       <ListGroup>
@@ -204,7 +203,7 @@ export function SettingsScreen() {
 
       <SectionHeader title="Satya" />
       <ListGroup>
-        {toggle('satya_enabled', 'Satya on the dashboard', 'Your guide and short motivational messages', false, 'sparkles')}
+        {toggle('satya_enabled', 'Satya on Home', 'Short tips from your guide', false, 'sparkles')}
         <ListRow
           icon="play"
           title="Replay tour"
@@ -216,7 +215,7 @@ export function SettingsScreen() {
         />
       </ListGroup>
 
-      <Text style={[t.caption, styles.version]}>Rememberly · v2.0</Text>
+      <Text style={[t.caption, styles.version]}>Memo · v2.1</Text>
 
       <Sheet visible={sheet === 'name'} onClose={() => setSheet(null)} title="Display name">
         <TextField value={name} onChangeText={setName} placeholder="Your name" maxLength={120} autoFocus />

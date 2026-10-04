@@ -33,7 +33,7 @@ export function AuthLayout({
               <Gradient colors={gradients.primary} borderRadius={radius.lg} style={styles.mark}>
                 <Icon name="flame" size={26} color={colors.white} strokeWidth={2.2} />
               </Gradient>
-              <Text style={styles.wordmark}>Rememberly</Text>
+              <Text style={styles.wordmark}>Memo</Text>
             </View>
             <Text style={[t.display, styles.title]}>{title}</Text>
             <Text style={[t.body, styles.subtitle]}>{subtitle}</Text>

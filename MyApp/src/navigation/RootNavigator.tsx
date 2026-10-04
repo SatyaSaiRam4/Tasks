@@ -1,18 +1,24 @@
 /**
- * The single source of truth for Rememberly's navigation.
+ * The single source of truth for Memo's navigation.
  *
  * Per the project convention, every navigator, the bottom tab bar, and the
  * NavigationContainer live in this one file so the whole app's flow reads
  * top to bottom:
  *
  *   Signed out → Login / Register / ForgotPassword / ResetPassword
- *   Signed in, first time → Onboarding (Satya's tour) → Main
- *   Signed in → Main tabs (Home · Routines · Reminders · Vault · Profile)
+ *   Signed in → Main tabs (Home · Categories · Reminders · Vault · Profile)
  *               + stack screens pushed on top of the tabs.
+ *   First time (or "Replay tour") → Satya's tour, drawn over the real app.
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import {
+  createNavigationContainerRef,
+  DarkTheme,
+  NavigationContainer,
+  type NavigatorScreenParams,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,12 +32,11 @@ import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
-import { OnboardingScreen } from '../modules/onboarding/OnboardingScreen';
+import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
 import { TrackDetailScreen } from '../modules/routines/screens/TrackDetailScreen';
 import { TrackEditorScreen } from '../modules/routines/screens/TrackEditorScreen';
-import { ActionEditorScreen } from '../modules/routines/screens/ActionEditorScreen';
 import { ConsistencyScreen } from '../modules/streaks/screens/ConsistencyScreen';
 import { AchievementsScreen } from '../modules/streaks/screens/AchievementsScreen';
 import { RemindersScreen } from '../modules/reminders/screens/RemindersScreen';
@@ -60,14 +65,12 @@ export type RootStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   ResetPassword: { email?: string } | undefined;
-  Onboarding: undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   TrackDetail: { trackId: string };
   TrackEditor: { trackId?: string } | undefined;
-  ActionEditor: { trackId: string; actionId?: string };
   Consistency: undefined;
   Achievements: undefined;
-  ReminderEditor: { reminderId?: string } | undefined;
+  ReminderEditor: { reminderId?: string; date?: string } | undefined;
   VaultEntry: { entryId?: string; folder?: string } | undefined;
   Discover: undefined;
   Settings: undefined;
@@ -80,7 +83,7 @@ export type RootStackParamList = {
 
 const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = {
   HomeTab: { label: 'Home', icon: 'home' },
-  RoutinesTab: { label: 'Routines', icon: 'target' },
+  RoutinesTab: { label: 'Categories', icon: 'target' },
   RemindersTab: { label: 'Reminders', icon: 'bell' },
   VaultTab: { label: 'Vault', icon: 'lock' },
   ProfileTab: { label: 'Profile', icon: 'user' },
@@ -151,13 +154,19 @@ const navTheme: Theme = {
   },
 };
 
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 export function RootNavigator() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectCurrentUser);
-  const needsOnboarding = isAuthenticated && user && !user.onboarding_completed;
+  const showTour = isAuthenticated && user && !user.onboarding_completed;
+
+  const goToTab = useCallback((tab: keyof MainTabParamList) => {
+    if (navigationRef.isReady()) navigationRef.navigate('Main', { screen: tab });
+  }, []);
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <RootStack.Navigator
         screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.background } }}
       >
@@ -168,18 +177,11 @@ export function RootNavigator() {
             <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </RootStack.Group>
-        ) : needsOnboarding ? (
-          // The tour exists only in this branch (first run, or "Replay tour" in
-          // Settings, which resets the flag). Keep it out of the signed-in
-          // group: a same-named route there would be kept on completion and
-          // the user would stay stuck on the tour.
-          <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: 'fade' }} />
         ) : (
           <RootStack.Group>
             <RootStack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
             <RootStack.Screen name="TrackDetail" component={TrackDetailScreen} />
             <RootStack.Screen name="TrackEditor" component={TrackEditorScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="ActionEditor" component={ActionEditorScreen} options={{ animation: 'slide_from_bottom' }} />
             <RootStack.Screen name="Consistency" component={ConsistencyScreen} />
             <RootStack.Screen name="Achievements" component={AchievementsScreen} />
             <RootStack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ animation: 'slide_from_bottom' }} />
@@ -192,6 +194,7 @@ export function RootNavigator() {
           </RootStack.Group>
         )}
       </RootStack.Navigator>
+      {showTour ? <SatyaTour goToTab={goToTab} /> : null}
     </NavigationContainer>
   );
 }

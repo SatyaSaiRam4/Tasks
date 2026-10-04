@@ -1,87 +1,144 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React, { useEffect, useState } from 'react';
+import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, gradients, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
-import { TextField } from '../../../components/TextField';
-import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
-import { Avatar } from '../../../components/Controls';
-import { EmptyState, FadeIn } from '../../../components/Feedback';
+import { Avatar, Chip, IconButton, Toggle } from '../../../components/Controls';
+import { EmptyState, FadeIn, Skeleton } from '../../../components/Feedback';
 import { Gradient } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
 import { errorStatus, getErrorMessage } from '../../../utils/apiError';
-import { formatFullDate } from '../../../utils/date';
-import { useAppSelector } from '../../../app/hooks';
-import { selectCurrentUser } from '../../auth/authSlice';
-import { useLazySearchUserQuery } from '../../users/usersApi';
+import { useGetMeQuery, useLazySearchUserQuery, useUpdateSettingsMutation } from '../../users/usersApi';
 import { achievementIcon } from '../../streaks/screens/AchievementsScreen';
-import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+const RECENT_KEY = '@rememberly/recent_friend_searches';
 
+/** Find a friend's streak by their User ID, and choose whether friends can find you. */
 export function DiscoverScreen() {
-  const navigation = useNavigation<Nav>();
-  const me = useAppSelector(selectCurrentUser);
+  const me = useGetMeQuery();
+  const [updateSettings] = useUpdateSettingsMutation();
   const [id, setId] = useState('');
+  const [recent, setRecent] = useState<string[]>([]);
   const [search, { data, error, isFetching, isError, isUninitialized }] = useLazySearchUserQuery();
+  const isPublic = Boolean(me.data?.settings.is_public_profile);
 
-  const submit = () => {
-    const value = id.trim().toUpperCase();
-    if (value.length >= 3) search(value);
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_KEY)
+      .then(raw => raw && setRecent(JSON.parse(raw)))
+      .catch(() => undefined);
+  }, []);
+
+  const run = (value: string) => {
+    const clean = value.trim().toUpperCase();
+    if (clean.length < 3) return;
+    setId(clean);
+    search(clean);
+    const next = [clean, ...recent.filter(r => r !== clean)].slice(0, 5);
+    setRecent(next);
+    AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)).catch(() => undefined);
   };
 
   return (
     <Screen>
-      <ScreenHeader title="Discover" />
-      <Text style={[t.body, styles.intro]}>
-        Search for someone by their User ID to see the consistency they’ve chosen to share. Nothing private is ever shown.
-      </Text>
-      <TextField
-        label="User ID"
-        icon="search"
-        value={id}
-        onChangeText={v => setId(v.toUpperCase())}
-        placeholder="SATYA_8F29A"
-        autoCapitalize="characters"
-        autoCorrect={false}
-        returnKeyType="search"
-        onSubmitEditing={submit}
-      />
-      <Button label="Search" icon="search" onPress={submit} loading={isFetching} disabled={id.trim().length < 3} />
+      <ScreenHeader title="Find friends" />
 
+      {/* Your own ID, and whether friends can find you */}
+      <Card style={styles.mb}>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Text style={t.micro}>Your ID</Text>
+            <Text style={styles.myId}>{me.data?.public_id ?? '…'}</Text>
+          </View>
+          <IconButton
+            icon="copy"
+            accessibilityLabel="Share your ID"
+            onPress={() => me.data && Share.share({ message: `Find me on Memo: ${me.data.public_id}` })}
+          />
+        </View>
+        <View style={[styles.row, styles.toggleRow]}>
+          <View style={styles.flex}>
+            <Text style={t.bodyStrong}>Let friends find me</Text>
+            <Text style={t.caption}>{isPublic ? 'Friends can see your streak.' : 'Nobody can find you right now.'}</Text>
+          </View>
+          <Toggle
+            value={isPublic}
+            onChange={v => updateSettings({ is_public_profile: v })}
+            accessibilityLabel="Let friends find me"
+          />
+        </View>
+      </Card>
+
+      {/* Search */}
+      <View style={styles.search}>
+        <Icon name="search" size={18} color={colors.textTertiary} />
+        <TextInput
+          value={id}
+          onChangeText={v => setId(v.toUpperCase())}
+          placeholder="Friend's ID, e.g. SATYA_8F29A"
+          placeholderTextColor={colors.textTertiary}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          returnKeyType="search"
+          onSubmitEditing={() => run(id)}
+          style={styles.searchInput}
+          accessibilityLabel="Friend's User ID"
+        />
+        <Pressable
+          onPress={() => run(id)}
+          disabled={id.trim().length < 3}
+          style={[styles.go, id.trim().length < 3 && styles.goOff]}
+          accessibilityRole="button"
+          accessibilityLabel="Search"
+        >
+          <Icon name="arrow-right" size={18} color={colors.white} />
+        </Pressable>
+      </View>
+      {recent.length && isUninitialized ? (
+        <View style={styles.recent}>
+          {recent.map(r => (
+            <Chip key={r} label={r} icon="refresh" onPress={() => run(r)} />
+          ))}
+        </View>
+      ) : null}
+
+      {/* Result */}
       <View style={styles.result}>
-        {isUninitialized ? (
-          <Card>
-            <View style={styles.row}>
-              <Icon name="info" size={18} color={colors.textTertiary} />
-              <Text style={[t.caption, styles.flex]}>
-                Your ID is <Text style={{ color: colors.text, fontWeight: '700' }}>{me?.public_id}</Text>. Turn on a public
-                profile in Settings → Privacy if you want others to find you.
-              </Text>
-            </View>
-          </Card>
+        {isFetching ? (
+          <Skeleton height={220} rounded={radius.xl} />
         ) : isError ? (
           <EmptyState
+            compact
             icon="users"
-            title={errorStatus(error) === 404 ? 'No public profile found' : 'Search failed'}
-            message={errorStatus(error) === 404 ? 'Check the ID, or the person may keep their profile private.' : getErrorMessage(error)}
+            title={errorStatus(error) === 404 ? 'No one found' : 'Search failed'}
+            message={errorStatus(error) === 404 ? 'Check the ID. Your friend may also need to turn on “Let friends find me”.' : getErrorMessage(error)}
           />
         ) : data ? (
           <FadeIn>
-            <Gradient colors={gradients.surface} borderRadius={radius.xl} style={styles.profile}>
-              <Avatar name={data.display_name} emoji={data.avatar} size={68} />
-              <Text style={[t.title, styles.center]}>{data.display_name}</Text>
-              <Text style={styles.id}>{data.public_id}</Text>
-              <Text style={t.caption}>Member since {formatFullDate(data.member_since)}</Text>
-              <View style={styles.stats}>
-                {data.current_streak !== null ? <Stat icon="flame" color={colors.streak} label="Streak" value={String(data.current_streak)} /> : null}
-                {data.best_streak !== null ? <Stat icon="trophy" color={colors.streakGold} label="Best" value={String(data.best_streak)} /> : null}
-                <Stat icon="zap" color={colors.success} label="Consistency" value={`${Math.round(data.consistency_pct)}%`} />
-                <Stat icon="flag" color={colors.info} label="Tracks" value={String(data.completed_tracks)} />
+            <Card>
+              <View style={styles.row}>
+                <Avatar name={data.display_name} emoji={data.avatar} size={52} />
+                <View style={styles.flex}>
+                  <Text style={t.heading}>{data.display_name}</Text>
+                  <Text style={t.caption}>{data.public_id}</Text>
+                </View>
               </View>
+
+              {data.current_streak !== null || data.best_streak !== null ? (
+                <Gradient colors={gradients.streak} opacity={[0.25, 0.08]} borderRadius={radius.lg} style={styles.streak}>
+                  <Icon name="flame" size={30} color={colors.streak} />
+                  {data.current_streak !== null ? (
+                    <Text style={styles.streakNum}>
+                      {data.current_streak} <Text style={styles.streakUnit}>day streak</Text>
+                    </Text>
+                  ) : null}
+                  {data.best_streak !== null ? <Text style={[t.caption, styles.best]}>Best {data.best_streak}</Text> : null}
+                </Gradient>
+              ) : (
+                <Text style={[t.caption, styles.hidden]}>{data.display_name.split(' ')[0]} keeps their streak private.</Text>
+              )}
+
               {data.achievements?.length ? (
                 <View style={styles.badges}>
                   {data.achievements.slice(0, 6).map(a => (
@@ -96,24 +153,11 @@ export function DiscoverScreen() {
                   ))}
                 </View>
               ) : null}
-            </Gradient>
+            </Card>
           </FadeIn>
         ) : null}
       </View>
-      {!isUninitialized ? null : (
-        <Button label="Privacy settings" variant="ghost" onPress={() => navigation.navigate('Settings')} />
-      )}
     </Screen>
-  );
-}
-
-function Stat({ icon, color, label, value }: { icon: 'flame' | 'trophy' | 'zap' | 'flag'; color: string; label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Icon name={icon} size={16} color={color} />
-      <Text style={t.heading}>{value}</Text>
-      <Text style={t.caption}>{label}</Text>
-    </View>
   );
 }
 
@@ -121,64 +165,109 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  center: {
-    textAlign: 'center',
-  },
-  intro: {
-    color: colors.textSecondary,
+  mb: {
     marginBottom: spacing.xl,
   },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  myId: {
+    ...t.heading,
+    letterSpacing: 0.8,
+    marginTop: 2,
+  },
+  toggleRow: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
+    height: 54,
+    paddingLeft: spacing.lg,
+    paddingRight: 6,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    paddingVertical: 0,
+  },
+  go: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+  },
+  goOff: {
+    opacity: 0.35,
+  },
+  recent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   result: {
     marginTop: spacing.xl,
-    marginBottom: spacing.lg,
   },
-  profile: {
-    alignItems: 'center',
-    padding: spacing.xxl,
-    gap: spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  id: {
-    color: colors.textSecondary,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  stats: {
+  streak: {
     flexDirection: 'row',
-    marginTop: spacing.xl,
-    alignSelf: 'stretch',
-  },
-  stat: {
-    flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  streakNum: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  streakUnit: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  best: {
+    color: colors.streakGold,
+    fontWeight: '700',
+  },
+  hidden: {
+    marginTop: spacing.lg,
   },
   badges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: spacing.md,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
   },
   badge: {
-    width: 70,
+    width: 64,
     alignItems: 'center',
     gap: 4,
   },
   badgeIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
-    color: colors.textSecondary,
-    fontSize: 10,
+    ...t.caption,
+    fontSize: 11,
     textAlign: 'center',
   },
 });
