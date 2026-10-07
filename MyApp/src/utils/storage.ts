@@ -48,3 +48,4 @@ export async function clearSession(): Promise<void> {
 
 /** The chosen accent name; read at startup before any styles are created. */
 export const ACCENT_STORAGE_KEY = '@rememberly/accent';
+export const THEME_STORAGE_KEY = '@rememberly/theme';

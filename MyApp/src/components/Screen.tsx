@@ -20,8 +20,8 @@ interface ScreenProps {
 }
 
 /**
- * Every screen's chrome: the near-black background with a faint ambient
- * glow at the top, safe areas, an offline banner, and an optional scroll
+ * Shared screen chrome: the selected background with a faint ambient glow,
+ * safe areas, an offline banner, and an optional scroll
  * container with pull-to-refresh.
  */
 export function Screen({

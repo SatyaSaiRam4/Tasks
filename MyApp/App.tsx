@@ -2,7 +2,7 @@
  * Memo — root app component.
  *
  * Wires up Redux, the ant-design/react-native provider (recolored to the
- * premium dark theme), safe areas, session rehydration, and the app-wide
+ * selected theme), safe areas, session rehydration, and the app-wide
  * providers (celebrations, the Action completion flow), then hands off to
  * RootNavigator (src/navigation/RootNavigator.tsx), which owns all navigation.
  */
@@ -25,7 +25,7 @@ import { BackgroundSync } from './src/modules/home/BackgroundSync';
 import { VaultAutoLock } from './src/modules/vault/VaultAutoLock';
 import { SatyaOrb } from './src/modules/satya/SatyaModel';
 
-// Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the dark theme.
+// Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the selected theme.
 const antTheme = {
   brand_primary: colors.primary,
   brand_primary_tap: colors.primarySecondary,
@@ -45,7 +45,7 @@ const antTheme = {
   radius_sm: radius.sm,
   radius_md: radius.md,
   radius_lg: radius.lg,
-  toast_fill: 'rgba(25, 29, 38, 0.97)',
+  toast_fill: colors.isDark ? 'rgba(25, 29, 38, 0.97)' : 'rgba(29, 41, 47, 0.94)',
   primary_button_fill: colors.primary,
   primary_button_fill_tap: colors.primarySecondary,
 };
@@ -89,8 +89,7 @@ function App() {
       <SafeAreaProvider>
         <ReduxProvider store={store}>
           <AntProvider locale={enUS} theme={antTheme}>
-            {/* The app is dark-only, so the status bar is always light. */}
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} />
             <CelebrationProvider>
               <CompletionProvider>
                 <AppContent />
