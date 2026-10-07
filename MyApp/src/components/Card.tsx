@@ -89,7 +89,7 @@ export function Card({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
-        android_ripple={{ color: 'rgba(217,188,130,0.06)' }}
+        android_ripple={{ color: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(29,41,47,0.06)' }}
         style={[styles.radius, styles.fill]}
       >
         {surface}

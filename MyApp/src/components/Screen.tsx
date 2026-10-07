@@ -23,9 +23,9 @@ interface ScreenProps {
 }
 
 /**
- * Every screen's chrome: the cinematic night-sky backdrop, safe areas, an
- * offline banner, and an optional scroll container with pull-to-refresh.
- * On tablets and desktops the content is centered at a readable width.
+ * Shared screen chrome: the selected background with a faint ambient glow,
+ * safe areas, an offline banner, and an optional scroll
+ * container with pull-to-refresh.
  */
 export function Screen({
   children,

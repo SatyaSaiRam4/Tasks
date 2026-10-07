@@ -69,14 +69,14 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin]);
 
-  const title = !status.has_pin ? (first ? 'Enter it again' : 'Create a PIN') : 'Enter your PIN';
+  const title = !status.has_pin ? (first ? 'Confirm your Vault PIN' : 'Create a Vault PIN') : 'Unlock your Vault';
   const subtitle = !status.has_pin
     ? first
-      ? 'Type the same 4 digits to confirm.'
-      : 'Pick 4 digits to protect your private notes. Remember it, it can’t be recovered.'
+      ? 'Enter the same 4 digits again.'
+      : 'Save private notes here, such as passwords or recovery codes. Notes are encrypted and protected by this PIN. It can’t be recovered.'
     : lockedOut
       ? `Too many tries. Try again in ${Math.ceil((lockedUntil - now) / 1000)}s.`
-      : 'Your notes are locked.';
+      : 'Your encrypted notes are only available after you unlock this space.';
 
   return (
     <FadeIn style={styles.root}>

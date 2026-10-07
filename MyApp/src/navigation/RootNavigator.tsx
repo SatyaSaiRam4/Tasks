@@ -15,6 +15,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   createNavigationContainerRef,
   DarkTheme,
+  DefaultTheme,
   NavigationContainer,
   type NavigatorScreenParams,
   type Theme,
@@ -171,9 +172,9 @@ function MainTabs() {
 }
 
 const navTheme: Theme = {
-  ...DarkTheme,
+  ...(colors.isDark ? DarkTheme : DefaultTheme),
   colors: {
-    ...DarkTheme.colors,
+    ...(colors.isDark ? DarkTheme.colors : DefaultTheme.colors),
     primary: colors.primary,
     background: colors.background,
     card: colors.background,

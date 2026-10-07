@@ -97,7 +97,7 @@ export function VaultEntryScreen() {
 
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
-      <Screen edges={['top', 'bottom']} glowColor={colors.violet}>
+      <Screen edges={['top', 'bottom']} glowColor={colors.primary}>
         <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} close />
         {entryId && existing.isLoading ? (
           <Skeleton height={300} rounded={radius.lg} />

@@ -9,16 +9,18 @@ import React, { useEffect, useState } from 'react';
 import { AppRegistry, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { name as appName } from './app.json';
-import { applyAccent, colors } from './src/theme';
-import { ACCENT_STORAGE_KEY } from './src/utils/storage';
+import { applyAccent, applyTheme, colors } from './src/theme';
+import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from './src/utils/storage';
 
 function Bootstrap() {
   const [App, setApp] = useState(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(ACCENT_STORAGE_KEY)
-      .catch(() => null)
-      .then(accent => {
+    AsyncStorage.getMany([ACCENT_STORAGE_KEY, THEME_STORAGE_KEY])
+      .catch(() => [])
+      .then(values => {
+        applyTheme(values[THEME_STORAGE_KEY]);
+        const accent = values[ACCENT_STORAGE_KEY];
         applyAccent(accent);
         setApp(() => require('./App').default);
       });

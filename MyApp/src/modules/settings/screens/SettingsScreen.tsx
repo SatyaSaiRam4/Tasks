@@ -5,8 +5,7 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../../app/hooks';
-import { ACCENTS, colors, DEFAULT_ACCENT, font, radius, spacing, type AccentName, type as t } from '../../../theme';
-import { Wordmark } from '../../../components/Brand';
+import { ACCENTS, colors, radius, spacing, type AccentName, type ThemeMode, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { SectionHeader, Toggle } from '../../../components/Controls';
@@ -17,7 +16,7 @@ import { Button } from '../../../components/Button';
 import { ErrorState, SkeletonList } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
-import { ACCENT_STORAGE_KEY } from '../../../utils/storage';
+import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from '../../../utils/storage';
 import { openExactAlarmSettings } from '../../../notifications';
 import { useLogoutAllMutation, useLogoutMutation } from '../../auth/authApi';
 import { selectRefreshToken } from '../../auth/authSlice';
@@ -58,11 +57,19 @@ export function SettingsScreen() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
-  const [accent, setAccent] = useState<AccentName>(DEFAULT_ACCENT);
+  const [accent, setAccent] = useState<AccentName>('amber');
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
 
   useEffect(() => {
-    AsyncStorage.getItem(ACCENT_STORAGE_KEY)
-      .then(v => v && v in ACCENTS && setAccent(v as AccentName))
+    AsyncStorage.getMany([ACCENT_STORAGE_KEY, THEME_STORAGE_KEY])
+      .then(values => {
+        if (values[ACCENT_STORAGE_KEY] && values[ACCENT_STORAGE_KEY] in ACCENTS) {
+          setAccent(values[ACCENT_STORAGE_KEY] as AccentName);
+        }
+        if (values[THEME_STORAGE_KEY] === 'light' || values[THEME_STORAGE_KEY] === 'dark') {
+          setThemeMode(values[THEME_STORAGE_KEY]);
+        }
+      })
       .catch(() => undefined);
   }, []);
 
@@ -76,6 +83,12 @@ export function SettingsScreen() {
     await AsyncStorage.setItem(ACCENT_STORAGE_KEY, key).catch(() => undefined);
     set({ accent_color: ACCENTS[key].primary });
     Toast.info('Accent saved. It applies the next time you open the app.', 2);
+  };
+
+  const pickTheme = async (mode: ThemeMode) => {
+    setThemeMode(mode);
+    await AsyncStorage.setItem(THEME_STORAGE_KEY, mode).catch(() => undefined);
+    Toast.info('Theme saved. It applies the next time you open the app.', 2);
   };
 
   if (me.isLoading) {
@@ -122,7 +135,26 @@ export function SettingsScreen() {
 
       <SectionHeader title="Appearance" />
       <ListGroup>
-        <ListRow icon="moon" title="Dark theme" subtitle="Memo is designed dark-first" right={<Text style={t.caption}>Always on</Text>} />
+        <View style={styles.themeRow}>
+          <Text style={t.bodyStrong}>Color theme</Text>
+          <View style={styles.themeSegment} accessibilityRole="radiogroup">
+            {(['light', 'dark'] as const).map(mode => (
+              <Pressable
+                key={mode}
+                onPress={() => pickTheme(mode)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: themeMode === mode }}
+                accessibilityLabel={`${mode} theme`}
+                style={[styles.themeOption, themeMode === mode && styles.themeOptionOn]}
+              >
+                <Text style={[t.bodyStrong, themeMode === mode && styles.themeTextOn]}>
+                  {mode === 'light' ? 'Light' : 'Dark'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[t.caption, styles.themeHint]}>Applies the next time you open the app</Text>
+        </View>
         <View style={styles.accentRow}>
           <Text style={t.bodyStrong}>Accent color</Text>
           <View style={styles.swatches}>
@@ -305,6 +337,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
+  },
+  themeRow: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  themeSegment: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    padding: 3,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  themeOption: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+  },
+  themeOptionOn: {
+    backgroundColor: colors.primary,
+  },
+  themeTextOn: {
+    color: colors.white,
+  },
+  themeHint: {
+    marginTop: spacing.sm,
   },
   swatches: {
     flexDirection: 'row',

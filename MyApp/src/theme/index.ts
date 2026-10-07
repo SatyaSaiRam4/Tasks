@@ -1,10 +1,9 @@
 /**
- * Memo design tokens — "Moonlight", a luxury dark system.
+ * Memo design tokens — a light-first system with a dark alternative.
  *
- * Obsidian and midnight-navy surfaces, ivory type, one champagne-gold brand
- * color, with moonlight blue and a soft violet for atmosphere. Headlines and
- * numbers use the platform serif, everything else the platform sans.
- * Screens use semantic tokens from here, never raw hex values.
+ * Warm, light-first surfaces with a configurable accent, semantic colors for
+ * completion and streaks, and red only for destructive actions. Screens use
+ * semantic tokens from here, never raw hex values.
  *
  * `primary` is the interactive accent and is user-configurable (Settings →
  * Accent). It is applied once at startup (see applyAccent / index.js), before
@@ -15,15 +14,74 @@
 import { Platform } from 'react-native';
 
 export const ACCENTS = {
-  amber: { primary: '#D9BC82', secondary: '#B89058' },
-  violet: { primary: '#B1A3EC', secondary: '#8790DC' },
-  ocean: { primary: '#A3BEEB', secondary: '#7C9BD6' },
-  emerald: { primary: '#93D2B6', secondary: '#6FAFC0' },
-  rose: { primary: '#E5AFBE', secondary: '#B9A0DC' },
+  violet: { primary: '#6D5BD0', secondary: '#5274C8' },
+  ocean: { primary: '#2678A8', secondary: '#168B83' },
+  emerald: { primary: '#168363', secondary: '#2678A8' },
+  rose: { primary: '#BD4C72', secondary: '#875AB8' },
+  amber: { primary: '#A85D20', secondary: '#C47732' },
 } as const;
 
 export type AccentName = keyof typeof ACCENTS;
+export type ThemeMode = 'light' | 'dark';
 export const DEFAULT_ACCENT: AccentName = 'amber';
+export const DEFAULT_THEME: ThemeMode = 'light';
+
+const PALETTES = {
+  light: {
+    background: '#F5F3EE',
+    backgroundRaised: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceAlt: '#F0EEE8',
+    surfaceHigh: '#E8E5DE',
+    overlay: 'rgba(19, 25, 31, 0.48)',
+    border: 'rgba(34, 43, 51, 0.09)',
+    borderStrong: 'rgba(34, 43, 51, 0.16)',
+    divider: 'rgba(34, 43, 51, 0.08)',
+    text: '#1D292F',
+    textSecondary: '#59666B',
+    textTertiary: '#7B8588',
+    textInverse: '#FFFFFF',
+    success: '#168363',
+    successSoft: 'rgba(22, 131, 99, 0.12)',
+    streak: '#B86A2D',
+    streakGold: '#C18436',
+    streakSoft: 'rgba(184, 106, 45, 0.12)',
+    warning: '#A66A1D',
+    warningSoft: 'rgba(166, 106, 29, 0.12)',
+    danger: '#C44747',
+    dangerSoft: 'rgba(196, 71, 71, 0.10)',
+    info: '#28759A',
+    infoSoft: 'rgba(40, 117, 154, 0.11)',
+    isDark: false,
+  },
+  dark: {
+    background: '#101416',
+    backgroundRaised: '#171D1F',
+    surface: '#1B2224',
+    surfaceAlt: '#242D2F',
+    surfaceHigh: '#303B3D',
+    overlay: 'rgba(3, 7, 8, 0.76)',
+    border: 'rgba(255, 255, 255, 0.08)',
+    borderStrong: 'rgba(255, 255, 255, 0.15)',
+    divider: 'rgba(255, 255, 255, 0.07)',
+    text: '#F3F4EF',
+    textSecondary: '#AEB8B7',
+    textTertiary: '#7E8A89',
+    textInverse: '#101416',
+    success: '#48BE91',
+    successSoft: 'rgba(72, 190, 145, 0.14)',
+    streak: '#E79A53',
+    streakGold: '#E8BE72',
+    streakSoft: 'rgba(231, 154, 83, 0.14)',
+    warning: '#E8BE72',
+    warningSoft: 'rgba(232, 190, 114, 0.14)',
+    danger: '#E77777',
+    dangerSoft: 'rgba(231, 119, 119, 0.14)',
+    info: '#71B5D2',
+    infoSoft: 'rgba(113, 181, 210, 0.14)',
+    isDark: true,
+  },
+} as const;
 
 export function withAlpha(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -37,70 +95,50 @@ export const fonts = {
 };
 
 export const colors = {
-  // Surfaces, from the deepest layer up: obsidian → midnight navy.
-  background: '#05060B',
-  backgroundRaised: '#0A0D18',
-  surface: '#0F1424',
-  surfaceAlt: '#151B2F',
-  surfaceHigh: '#1F2741',
-  glass: 'rgba(17, 22, 40, 0.72)',
-  glassStrong: 'rgba(14, 18, 34, 0.92)',
-  overlay: 'rgba(2, 3, 8, 0.78)',
-
-  // Warm hairlines: borders carry a hint of champagne.
-  border: 'rgba(232, 214, 178, 0.08)',
-  borderStrong: 'rgba(232, 214, 178, 0.16)',
-  divider: 'rgba(232, 214, 178, 0.07)',
-
-  text: '#F5F0E6',
-  textSecondary: '#B4B1AB',
-  textTertiary: '#77798A',
-  textInverse: '#0A0B10',
-
-  // Brand: champagne gold (constant).
-  gold: '#D9BC82',
-  goldBright: '#F1DDAF',
-  goldDeep: '#A8844C',
-  goldSoft: 'rgba(217, 188, 130, 0.12)',
-  goldLine: 'rgba(217, 188, 130, 0.38)',
-  moon: '#A9C0EC',
-  moonSoft: 'rgba(169, 192, 236, 0.12)',
-  violet: '#9C8BDA',
+  ...PALETTES.light,
 
   // Accent (mutated by applyAccent at startup).
-  primary: ACCENTS.amber.primary as string,
-  primarySecondary: ACCENTS.amber.secondary as string,
-  primarySoft: withAlpha(ACCENTS.amber.primary, 0.14),
-  primaryGlow: withAlpha(ACCENTS.amber.primary, 0.32),
-  onPrimary: '#0A0B10',
-
-  success: '#8CD3B3',
-  successSoft: 'rgba(140, 211, 179, 0.13)',
-  streak: '#E8AD66',
-  streakGold: '#F1D08E',
-  streakSoft: 'rgba(232, 173, 102, 0.13)',
-  warning: '#EACB82',
-  warningSoft: 'rgba(234, 203, 130, 0.13)',
-  danger: '#EC8796',
-  dangerSoft: 'rgba(236, 135, 150, 0.13)',
-  info: '#A3BEEB',
-  infoSoft: 'rgba(163, 190, 235, 0.13)',
+  primary: ACCENTS[DEFAULT_ACCENT].primary as string,
+  primarySecondary: ACCENTS[DEFAULT_ACCENT].secondary as string,
+  primarySoft: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.16),
+  primaryGlow: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.35),
 
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
 };
 
+/** Selects the shared surface and semantic colors before screens are loaded. */
+export function applyTheme(mode: string | null | undefined): ThemeMode {
+  const key: ThemeMode = mode === 'dark' ? 'dark' : DEFAULT_THEME;
+  Object.assign(colors, PALETTES[key]);
+  gradients.surface = key === 'light' ? ['#FFFFFF', '#F0EEE8'] : ['#242D2F', '#171D1F'];
+  gradients.vault = key === 'light' ? ['#E9E5F1', '#F5F3EE'] : ['#292536', '#101416'];
+  gradients.dashboard = key === 'light' ? ['#304840', '#203932'] : ['#293B36', '#182925'];
+  gradients.streak = key === 'light' ? ['#C18436', '#A85D20'] : ['#E8BE72', '#D78642'];
+  gradients.success = key === 'light' ? ['#168363', '#267D69'] : ['#48BE91', '#2E9B8C'];
+  gradients.danger = key === 'light' ? ['#C44747', '#A93E57'] : ['#E77777', '#C85B65'];
+  Object.assign(shadow.card, {
+    shadowOpacity: key === 'light' ? 0.09 : 0.35,
+    shadowRadius: key === 'light' ? 14 : 20,
+    elevation: key === 'light' ? 2 : 6,
+  });
+  Object.assign(shadow.float, {
+    shadowOpacity: key === 'light' ? 0.14 : 0.45,
+    shadowRadius: key === 'light' ? 20 : 28,
+    elevation: key === 'light' ? 5 : 12,
+  });
+  return key;
+}
+
 export const gradients = {
   primary: [colors.primary, colors.primarySecondary] as [string, string],
-  gold: ['#F1DDAF', '#B89058'] as [string, string],
-  streak: ['#F1D08E', '#D98A4E'] as [string, string],
-  success: ['#A6E0C5', '#6FB7A8'] as [string, string],
-  surface: ['#161C31', '#0B0F1C'] as [string, string],
-  night: ['#121935', '#070912'] as [string, string],
-  moonlight: ['#1B2546', '#0A0D1A'] as [string, string],
-  vault: ['#1E1838', '#0A0A14'] as [string, string],
-  danger: ['#EC8796', '#D9907A'] as [string, string],
+  streak: ['#C18436', '#A85D20'] as [string, string],
+  success: ['#168363', '#267D69'] as [string, string],
+  surface: ['#FFFFFF', '#F0EEE8'] as [string, string],
+  vault: ['#E9E5F1', '#F5F3EE'] as [string, string],
+  dashboard: ['#304840', '#203932'] as [string, string],
+  danger: ['#C44747', '#A93E57'] as [string, string],
 };
 
 /** Applies a named accent before any styles are created. */
@@ -145,12 +183,12 @@ export const CONTENT_MAX_WIDTH = 760;
 export const WIDE_CONTENT_MAX_WIDTH = 1080;
 
 export const radius = {
-  xs: 6,
-  sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 26,
-  xxl: 34,
+  xs: 4,
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 16,
+  xxl: 24,
   pill: 999,
 } as const;
 
@@ -195,18 +233,18 @@ export const font = {
 };
 
 export const type = {
-  hero: { ...serif(fontSize.hero, '600'), letterSpacing: -1, lineHeight: fontSize.hero * 1.02 },
-  display: { ...serif(fontSize.display, '600'), letterSpacing: -0.4, lineHeight: fontSize.display * 1.08 },
-  title: { ...serif(fontSize.title, '600'), letterSpacing: -0.2, lineHeight: fontSize.title * 1.12 },
-  heading: { ...serif(fontSize.heading, '600'), lineHeight: fontSize.heading * 1.18 },
-  subtitle: { ...sans(fontSize.subtitle, '600'), letterSpacing: 0.1 },
-  body: { ...sans(fontSize.body, '400'), lineHeight: 23 },
-  bodyStrong: { ...sans(fontSize.body, '600') },
-  caption: { ...sans(fontSize.caption, '500'), color: colors.textSecondary, lineHeight: 19 },
-  /** Editorial eyebrow: small, spaced, champagne. */
+  hero: { fontFamily: 'serif', fontSize: fontSize.hero, fontWeight: '800' as const, color: colors.text },
+  display: { fontFamily: 'serif', fontSize: fontSize.display, fontWeight: '800' as const, color: colors.text },
+  title: { fontFamily: 'serif', fontSize: fontSize.title, fontWeight: '700' as const, color: colors.text },
+  heading: { fontFamily: 'serif', fontSize: fontSize.heading, fontWeight: '700' as const, color: colors.text },
+  subtitle: { fontSize: fontSize.subtitle, fontWeight: '600' as const, color: colors.text },
+  body: { fontSize: fontSize.body, fontWeight: '400' as const, lineHeight: 22, color: colors.text },
+  bodyStrong: { fontSize: fontSize.body, fontWeight: '600' as const, color: colors.text },
+  caption: { fontSize: fontSize.caption, fontWeight: '500' as const, color: colors.textSecondary },
   micro: {
-    ...sans(fontSize.micro, '700'),
-    letterSpacing: 2.2,
+    fontSize: fontSize.micro,
+    fontWeight: '700' as const,
+    letterSpacing: 0,
     textTransform: 'uppercase' as const,
     color: withAlpha(colors.gold, 0.78),
   },
@@ -219,24 +257,17 @@ export const type = {
 export const shadow = {
   card: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.45,
-    shadowRadius: 26,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    elevation: 2,
   },
   float: {
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.55,
-    shadowRadius: 34,
-    elevation: 16,
-  },
-  glow: {
-    shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 22,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 5,
   },
 };
 
