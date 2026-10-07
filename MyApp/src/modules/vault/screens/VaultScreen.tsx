@@ -31,7 +31,7 @@ export function VaultScreen() {
 
   if (!unlocked) {
     return (
-      <Screen glowColor="#6B4BFF">
+      <Screen glowColor={colors.primary}>
         <LargeTitle title="Vault" />
         {status.isLoading ? (
           <SkeletonList count={1} height={300} />
@@ -63,7 +63,7 @@ function UnlockedVault() {
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
       <Screen
-        glowColor="#6B4BFF"
+        glowColor={colors.primary}
         onRefresh={entries.refetch}
         refreshing={entries.isFetching && !entries.isLoading}
         footer={showDeleted ? null : <Fab accessibilityLabel="New note" onPress={() => navigation.navigate('VaultEntry')} />}
@@ -80,7 +80,7 @@ function UnlockedVault() {
         ) : (
           <View style={styles.note}>
             <Icon name="lock" size={14} color={colors.textTertiary} />
-            <Text style={t.caption}>Only you can see these. The Vault locks when you leave the app.</Text>
+            <Text style={t.caption}>Private notes are encrypted. Search, edit, or delete them here; the Vault locks when you leave Memo.</Text>
           </View>
         )}
 
@@ -107,7 +107,7 @@ function UnlockedVault() {
           <EmptyState
             icon={showDeleted ? 'trash' : 'lock'}
             title={showDeleted ? 'Nothing deleted' : query ? 'No notes found' : 'No notes yet'}
-            message={showDeleted || query ? undefined : 'Keep passwords, codes or anything private here.'}
+            message={showDeleted || query ? undefined : 'Save passwords, recovery codes, or personal notes. Only you can open them with your Vault PIN.'}
             actionLabel={showDeleted || query ? undefined : 'New note'}
             onAction={() => navigation.navigate('VaultEntry')}
           />

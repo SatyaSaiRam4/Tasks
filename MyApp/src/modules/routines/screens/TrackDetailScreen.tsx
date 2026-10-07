@@ -17,6 +17,7 @@ import {
   useDeleteActionMutation,
   useDeleteTrackMutation,
   useGetTrackQuery,
+  useListTracksQuery,
   useTrackGridQuery,
   useUpdateActionMutation,
   type TrackGrid,
@@ -33,6 +34,7 @@ export function TrackDetailScreen() {
   const navigation = useNavigation<Nav>();
   const { trackId } = useRoute<RouteProp<RootStackParamList, 'TrackDetail'>>().params;
   const track = useGetTrackQuery(trackId);
+  const tracks = useListTracksQuery({ includeArchived: true });
   const grid = useTrackGridQuery(trackId);
   const { request } = useCompletion();
   const [createTask, { isLoading: adding }] = useCreateActionMutation();
@@ -97,6 +99,8 @@ export function TrackDetailScreen() {
 
   const tr = track.data;
   const rows = grid.data?.rows ?? [];
+  const accountTaskCount = tracks.data?.reduce((total, category) => total + category.action_count, 0) ?? 0;
+  const taskLimitReached = (tr?.action_count ?? 0) >= 15 || accountTaskCount >= 150;
 
   return (
     <Screen
@@ -110,7 +114,12 @@ export function TrackDetailScreen() {
         title={tr?.name}
         right={<IconButton icon="edit" accessibilityLabel="Edit category" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
       />
-      {tr ? <Text style={styles.period}>{periodLabel(tr)}</Text> : null}
+      {tr ? (
+        <View style={styles.meta}>
+          <Text style={styles.period}>{periodLabel(tr)}</Text>
+          <Text style={styles.taskCount}>{tr.action_count}/15 tasks</Text>
+        </View>
+      ) : null}
 
       {!grid.data ? (
         <Skeleton height={160} />
@@ -135,14 +144,28 @@ export function TrackDetailScreen() {
           <TextField
             value={newTask}
             onChangeText={setNewTask}
-            placeholder={rows.length ? 'Add another task' : 'Task name, e.g. Workout'}
-            onSubmitEditing={add}
+            placeholder={taskLimitReached ? 'Task limit reached' : rows.length ? 'Add another task' : 'Task name, e.g. Workout'}
+            onSubmitEditing={() => {
+              if (!adding && !taskLimitReached) add();
+            }}
             returnKeyType="done"
             maxLength={200}
+            editable={!adding && !taskLimitReached}
           />
         </View>
-        <IconButton icon="plus" accessibilityLabel="Add task" onPress={() => !adding && add()} />
+        <IconButton
+          icon="plus"
+          accessibilityLabel={taskLimitReached ? 'Task limit reached' : 'Add task'}
+          onPress={() => {
+            if (taskLimitReached) {
+              Toast.info('Task limit reached. Remove or deactivate a task to add another.', 2);
+            } else if (!adding) {
+              add();
+            }
+          }}
+        />
       </View>
+      {taskLimitReached ? <Text style={styles.limit}>A category can have up to 15 active tasks, with 150 across your account.</Text> : null}
 
       <Button label="Delete category" variant="ghost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
 
@@ -173,8 +196,20 @@ const styles = StyleSheet.create({
   },
   period: {
     ...t.caption,
+  },
+  meta: {
     marginTop: -spacing.sm,
     marginBottom: spacing.lg,
+  },
+  taskCount: {
+    ...t.micro,
+    color: colors.textTertiary,
+    marginTop: 4,
+  },
+  limit: {
+    ...t.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
   hint: {
     ...t.caption,
