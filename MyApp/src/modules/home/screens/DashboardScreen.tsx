@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import { Screen } from '../../../components/Screen';
 import { Card } from '../../../components/Card';
 import { IconButton } from '../../../components/Controls';
 import { ErrorState, FadeIn, Skeleton } from '../../../components/Feedback';
+import { Glow } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
 import { Eyebrow, TopBar } from '../../../components/ScreenHeader';
 import { useLayout } from '../../../hooks/useLayout';
@@ -125,12 +126,10 @@ export function DashboardScreen() {
             </View>
           </View>
           <View style={styles.flameBadge}>
-            <Icon name="flame" size={32} color={colors.streakGold} strokeWidth={2.2} />
+            <FlameMark lit={streak.today.secured} />
           </View>
         </Card>
       </FadeIn>
-    </>
-  );
 
       <View style={styles.destinationRow}>
         <Card
@@ -189,6 +188,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 132,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
   skelEyebrow: {
     marginTop: spacing.xxl,
     marginBottom: spacing.md,
@@ -245,6 +250,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.2)',
+  },
+  flame: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flameGlow: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   streakNum: {
     fontFamily: 'serif',

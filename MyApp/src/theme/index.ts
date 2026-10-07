@@ -103,6 +103,16 @@ export const colors = {
   primarySoft: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.16),
   primaryGlow: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.35),
 
+  gold: '#D9A74A',
+  goldBright: '#F5C977',
+  goldDeep: '#B77B2F',
+  goldSoft: 'rgba(217, 167, 74, 0.12)',
+  goldLine: 'rgba(201, 159, 82, 0.5)',
+  glass: 'rgba(255, 255, 255, 0.14)',
+  glassStrong: 'rgba(255, 255, 255, 0.22)',
+  moon: '#E1D2A0',
+  violet: '#7C6BC0',
+  onPrimary: '#FFFFFF',
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
@@ -118,6 +128,8 @@ export function applyTheme(mode: string | null | undefined): ThemeMode {
   gradients.streak = key === 'light' ? ['#C18436', '#A85D20'] : ['#E8BE72', '#D78642'];
   gradients.success = key === 'light' ? ['#168363', '#267D69'] : ['#48BE91', '#2E9B8C'];
   gradients.danger = key === 'light' ? ['#C44747', '#A93E57'] : ['#E77777', '#C85B65'];
+  gradients.gold = key === 'light' ? ['#F5C977', '#B77B2F'] : ['#E8BE72', '#D29A4E'];
+  gradients.moonlight = key === 'light' ? ['#F8F2E2', '#E7D6AE'] : ['#2E2C31', '#1F2127'];
   Object.assign(shadow.card, {
     shadowOpacity: key === 'light' ? 0.09 : 0.35,
     shadowRadius: key === 'light' ? 14 : 20,
@@ -139,6 +151,8 @@ export const gradients = {
   vault: ['#E9E5F1', '#F5F3EE'] as [string, string],
   dashboard: ['#304840', '#203932'] as [string, string],
   danger: ['#C44747', '#A93E57'] as [string, string],
+  gold: ['#F5C977', '#B77B2F'] as [string, string],
+  moonlight: ['#F8F2E2', '#E7D6AE'] as [string, string],
 };
 
 /** Applies a named accent before any styles are created. */
