@@ -109,7 +109,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           ) : (
             <View>
               <View style={styles.badge}>
-                <Icon name="check-circle" size={28} color={colors.success} />
+                <Icon name="check-circle" size={28} color={colors.success} strokeWidth={1.6} />
               </View>
               <Text style={[t.heading, styles.center]}>Did you do “{target.title}” today?</Text>
               <View style={styles.actions}>
@@ -127,16 +127,20 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
 const styles = StyleSheet.create({
   center: {
     textAlign: 'center',
+    fontSize: 28,
+    lineHeight: 32,
   },
   badge: {
     alignSelf: 'center',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
     backgroundColor: colors.successSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(140,211,179,0.35)',
   },
   actions: {
     marginTop: spacing.xl,

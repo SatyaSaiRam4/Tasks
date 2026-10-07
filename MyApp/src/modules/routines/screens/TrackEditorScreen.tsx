@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, spacing, type as t } from '../../../theme';
+import { colors, font, spacing } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TextField } from '../../../components/TextField';
@@ -83,7 +83,12 @@ export function TrackEditorScreen() {
           <DateField label="To" value={end} onChange={v => v && setEnd(v)} minDate={start} />
         </View>
       </View>
-      {days > 0 ? <Text style={styles.hint}>{days === 1 ? '1 day' : `${days} days`}</Text> : null}
+      {days > 0 ? (
+        <View style={styles.duration}>
+          <Text style={styles.durationNum}>{days}</Text>
+          <Text style={styles.durationUnit}>{days === 1 ? 'day' : 'days'}</Text>
+        </View>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label={editing ? 'Save' : 'Create'} onPress={save} loading={creating || updating} size="lg" />
@@ -109,12 +114,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  hint: {
-    ...t.caption,
-    marginTop: -spacing.sm,
-    marginBottom: spacing.xl,
+  duration: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxl,
+  },
+  durationNum: {
+    ...font.serif,
+    fontSize: 36,
+    color: colors.goldBright,
+  },
+  durationUnit: {
+    ...font.serifItalic,
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   error: {
+    ...font.medium,
     color: colors.danger,
     marginBottom: spacing.md,
   },

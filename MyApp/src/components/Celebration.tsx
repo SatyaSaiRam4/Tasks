@@ -1,10 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Dimensions, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, gradients, radius, spacing, type as t } from '../theme';
+import { Emblem } from './Emblem';
+import { Eyebrow } from './ScreenHeader';
 import { useMotion } from '../hooks/useMotion';
 import { Button } from './Button';
-import { Glow, Gradient } from './Gradient';
-import { Icon, type IconName } from './Icon';
+import { Gradient } from './Gradient';
+import { type IconName } from './Icon';
 
 export interface CelebrationSpec {
   icon: IconName;
@@ -57,23 +59,24 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
       Array.from({ length: PARTICLES }, (_, i) => ({
         angle: (i / PARTICLES) * Math.PI * 2 + Math.random() * 0.4,
         dist: 120 + Math.random() * 160,
-        size: 5 + Math.random() * 6,
-        color: [colors.primary, colors.streak, colors.success, colors.streakGold, colors.info][i % 5],
+        size: 3 + Math.random() * 5,
+        color: [colors.goldBright, colors.gold, colors.text, colors.streakGold, colors.moon][i % 5],
+        star: i % 3 === 0,
       })),
     [],
   );
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(appear, { toValue: 1, useNativeDriver: true, bounciness: 8, speed: 12 }),
+      Animated.spring(appear, { toValue: 1, useNativeDriver: true, bounciness: 3, speed: 9 }),
       reduced
         ? Animated.timing(burst, { toValue: 0, duration: 0, useNativeDriver: true })
-        : Animated.timing(burst, { toValue: 1, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        : Animated.timing(burst, { toValue: 1, duration: 1700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, [appear, burst, reduced]);
 
-  const pair = spec.tone === 'streak' ? gradients.streak : spec.tone === 'success' ? gradients.success : gradients.primary;
-  const accent = spec.tone === 'streak' ? colors.streak : spec.tone === 'success' ? colors.success : colors.primary;
+  const ring = spec.tone === 'streak' ? gradients.streak : spec.tone === 'success' ? gradients.success : gradients.gold;
+  const accent = spec.tone === 'streak' ? colors.streak : spec.tone === 'success' ? colors.success : colors.gold;
   const scale = appear.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
 
   return (
@@ -93,22 +96,23 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
                 top: H / 2 - 120,
                 width: p.size,
                 height: p.size,
-                borderRadius: p.size / 2,
+                borderRadius: p.star ? 1 : p.size / 2,
                 backgroundColor: p.color,
                 opacity,
-                transform: [{ translateX: tx }, { translateY: ty }],
+                transform: [{ translateX: tx }, { translateY: ty }, { rotate: p.star ? '45deg' : '0deg' }],
               }}
             />
           );
         })}
         <Animated.View style={[styles.card, { opacity: appear, transform: [{ scale }] }]} accessibilityViewIsModal>
+          <Gradient colors={gradients.moonlight} direction="vertical" style={StyleSheet.absoluteFill} />
+          <View style={styles.sheen} pointerEvents="none" />
           <View style={styles.iconArea}>
-            <Glow color={accent} size={180} intensity={0.5} style={styles.glow} />
-            <Gradient colors={pair} borderRadius={radius.xxl} style={styles.iconBadge}>
-              <Icon name={spec.icon} size={40} color={colors.white} strokeWidth={2.2} />
-            </Gradient>
+            <Emblem icon={spec.icon} size={190} tint={accent} ring={ring} />
           </View>
-          <Text style={[t.micro, { color: accent, textAlign: 'center' }]}>{spec.eyebrow}</Text>
+          <View style={styles.eyebrow}>
+            <Eyebrow label={spec.eyebrow} color={accent} />
+          </View>
           <Text style={[t.title, styles.center, styles.title]}>{spec.title}</Text>
           {spec.subtitle ? <Text style={[t.body, styles.subtitle]}>{spec.subtitle}</Text> : null}
           {spec.stats?.length ? (
@@ -131,40 +135,45 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(3,4,7,0.86)',
+    backgroundColor: 'rgba(2,3,8,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
   },
   card: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
     padding: spacing.xxl,
+    paddingTop: spacing.lg,
     borderRadius: radius.xxl,
     backgroundColor: colors.backgroundRaised,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.goldLine,
+    overflow: 'hidden',
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: '20%',
+    right: '20%',
+    height: 1,
+    backgroundColor: 'rgba(241,221,175,0.5)',
   },
   iconArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 120,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
-  glow: {
-    position: 'absolute',
-  },
-  iconBadge: {
-    width: 84,
-    height: 84,
+  eyebrow: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
   center: {
     textAlign: 'center',
   },
   title: {
     marginTop: spacing.sm,
+    fontSize: 36,
+    lineHeight: 40,
   },
   subtitle: {
     textAlign: 'center',
@@ -175,13 +184,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: spacing.xl,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     paddingVertical: spacing.lg,
   },
   stat: {
     flex: 1,
   },
   cta: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
   },
 });

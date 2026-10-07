@@ -1,17 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import { colors, gradients, radius, spacing, type as t } from '../../../theme';
+import { colors, font, gradients, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { Card } from '../../../components/Card';
-import { Chip, IconButton } from '../../../components/Controls';
-import { ProgressRing } from '../../../components/Progress';
+import { IconButton, Segmented } from '../../../components/Controls';
+import { AnimatedNumber, ProgressRing } from '../../../components/Progress';
 import { EmptyState, ErrorState, FadeIn, Skeleton } from '../../../components/Feedback';
+import { Glow } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
+import { Eyebrow, TopBar } from '../../../components/ScreenHeader';
+import { useLayout } from '../../../hooks/useLayout';
+import { useLoop } from '../../../animations';
 import { useCelebration } from '../../../components/Celebration';
 import { useAppSelector } from '../../../app/hooks';
 import { formatClock, formatDayShort, relativeDayLabel, toDateKey } from '../../../utils/date';
@@ -31,7 +35,11 @@ type Tab = 'categories' | 'reminders';
 
 const SEEN_COMPLETIONS_KEY = '@rememberly/seen_track_completions';
 
-/** Home: the streak, then two simple lists, Categories and Reminders. */
+/**
+ * Home, laid out like an editorial cover: the date and greeting, Satya's
+ * line, the streak hero, then two simple lists, Categories and Reminders.
+ * Tablets split it into two columns.
+ */
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const satyaOn = useAppSelector(s => s.preferences.satyaEnabled);
@@ -41,6 +49,7 @@ export function DashboardScreen() {
   const { celebrate } = useCelebration();
   const [tab, setTab] = useState<Tab>('categories');
   const celebrated = useRef(false);
+  const { isTablet } = useLayout();
 
   // Celebrate finished categories the user hasn't seen yet.
   useEffect(() => {
@@ -68,32 +77,28 @@ export function DashboardScreen() {
   }, [completions.data, celebrate]);
 
   const header = (
-    <View style={styles.header}>
-      <View style={styles.flex}>
-        <Text style={t.title} numberOfLines={1}>
-          {data ? greeting(data) : ' '}
-        </Text>
-        <Text style={t.caption}>{data ? formatDayShort(data.streak.today.date) : ' '}</Text>
-      </View>
-      <IconButton icon="search" accessibilityLabel="Find friends by User ID" onPress={() => navigation.navigate('Discover')} />
-      <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
-    </View>
+    <TopBar
+      actions={<IconButton icon="search" accessibilityLabel="Find friends by User ID" onPress={() => navigation.navigate('Discover')} />}
+    />
   );
 
   if (isLoading) {
     return (
-      <Screen>
+      <Screen wide>
         {header}
-        <Skeleton height={150} rounded={radius.xl} style={styles.mbLg} />
-        <Skeleton height={76} rounded={radius.lg} style={styles.mbSm} />
-        <Skeleton height={76} rounded={radius.lg} />
+        <Skeleton width={140} height={12} style={styles.skelEyebrow} />
+        <Skeleton width="80%" height={40} rounded={radius.sm} style={styles.mbLg} />
+        <Skeleton height={190} rounded={radius.xl} style={styles.mbLg} />
+        <Skeleton height={50} rounded={radius.pill} style={styles.mbLg} />
+        <Skeleton height={84} rounded={radius.lg} style={styles.mbSm} />
+        <Skeleton height={84} rounded={radius.lg} />
       </Screen>
     );
   }
 
   if (isError || !data) {
     return (
-      <Screen>
+      <Screen wide>
         {header}
         <ErrorState message={getErrorMessage(error, 'Could not load your home screen.')} onRetry={refetch} />
       </Screen>
@@ -104,64 +109,88 @@ export function DashboardScreen() {
   const today = streak.today;
   const todayKey = today.date;
 
-  return (
-    <Screen
-      onRefresh={() => {
-        refetch();
-        tracks.refetch();
-      }}
-      refreshing={isFetching && !isLoading}
-    >
-      {header}
-
-      {satyaOn ? (
-        <View style={styles.tip}>
-          <View style={styles.tipOrb}>
-            <SatyaOrb size={26} />
+  const intro = (
+    <>
+      <FadeIn style={styles.cover}>
+        <Eyebrow label={formatDayShort(today.date)} />
+        <Text style={[t.display, styles.greeting]} numberOfLines={2}>
+          {greeting(data)}
+        </Text>
+        {satyaOn ? (
+          <View style={styles.tip}>
+            <View style={styles.tipOrb}>
+              <SatyaOrb size={28} />
+            </View>
+            <Text style={[t.aside, styles.tipText]}>{satyaMessage(data)}</Text>
           </View>
-          <Text style={[t.caption, styles.tipText]}>{satyaMessage(data)}</Text>
-        </View>
-      ) : null}
+        ) : null}
+      </FadeIn>
 
       {/* Streak */}
-      <FadeIn>
+      <FadeIn index={1}>
         <Card
-          gradient={gradients.streak}
-          gradientOpacity={[0.28, 0.1]}
+          tone="feature"
+          padded={false}
           onPress={() => navigation.navigate('Consistency')}
           accessibilityLabel={`${streak.current_streak} day streak. Today ${today.completed} of ${today.required} done.`}
         >
-          <View style={styles.streakRow}>
-            <Icon name="flame" size={34} color={colors.streak} />
+          <View style={styles.hero}>
             <View style={styles.flex}>
-              <Text style={styles.streakNum}>
-                {streak.current_streak} <Text style={styles.streakUnit}>{streak.current_streak === 1 ? 'day' : 'days'}</Text>
+              <View style={styles.heroLabel}>
+                <FlameMark lit={today.secured} />
+                <Text style={t.micro}>Current streak</Text>
+              </View>
+              <View style={styles.heroNumberRow}>
+                <AnimatedNumber value={streak.current_streak} style={styles.heroNumber} />
+                <Text style={styles.heroUnit}>{streak.current_streak === 1 ? 'day' : 'days'}</Text>
+              </View>
+              <Text style={styles.best}>
+                Best <Text style={styles.bestNum}>{streak.best_streak}</Text>
               </Text>
-              <Text style={t.caption}>Streak · Best {streak.best_streak}</Text>
             </View>
             {today.required > 0 ? (
-              <ProgressRing progress={today.progress} size={64} stroke={6} colorsPair={today.secured ? gradients.success : gradients.primary}>
-                <Text style={styles.ringText}>
-                  {today.completed}/{today.required}
+              <ProgressRing progress={today.progress} size={96} stroke={5} colorsPair={today.secured ? gradients.success : gradients.gold}>
+                <Text style={styles.ringNum}>
+                  {today.completed}
+                  <Text style={styles.ringOf}>/{today.required}</Text>
                 </Text>
+                <Text style={styles.ringLabel}>today</Text>
               </ProgressRing>
             ) : null}
           </View>
-          <Text style={[t.caption, styles.streakNote, today.secured && { color: colors.success }]}>
-            {today.required === 0 ? 'No tasks today' : today.secured ? 'Today is done ✓' : `${today.remaining} left today`}
-          </Text>
+          <View style={styles.heroFoot}>
+            <Icon
+              name={today.secured ? 'check-circle' : today.required === 0 ? 'moon' : 'clock'}
+              size={15}
+              color={today.secured ? colors.success : colors.gold}
+              strokeWidth={1.8}
+            />
+            <Text style={[styles.heroNote, today.secured && { color: colors.success }]}>
+              {today.required === 0 ? 'No tasks today' : today.secured ? 'Today is done ✓' : `${today.remaining} left today`}
+            </Text>
+            <Icon name="arrow-right" size={15} color={colors.textTertiary} />
+          </View>
         </Card>
       </FadeIn>
+    </>
+  );
 
+  const lists = (
+    <FadeIn index={2}>
       {/* Two tabs */}
-      <View style={styles.tabs} accessibilityRole="tablist">
-        <Chip label="Categories" selected={tab === 'categories'} onPress={() => setTab('categories')} count={tracks.data?.length} />
-        <Chip label="Reminders" selected={tab === 'reminders'} onPress={() => setTab('reminders')} count={data.reminder_count} />
-      </View>
+      <Segmented
+        style={styles.tabs}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'categories', label: 'Categories', count: tracks.data?.length },
+          { value: 'reminders', label: 'Reminders', count: data.reminder_count },
+        ]}
+      />
 
       {tab === 'categories' ? (
         !tracks.data ? (
-          <Skeleton height={76} rounded={radius.lg} />
+          <Skeleton height={84} rounded={radius.lg} />
         ) : tracks.data.length ? (
           tracks.data.map(track => (
             <CategoryCard key={track.id} track={track} onPress={() => navigation.navigate('TrackDetail', { trackId: track.id })} />
@@ -180,13 +209,18 @@ export function DashboardScreen() {
                 style={({ pressed }) => [styles.reminder, i > 0 && styles.divider, pressed && styles.pressed]}
                 accessibilityRole="button"
               >
-                <Icon name="bell" size={18} color={colors.primary} />
-                <Text style={[t.bodyStrong, styles.flex]} numberOfLines={1}>
-                  {r.title}
-                </Text>
-                <Text style={t.caption}>
-                  {relativeDayLabel(toDateKey(when), todayKey)}, {formatClock(when)}
-                </Text>
+                <View style={styles.reminderIcon}>
+                  <Icon name="bell" size={16} color={colors.gold} strokeWidth={1.8} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={t.bodyStrong} numberOfLines={1}>
+                    {r.title}
+                  </Text>
+                  <Text style={[t.caption, styles.reminderWhen]}>
+                    {relativeDayLabel(toDateKey(when), todayKey)}, {formatClock(when)}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
               </Pressable>
             );
           })}
@@ -194,7 +228,45 @@ export function DashboardScreen() {
       ) : (
         <EmptyState compact icon="bell" title="No reminders coming up" actionLabel="Add reminder" onAction={() => navigation.navigate('ReminderEditor')} />
       )}
+    </FadeIn>
+  );
+
+  return (
+    <Screen
+      wide
+      onRefresh={() => {
+        refetch();
+        tracks.refetch();
+      }}
+      refreshing={isFetching && !isLoading}
+    >
+      {header}
+      {isTablet ? (
+        <View style={styles.columns}>
+          <View style={styles.colMain}>{intro}</View>
+          <View style={styles.colSide}>{lists}</View>
+        </View>
+      ) : (
+        <>
+          {intro}
+          {lists}
+        </>
+      )}
     </Screen>
+  );
+}
+
+/** The streak flame with a slow breathing halo; brighter once today is secured. */
+function FlameMark({ lit }: { lit: boolean }) {
+  const breathe = useLoop(3200);
+  const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] });
+  return (
+    <View style={styles.flame}>
+      <Animated.View style={[styles.flameGlow, { transform: [{ scale }] }]}>
+        <Glow color={colors.streak} size={44} intensity={lit ? 0.7 : 0.45} />
+      </Animated.View>
+      <Icon name="flame" size={18} color={colors.streak} fill={lit ? colors.streak : 'none'} strokeWidth={1.8} />
+    </View>
   );
 }
 
@@ -211,61 +283,142 @@ const styles = StyleSheet.create({
   mbSm: {
     marginBottom: spacing.sm,
   },
-  header: {
+  skelEyebrow: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+  },
+  columns: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.lg,
-    marginBottom: spacing.lg,
+    gap: spacing.xxl,
+    alignItems: 'flex-start',
+  },
+  colMain: {
+    flex: 1.1,
+  },
+  colSide: {
+    flex: 1,
+    paddingTop: spacing.xxl + spacing.lg,
+  },
+  cover: {
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xl,
+  },
+  greeting: {
+    marginTop: spacing.md,
   },
   tip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   tipOrb: {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
   },
   tipText: {
     flex: 1,
-    color: colors.textSecondary,
   },
-  streakRow: {
+  hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.lg,
+    padding: spacing.xl,
+    paddingBottom: spacing.lg,
   },
-  streakNum: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: colors.text,
+  heroLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  streakUnit: {
-    fontSize: 18,
-    fontWeight: '700',
+  flame: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flameGlow: {
+    position: 'absolute',
+  },
+  heroNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  heroNumber: {
+    ...t.hero,
+    fontSize: 62,
+    lineHeight: 66,
+    color: colors.goldBright,
+  },
+  heroUnit: {
+    ...font.serifItalic,
+    fontSize: 20,
     color: colors.textSecondary,
   },
-  ringText: {
-    color: colors.text,
-    fontWeight: '800',
+  best: {
+    ...font.medium,
+    fontSize: 13,
+    color: colors.textSecondary,
+    letterSpacing: 0.3,
   },
-  streakNote: {
-    marginTop: spacing.md,
+  bestNum: {
+    ...font.bold,
+    color: colors.text,
+  },
+  ringNum: {
+    ...font.serif,
+    fontSize: 25,
+    lineHeight: 26,
+    color: colors.text,
+  },
+  ringOf: {
+    fontSize: 20,
+    color: colors.textSecondary,
+  },
+  ringLabel: {
+    ...t.micro,
+    fontSize: 9,
+    letterSpacing: 1.6,
+  },
+  heroFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md + 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+    backgroundColor: 'rgba(5,6,11,0.25)',
+  },
+  heroNote: {
+    ...font.semibold,
+    flex: 1,
+    fontSize: 13.5,
+    color: colors.text,
   },
   tabs: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
+    marginTop: spacing.xxl,
+    marginBottom: spacing.lg,
   },
   reminder: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    minHeight: 56,
+    minHeight: 68,
+  },
+  reminderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.goldSoft,
+  },
+  reminderWhen: {
+    marginTop: 1,
   },
   divider: {
     borderTopWidth: StyleSheet.hairlineWidth,

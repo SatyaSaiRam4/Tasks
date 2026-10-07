@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useAppSelector } from '../../../app/hooks';
-import { colors, radius, spacing, type as t } from '../../../theme';
+import { colors, font, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Button } from '../../../components/Button';
@@ -97,7 +97,7 @@ export function VaultEntryScreen() {
 
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
-      <Screen edges={['top', 'bottom']} glowColor="#6B4BFF">
+      <Screen edges={['top', 'bottom']} glowColor={colors.violet}>
         <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} close />
         {entryId && existing.isLoading ? (
           <Skeleton height={300} rounded={radius.lg} />
@@ -172,17 +172,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    ...t.title,
+    ...t.display,
+    fontSize: 30,
     paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.goldLine,
   },
   content: {
     ...t.body,
-    minHeight: 260,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
+    fontSize: 16,
+    lineHeight: 26,
+    minHeight: 280,
+    padding: spacing.xl,
+    marginTop: spacing.xl,
     marginBottom: spacing.xl,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
@@ -190,6 +195,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   error: {
+    ...font.medium,
     color: colors.danger,
     marginBottom: spacing.md,
   },

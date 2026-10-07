@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, type as t } from '../theme';
+import { colors, font, spacing, type as t } from '../theme';
 
 export interface HeatmapDay {
   date: string; // YYYY-MM-DD
@@ -17,11 +17,11 @@ function cellColor(status: string): string {
     case 'FAILED':
       return colors.danger;
     case 'PENDING':
-      return colors.primary;
+      return colors.gold;
     case 'NO_ACTIONS':
       return colors.surfaceHigh;
     default:
-      return colors.surfaceAlt;
+      return 'rgba(217,188,130,0.06)';
   }
 }
 
@@ -77,7 +77,7 @@ export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]
                       width: cell,
                       height: cell,
                       marginBottom: gap,
-                      borderRadius: 4,
+                      borderRadius: cell / 2,
                       backgroundColor: day ? cellColor(day.status) : 'transparent',
                       opacity: day && day.status === 'FUTURE' ? 0.35 : 1,
                     }}
@@ -100,7 +100,7 @@ export function HeatmapLegend() {
       <Legend color={colors.success} label="Complete" />
       <Legend color={colors.danger} label="Missed" />
       <Legend color={colors.surfaceHigh} label="Rest day" />
-      <Legend color={colors.primary} label="Today" />
+      <Legend color={colors.gold} label="Today" />
     </View>
   );
 }
@@ -142,11 +142,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendSwatch: {
-    width: 10,
-    height: 10,
-    borderRadius: 3,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
   },
   legendText: {
+    ...font.medium,
     color: colors.textSecondary,
     fontSize: 12,
   },

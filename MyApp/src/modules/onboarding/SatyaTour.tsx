@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing, type as t } from '../../theme';
+import { colors, font, radius, spacing, type as t } from '../../theme';
 import { useMotion } from '../../hooks/useMotion';
 import { Button } from '../../components/Button';
 import { useAppSelector } from '../../app/hooks';
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    backgroundColor: 'rgba(2, 3, 8, 0.7)',
     justifyContent: 'flex-end',
   },
   bottom: {
@@ -115,17 +115,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.xl,
     borderBottomRightRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
+    backgroundColor: colors.glassStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
     marginBottom: spacing.xl,
   },
   name: {
     ...t.micro,
-    color: colors.primary,
   },
   text: {
-    marginTop: spacing.xs,
+    ...t.aside,
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 20,
+    marginTop: spacing.sm,
   },
   footer: {
     flexDirection: 'row',
@@ -146,11 +149,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceHigh,
   },
   dotOn: {
-    width: 16,
-    backgroundColor: colors.primary,
+    width: 18,
+    backgroundColor: colors.gold,
   },
   skip: {
+    ...font.semibold,
     color: colors.textSecondary,
-    fontWeight: '600',
   },
 });

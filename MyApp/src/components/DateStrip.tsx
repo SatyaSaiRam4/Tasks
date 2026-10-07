@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, font, radius, spacing } from '../theme';
 import { addDays, toDateKey, WEEKDAY_SHORT } from '../utils/date';
 
 export interface DayMark {
@@ -9,7 +9,7 @@ export interface DayMark {
   status: string;
 }
 
-const CELL = 52;
+const CELL = 54;
 
 /** Horizontally scrolling day tabs with a completion dot under each day. */
 export function DateStrip({
@@ -87,35 +87,36 @@ const styles = StyleSheet.create({
   },
   cell: {
     width: CELL,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   cellSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.goldBright,
   },
   cellToday: {
-    borderColor: colors.primary,
+    borderColor: colors.goldLine,
     borderWidth: 1,
   },
   weekday: {
-    fontSize: 10,
-    fontWeight: '700',
+    ...font.bold,
+    fontSize: 9.5,
     color: colors.textTertiary,
-    letterSpacing: 0.6,
+    letterSpacing: 1.4,
   },
   day: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...font.serif,
+    fontSize: 20,
+    lineHeight: 23,
     color: colors.text,
     marginTop: 2,
   },
   textSelected: {
-    color: colors.white,
+    color: colors.onPrimary,
   },
   dot: {
     width: 6,
@@ -125,6 +126,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   dotSelected: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.onPrimary,
   },
 });

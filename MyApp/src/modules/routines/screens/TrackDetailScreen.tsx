@@ -4,6 +4,8 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, type as t } from '../../../theme';
+import { Eyebrow } from '../../../components/ScreenHeader';
+import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { IconButton } from '../../../components/Controls';
@@ -107,10 +109,18 @@ export function TrackDetailScreen() {
       refreshing={track.isFetching || grid.isFetching}
     >
       <ScreenHeader
-        title={tr?.name}
         right={<IconButton icon="edit" accessibilityLabel="Edit category" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
       />
-      {tr ? <Text style={styles.period}>{periodLabel(tr)}</Text> : null}
+      {tr ? (
+        <FadeIn style={styles.cover}>
+          <Eyebrow label={periodLabel(tr)} />
+          <Text style={[t.display, styles.name]} accessibilityRole="header">
+            {tr.name}
+          </Text>
+        </FadeIn>
+      ) : (
+        <Skeleton width="60%" height={40} style={styles.cover} />
+      )}
 
       {!grid.data ? (
         <Skeleton height={160} />
@@ -141,7 +151,7 @@ export function TrackDetailScreen() {
             maxLength={200}
           />
         </View>
-        <IconButton icon="plus" accessibilityLabel="Add task" onPress={() => !adding && add()} />
+        <IconButton icon="plus" color={colors.gold} style={styles.addButton} accessibilityLabel="Add task" onPress={() => !adding && add()} />
       </View>
 
       <Button label="Delete category" variant="ghost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
@@ -171,18 +181,21 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  period: {
-    ...t.caption,
-    marginTop: -spacing.sm,
-    marginBottom: spacing.lg,
+  cover: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxl,
+  },
+  name: {
+    marginTop: spacing.md,
   },
   hint: {
-    ...t.caption,
-    marginTop: spacing.sm,
+    ...t.aside,
+    fontSize: 13,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
   empty: {
-    ...t.body,
-    color: colors.textSecondary,
+    ...t.aside,
     marginBottom: spacing.md,
   },
   addRow: {
@@ -190,6 +203,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.sm,
     marginTop: spacing.xl,
+  },
+  addButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderColor: colors.goldLine,
   },
   delete: {
     marginTop: spacing.xl,

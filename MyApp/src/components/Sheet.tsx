@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, type as t } from '../theme';
+import { useLayout } from '../hooks/useLayout';
+import { easeOut } from '../animations';
+import { Gradient } from './Gradient';
 import { useMotion } from '../hooks/useMotion';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
@@ -26,10 +29,14 @@ interface SheetProps {
   dismissable?: boolean;
 }
 
-/** A bottom sheet with a dimmed backdrop; slides up, or fades under reduced motion. */
+/**
+ * A midnight bottom sheet with a dimmed backdrop; glides up, or fades under
+ * reduced motion. On tablets it floats as a centered panel.
+ */
 export function Sheet({ visible, onClose, title, subtitle, children, dismissable = true }: SheetProps) {
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
+  const { isTablet, width } = useLayout();
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
 
@@ -38,12 +45,12 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
       setMounted(true);
       Animated.timing(progress, {
         toValue: 1,
-        duration: reduced ? 0 : 280,
-        easing: Easing.out(Easing.cubic),
+        duration: reduced ? 0 : 420,
+        easing: easeOut,
         useNativeDriver: true,
       }).start();
     } else if (mounted) {
-      Animated.timing(progress, { toValue: 0, duration: reduced ? 0 : 200, useNativeDriver: true }).start(() =>
+      Animated.timing(progress, { toValue: 0, duration: reduced ? 0 : 220, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() =>
         setMounted(false),
       );
     }
@@ -52,6 +59,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
   if (!mounted) return null;
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [420, 0] });
+  const panel = isTablet ? { left: (width - Math.min(width - 64, 560)) / 2, right: (width - Math.min(width - 64, 560)) / 2 } : null;
   return (
     <Modal transparent visible animationType="none" onRequestClose={() => {
       if (dismissable) onClose();
@@ -66,9 +74,11 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
           />
         </Animated.View>
         <Animated.View
-          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg, transform: [{ translateY }] }]}
+          style={[styles.sheet, panel, { paddingBottom: insets.bottom + spacing.xl, transform: [{ translateY }] }]}
           accessibilityViewIsModal
         >
+          <Gradient colors={['#141B33', '#0A0D18']} direction="vertical" style={StyleSheet.absoluteFill} />
+          <View style={styles.sheen} pointerEvents="none" />
           <View style={styles.handle} />
           {title ? (
             <Text style={[t.heading, styles.title]} accessibilityRole="header">
@@ -116,8 +126,8 @@ export function ConfirmSheet({
   return (
     <Sheet visible={visible} onClose={onCancel}>
       {icon ? (
-        <View style={[styles.confirmIcon, { backgroundColor: destructive ? colors.dangerSoft : colors.primarySoft }]}>
-          <Icon name={icon} size={26} color={destructive ? colors.danger : colors.primary} />
+        <View style={[styles.confirmIcon, destructive ? styles.confirmIconDanger : styles.confirmIconGold]}>
+          <Icon name={icon} size={24} color={destructive ? colors.danger : colors.gold} strokeWidth={1.7} />
         </View>
       ) : null}
       <Text style={[t.heading, styles.confirmTitle]} accessibilityRole="header">
@@ -184,7 +194,7 @@ export function SelectSheet<T extends string>({
                 <Text style={styles.optionLabel}>{option.label}</Text>
                 {option.description ? <Text style={styles.optionDescription}>{option.description}</Text> : null}
               </View>
-              {selected ? <Icon name="check" size={18} color={colors.primary} /> : null}
+              {selected ? <Icon name="check" size={18} color={colors.primary} strokeWidth={2.2} /> : null}
             </Pressable>
           );
         })}
@@ -211,40 +221,62 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     maxHeight: '88%',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.xl + 4,
     paddingTop: spacing.md,
     backgroundColor: colors.backgroundRaised,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
+    overflow: 'hidden',
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: '20%',
+    right: '20%',
+    height: 1,
+    backgroundColor: 'rgba(241,221,175,0.45)',
   },
   handle: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
+    width: 36,
+    height: 3,
     borderRadius: 2,
-    backgroundColor: colors.surfaceHigh,
-    marginBottom: spacing.lg,
+    backgroundColor: colors.goldLine,
+    marginBottom: spacing.xl,
   },
   title: {
     marginBottom: spacing.xs,
   },
   subtitle: {
-    color: colors.textSecondary,
+    ...t.caption,
     marginBottom: spacing.lg,
   },
   confirmIcon: {
     alignSelf: 'center',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
+    borderWidth: 1,
+  },
+  confirmIconGold: {
+    backgroundColor: colors.goldSoft,
+    borderColor: colors.goldLine,
+  },
+  confirmIconDanger: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: 'rgba(236,135,150,0.35)',
   },
   confirmTitle: {
     textAlign: 'center',
+    fontSize: 28,
+    lineHeight: 32,
   },
   confirmMessage: {
     ...t.body,
@@ -253,7 +285,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   confirmActions: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
     gap: spacing.sm,
   },
   options: {
@@ -263,13 +295,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md + 2,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md + 4,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
     marginBottom: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
   },
   optionSelected: {
     backgroundColor: colors.primarySoft,
+    borderColor: colors.goldLine,
   },
   optionLabel: {
     ...t.bodyStrong,

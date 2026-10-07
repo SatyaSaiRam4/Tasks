@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { colors, radius, spacing, type as t } from '../../../theme';
+import { colors, font, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -31,8 +31,8 @@ export function VaultScreen() {
 
   if (!unlocked) {
     return (
-      <Screen glowColor="#6B4BFF">
-        <LargeTitle title="Vault" />
+      <Screen glowColor={colors.violet}>
+        <LargeTitle eyebrow="Private" title="Vault" />
         {status.isLoading ? (
           <SkeletonList count={1} height={300} />
         ) : status.isError || !status.data ? (
@@ -63,12 +63,13 @@ function UnlockedVault() {
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
       <Screen
-        glowColor="#6B4BFF"
+        glowColor={colors.violet}
         onRefresh={entries.refetch}
         refreshing={entries.isFetching && !entries.isLoading}
         footer={showDeleted ? null : <Fab accessibilityLabel="New note" onPress={() => navigation.navigate('VaultEntry')} />}
       >
         <LargeTitle
+          eyebrow="Private"
           title={showDeleted ? 'Deleted notes' : 'Vault'}
           right={<IconButton icon="lock" accessibilityLabel="Lock Vault" onPress={lock} />}
         />
@@ -79,14 +80,14 @@ function UnlockedVault() {
           </Pressable>
         ) : (
           <View style={styles.note}>
-            <Icon name="lock" size={14} color={colors.textTertiary} />
-            <Text style={t.caption}>Only you can see these. The Vault locks when you leave the app.</Text>
+            <Icon name="shield" size={14} color={colors.gold} strokeWidth={1.8} />
+            <Text style={[t.caption, styles.flex]}>Only you can see these. The Vault locks when you leave the app.</Text>
           </View>
         )}
 
         {!showDeleted ? (
           <View style={styles.search}>
-            <Icon name="search" size={18} color={colors.textTertiary} />
+            <Icon name="search" size={18} color={colors.gold} strokeWidth={1.7} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -115,14 +116,21 @@ function UnlockedVault() {
           entries.data.map((e, i) => (
             <FadeIn key={e.id} index={i}>
               <Card onPress={() => navigation.navigate('VaultEntry', { entryId: e.id })} style={styles.entry} accessibilityLabel={e.title ?? 'Untitled note'}>
-                <Text style={t.subtitle} numberOfLines={1}>
-                  {e.title || 'Untitled'}
-                </Text>
-                {e.preview ? (
-                  <Text style={[t.caption, styles.preview]} numberOfLines={1}>
-                    {e.preview}
-                  </Text>
-                ) : null}
+                <View style={styles.entryRow}>
+                  <View style={styles.entryIcon}>
+                    <Icon name="key" size={16} color={colors.gold} strokeWidth={1.7} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.entryTitle} numberOfLines={1}>
+                      {e.title || 'Untitled'}
+                    </Text>
+                    {e.preview ? (
+                      <Text style={[t.caption, styles.preview]} numberOfLines={1}>
+                        {e.preview}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
               </Card>
             </FadeIn>
           ))
@@ -181,31 +189,53 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   link: {
+    ...font.bold,
     color: colors.primary,
-    fontWeight: '700',
   },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    height: 48,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: spacing.md,
+    height: 52,
+    paddingHorizontal: spacing.lg + 2,
+    marginBottom: spacing.xl,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   searchInput: {
+    ...font.medium,
     flex: 1,
     color: colors.text,
     paddingVertical: 0,
   },
   entry: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  entryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(156,139,218,0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(156,139,218,0.35)',
+  },
+  entryTitle: {
+    ...font.serif,
+    fontSize: 18,
+    lineHeight: 21,
+    color: colors.text,
   },
   preview: {
-    marginTop: 4,
+    marginTop: 2,
   },
   footerLink: {
     flexDirection: 'row',
@@ -215,7 +245,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   danger: {
+    ...font.bold,
     color: colors.danger,
-    fontWeight: '700',
   },
 });

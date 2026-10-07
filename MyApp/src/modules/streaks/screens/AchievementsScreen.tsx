@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, gradients, radius, spacing, type as t } from '../../../theme';
+import { colors, font, gradients, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -44,16 +44,18 @@ export function AchievementsScreen() {
             <Card style={[styles.card, !a.earned && styles.locked]} accessibilityLabel={`${a.title}, ${a.earned ? 'earned' : 'locked'}`}>
               <View style={styles.row}>
                 {a.earned ? (
-                  <Gradient colors={gradients.streak} borderRadius={radius.md} style={styles.badge}>
-                    <Icon name={achievementIcon(a.icon)} size={22} color={colors.white} />
+                  <Gradient colors={gradients.gold} borderRadius={26} style={styles.badge}>
+                    <View style={styles.badgeInner}>
+                      <Icon name={achievementIcon(a.icon)} size={21} color={colors.goldBright} strokeWidth={1.7} />
+                    </View>
                   </Gradient>
                 ) : (
                   <View style={[styles.badge, styles.badgeLocked]}>
-                    <Icon name="lock" size={18} color={colors.textTertiary} />
+                    <Icon name="lock" size={17} color={colors.textTertiary} strokeWidth={1.7} />
                   </View>
                 )}
                 <View style={styles.flex}>
-                  <Text style={t.bodyStrong}>{a.title}</Text>
+                  <Text style={styles.title}>{a.title}</Text>
                   <Text style={t.caption}>{a.description}</Text>
                 </View>
                 {a.earned && a.earned_at ? <Text style={styles.date}>{formatFullDate(a.earned_at)}</Text> : null}
@@ -74,7 +76,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   locked: {
-    opacity: 0.6,
+    opacity: 0.5,
+  },
+  title: {
+    ...font.serif,
+    fontSize: 17,
+    lineHeight: 20,
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',
@@ -82,16 +90,28 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   badge: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
+    padding: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badgeInner: {
+    flex: 1,
+    alignSelf: 'stretch',
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111830',
+  },
   badgeLocked: {
-    borderRadius: radius.md,
+    borderRadius: 26,
     backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   date: {
+    ...font.medium,
     color: colors.textTertiary,
     fontSize: 11,
   },

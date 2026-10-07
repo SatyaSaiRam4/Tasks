@@ -5,7 +5,8 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../../app/hooks';
-import { ACCENTS, colors, radius, spacing, type AccentName, type as t } from '../../../theme';
+import { ACCENTS, colors, DEFAULT_ACCENT, font, radius, spacing, type AccentName, type as t } from '../../../theme';
+import { Wordmark } from '../../../components/Brand';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { SectionHeader, Toggle } from '../../../components/Controls';
@@ -57,7 +58,7 @@ export function SettingsScreen() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
-  const [accent, setAccent] = useState<AccentName>('violet');
+  const [accent, setAccent] = useState<AccentName>(DEFAULT_ACCENT);
 
   useEffect(() => {
     AsyncStorage.getItem(ACCENT_STORAGE_KEY)
@@ -134,7 +135,7 @@ export function SettingsScreen() {
                 accessibilityLabel={`${key} accent`}
                 style={[styles.swatch, { backgroundColor: ACCENTS[key].primary }, accent === key && styles.swatchOn]}
               >
-                {accent === key ? <Icon name="check" size={14} color={colors.white} strokeWidth={3} /> : null}
+                {accent === key ? <Icon name="check" size={14} color={colors.onPrimary} strokeWidth={2.6} /> : null}
               </Pressable>
             ))}
           </View>
@@ -165,8 +166,8 @@ export function SettingsScreen() {
                 accessibilityState={{ selected: s.confirmation_mode === mode }}
                 style={[styles.mode, s.confirmation_mode === mode && styles.modeOn]}
               >
-                <Text style={[t.bodyStrong, s.confirmation_mode === mode && { color: colors.white }]}>{mode === 'STANDARD' ? 'Standard' : 'Quick'}</Text>
-                <Text style={[t.caption, s.confirmation_mode === mode && { color: 'rgba(255,255,255,0.8)' }]}>
+                <Text style={[t.bodyStrong, s.confirmation_mode === mode && { color: colors.onPrimary }]}>{mode === 'STANDARD' ? 'Standard' : 'Quick'}</Text>
+                <Text style={[t.caption, s.confirmation_mode === mode && styles.modeCaptionOn]}>
                   {mode === 'STANDARD' ? '“Did you actually complete this?”' : 'One-tap confirm'}
                 </Text>
               </Pressable>
@@ -215,7 +216,10 @@ export function SettingsScreen() {
         />
       </ListGroup>
 
-      <Text style={[t.caption, styles.version]}>Memo · v2.1</Text>
+      <View style={styles.version}>
+        <Wordmark />
+        <Text style={[t.micro, styles.versionText]}>Version 2.1</Text>
+      </View>
 
       <Sheet visible={sheet === 'name'} onClose={() => setSheet(null)} title="Display name">
         <TextField value={name} onChangeText={setName} placeholder="Your name" maxLength={120} autoFocus />
@@ -308,15 +312,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   swatch: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(5,6,11,0.6)',
   },
   swatchOn: {
-    borderWidth: 2,
-    borderColor: colors.white,
+    borderColor: colors.goldBright,
   },
   modeBlock: {
     paddingVertical: spacing.md,
@@ -330,21 +335,31 @@ const styles = StyleSheet.create({
   },
   mode: {
     flex: 1,
-    padding: spacing.md,
+    padding: spacing.md + 2,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     gap: 2,
   },
   modeOn: {
     backgroundColor: colors.primary,
+    borderColor: colors.goldBright,
+  },
+  modeCaptionOn: {
+    color: 'rgba(10,11,16,0.7)',
   },
   note: {
     marginTop: spacing.sm,
     paddingHorizontal: spacing.xs,
   },
   version: {
-    textAlign: 'center',
-    marginTop: spacing.xxl,
-    color: colors.textTertiary,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.huge,
+    opacity: 0.7,
+  },
+  versionText: {
+    ...font.bold,
   },
 });

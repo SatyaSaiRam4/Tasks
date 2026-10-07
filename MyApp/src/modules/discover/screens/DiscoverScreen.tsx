@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, gradients, radius, spacing, type as t } from '../../../theme';
+import { colors, font, gradients, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -72,7 +72,7 @@ export function DiscoverScreen() {
 
       {/* Search */}
       <View style={styles.search}>
-        <Icon name="search" size={18} color={colors.textTertiary} />
+        <Icon name="search" size={18} color={colors.gold} strokeWidth={1.7} />
         <TextInput
           value={id}
           onChangeText={v => setId(v.toUpperCase())}
@@ -92,7 +92,7 @@ export function DiscoverScreen() {
           accessibilityRole="button"
           accessibilityLabel="Search"
         >
-          <Icon name="arrow-right" size={18} color={colors.white} />
+          <Icon name="arrow-right" size={18} color={colors.onPrimary} strokeWidth={2.2} />
         </Pressable>
       </View>
       {recent.length && isUninitialized ? (
@@ -121,13 +121,13 @@ export function DiscoverScreen() {
                 <Avatar name={data.display_name} emoji={data.avatar} size={52} />
                 <View style={styles.flex}>
                   <Text style={t.heading}>{data.display_name}</Text>
-                  <Text style={t.caption}>{data.public_id}</Text>
+                  <Text style={styles.publicId}>{data.public_id}</Text>
                 </View>
               </View>
 
               {data.current_streak !== null || data.best_streak !== null ? (
-                <Gradient colors={gradients.streak} opacity={[0.25, 0.08]} borderRadius={radius.lg} style={styles.streak}>
-                  <Icon name="flame" size={30} color={colors.streak} />
+                <Gradient colors={gradients.moonlight} direction="vertical" borderRadius={radius.lg} style={styles.streak}>
+                  <Icon name="flame" size={28} color={colors.streak} strokeWidth={1.6} />
                   {data.current_streak !== null ? (
                     <Text style={styles.streakNum}>
                       {data.current_streak} <Text style={styles.streakUnit}>day streak</Text>
@@ -143,8 +143,10 @@ export function DiscoverScreen() {
                 <View style={styles.badges}>
                   {data.achievements.slice(0, 6).map(a => (
                     <View key={a.code} style={styles.badge} accessible accessibilityLabel={a.title}>
-                      <Gradient colors={gradients.streak} borderRadius={radius.md} style={styles.badgeIcon}>
-                        <Icon name={achievementIcon(a.icon)} size={18} color={colors.white} />
+                      <Gradient colors={gradients.gold} borderRadius={22} style={styles.badgeIcon}>
+                        <View style={styles.badgeInner}>
+                          <Icon name={achievementIcon(a.icon)} size={17} color={colors.goldBright} strokeWidth={1.7} />
+                        </View>
                       </Gradient>
                       <Text style={styles.badgeText} numberOfLines={2}>
                         {a.title}
@@ -175,7 +177,16 @@ const styles = StyleSheet.create({
   },
   myId: {
     ...t.heading,
-    letterSpacing: 0.8,
+    fontSize: 23,
+    color: colors.goldBright,
+    letterSpacing: 1.2,
+    marginTop: 2,
+  },
+  publicId: {
+    ...font.bold,
+    fontSize: 11.5,
+    letterSpacing: 1.8,
+    color: colors.gold,
     marginTop: 2,
   },
   toggleRow: {
@@ -188,25 +199,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    height: 54,
-    paddingLeft: spacing.lg,
-    paddingRight: 6,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    height: 58,
+    paddingLeft: spacing.lg + 2,
+    paddingRight: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   searchInput: {
+    ...font.semibold,
     flex: 1,
     color: colors.text,
-    fontWeight: '600',
     letterSpacing: 0.5,
     paddingVertical: 0,
   },
   go: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
@@ -229,21 +240,24 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg,
     marginTop: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
   },
   streakNum: {
+    ...font.serif,
     flex: 1,
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.text,
+    fontSize: 33,
+    lineHeight: 36,
+    color: colors.goldBright,
   },
   streakUnit: {
+    ...font.serifItalic,
     fontSize: 15,
-    fontWeight: '700',
     color: colors.textSecondary,
   },
   best: {
+    ...font.bold,
     color: colors.streakGold,
-    fontWeight: '700',
   },
   hidden: {
     marginTop: spacing.lg,
@@ -260,10 +274,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badgeIcon: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    padding: 1.5,
+  },
+  badgeInner: {
+    flex: 1,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#111830',
   },
   badgeText: {
     ...t.caption,

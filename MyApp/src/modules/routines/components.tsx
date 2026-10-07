@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, type as t } from '../../theme';
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { colors, font, gradients, radius, spacing, type as t } from '../../theme';
 import { Card } from '../../components/Card';
 import { Icon } from '../../components/Icon';
+import { ProgressBar } from '../../components/Progress';
 import { formatDayMonth, fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
 import type { GridCell, Track, TrackGrid } from './routinesApi';
 
@@ -15,28 +16,41 @@ export function periodLabel(track: Track): string {
   return range;
 }
 
-/** One category in a list: its name, period and today's progress. */
-export function CategoryCard({ track, onPress }: { track: Track; onPress: () => void }) {
+/**
+ * One category in a list: a monogram medallion, its name and period, and
+ * today's progress as a fine gauge underneath.
+ */
+export function CategoryCard({ track, onPress, style }: { track: Track; onPress: () => void; style?: StyleProp<ViewStyle> }) {
   const allDone = track.today_required > 0 && track.today_completed >= track.today_required;
+  const progress = track.today_required > 0 ? track.today_completed / track.today_required : 0;
   return (
-    <Card onPress={onPress} style={styles.card} accessibilityLabel={`${track.name}, ${track.today_completed} of ${track.today_required} done today`}>
+    <Card onPress={onPress} style={[styles.card, style]} accessibilityLabel={`${track.name}, ${track.today_completed} of ${track.today_required} done today`}>
       <View style={styles.cardRow}>
+        <View style={[styles.monogram, allDone && styles.monogramDone]}>
+          <Text style={[styles.monogramText, allDone && { color: colors.success }]}>{track.name.trim().charAt(0).toUpperCase() || '•'}</Text>
+        </View>
         <View style={styles.flex}>
-          <Text style={t.subtitle} numberOfLines={1}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
             {track.name}
           </Text>
-          <Text style={[t.caption, styles.cardMeta]}>{periodLabel(track)}</Text>
+          <Text style={[t.caption, styles.cardMeta]} numberOfLines={1}>
+            {periodLabel(track)}
+          </Text>
         </View>
         {track.today_required > 0 ? (
-          <View style={[styles.today, allDone && styles.todayDone]}>
-            {allDone ? <Icon name="check" size={14} color={colors.success} strokeWidth={3} /> : null}
+          <View style={styles.today}>
+            {allDone ? <Icon name="check" size={13} color={colors.success} strokeWidth={2.6} /> : null}
             <Text style={[styles.todayText, allDone && { color: colors.success }]}>
-              {track.today_completed}/{track.today_required}
+              {track.today_completed}
+              <Text style={styles.todayOf}>/{track.today_required}</Text>
             </Text>
           </View>
         ) : null}
-        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+        <Icon name="chevron-right" size={17} color={colors.textTertiary} />
       </View>
+      {track.today_required > 0 ? (
+        <ProgressBar progress={progress} height={3} colorsPair={allDone ? gradients.success : gradients.gold} style={styles.gauge} />
+      ) : null}
     </Card>
   );
 }
@@ -139,10 +153,10 @@ function Mark({ cell, label, onPress }: { cell: GridCell; label: string; onPress
   const box =
     cell === 'DONE' ? (
       <View style={[styles.box, styles.boxDone]}>
-        <Icon name="check" size={16} color={colors.white} strokeWidth={3} />
+        <Icon name="check" size={15} color={colors.onPrimary} strokeWidth={2.8} />
       </View>
     ) : cell === 'MISSED' ? (
-      <Icon name="x" size={16} color={colors.danger} strokeWidth={2.5} />
+      <Icon name="x" size={15} color={colors.danger} strokeWidth={2} />
     ) : cell === 'TODO' ? (
       <View style={[styles.box, styles.boxTodo]} />
     ) : cell === 'FUTURE' ? (
@@ -187,39 +201,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  monogram: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#161D36',
+    borderWidth: 1,
+    borderColor: colors.goldLine,
+  },
+  monogramDone: {
+    backgroundColor: colors.successSoft,
+    borderColor: 'rgba(140,211,179,0.35)',
+  },
+  monogramText: {
+    ...font.serif,
+    fontSize: 20,
+    lineHeight: 23,
+    color: colors.goldBright,
+  },
+  cardTitle: {
+    ...font.serif,
+    fontSize: 19,
+    lineHeight: 22,
+    color: colors.text,
+  },
   cardMeta: {
-    marginTop: 4,
+    marginTop: 2,
   },
   today: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
-  },
-  todayDone: {
-    backgroundColor: colors.successSoft,
   },
   todayText: {
-    color: colors.primary,
-    fontWeight: '800',
+    ...font.serif,
+    fontSize: 20,
+    color: colors.goldBright,
+  },
+  todayOf: {
+    fontSize: 17,
+    color: colors.textTertiary,
+  },
+  gauge: {
+    marginTop: spacing.lg,
   },
 
   table: {
     flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
+    borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
   },
   nameCol: {
     width: NAME_W,
-    borderRightWidth: 1,
-    borderRightColor: colors.borderStrong,
-    backgroundColor: colors.surfaceAlt,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.goldLine,
+    backgroundColor: 'rgba(21,27,47,0.9)',
   },
   row: {
     flexDirection: 'row',
@@ -240,39 +281,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomLine: {
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
   },
   leftLine: {
     borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: colors.borderStrong,
+    borderLeftColor: colors.border,
   },
   todayCol: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.goldSoft,
   },
   taskName: {
+    ...font.semibold,
     color: colors.text,
-    fontWeight: '600',
   },
   weekday: {
-    fontSize: 10,
-    fontWeight: '700',
+    ...font.bold,
+    fontSize: 9.5,
+    letterSpacing: 1,
     color: colors.textTertiary,
     textTransform: 'uppercase',
   },
   dayNum: {
-    fontSize: 15,
-    fontWeight: '700',
+    ...font.serif,
+    fontSize: 16,
+    lineHeight: 18,
     color: colors.text,
-    marginTop: 1,
   },
   todayText2: {
-    color: colors.primary,
+    color: colors.gold,
   },
   box: {
     width: 26,
     height: 26,
-    borderRadius: 7,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -280,12 +322,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
   boxTodo: {
-    borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(5,6,11,0.6)',
   },
   boxFuture: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   none: {

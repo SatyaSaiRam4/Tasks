@@ -10,8 +10,8 @@
  *               + stack screens pushed on top of the tabs.
  *   First time (or "Replay tour") → Satya's tour, drawn over the real app.
  */
-import React, { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   createNavigationContainerRef,
   DarkTheme,
@@ -25,8 +25,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, font, radius, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
 import { Icon, type IconName } from '../components/Icon';
+import { Gradient } from '../components/Gradient';
+import { useMotion } from '../hooks/useMotion';
+import { useLayout } from '../hooks/useLayout';
+import { easeOut } from '../animations';
 
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
@@ -89,12 +93,39 @@ const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = 
   ProfileTab: { label: 'Profile', icon: 'user' },
 };
 
-/** A floating, rounded tab bar with an accent pill behind the active tab. */
+/**
+ * A floating glass tab bar. A champagne pill glides to the active tab;
+ * the active icon turns gold. On tablets the bar is centered at a fixed width.
+ */
 function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { reduced } = useMotion();
+  const { isTablet } = useLayout();
+  const [barWidth, setBarWidth] = useState(0);
+  const x = useRef(new Animated.Value(state.index)).current;
+  useEffect(() => {
+    Animated.timing(x, { toValue: state.index, duration: reduced ? 0 : 420, easing: easeOut, useNativeDriver: true }).start();
+  }, [state.index, reduced, x]);
+  const slot = barWidth ? (barWidth - spacing.sm * 2) / state.routes.length : 0;
+
   return (
     <View style={[styles.tabWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]} pointerEvents="box-none">
-      <View style={[styles.tabBar, shadow.float]} accessibilityRole="tablist">
+      <View
+        style={[styles.tabBar, shadow.float, isTablet && styles.tabBarTablet]}
+        accessibilityRole="tablist"
+        onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
+      >
+        <Gradient colors={['#151C34', '#090C17']} direction="vertical" borderRadius={radius.xl + 4} style={StyleSheet.absoluteFill} />
+        <View style={styles.tabSheen} pointerEvents="none" />
+        {slot ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.tabIndicator, { width: slot, transform: [{ translateX: Animated.multiply(x, slot) }] }]}
+          >
+            <View style={styles.tabIndicatorPill} />
+            <View style={styles.tabIndicatorLine} />
+          </Animated.View>
+        ) : null}
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const tab = TABS[route.name as keyof MainTabParamList];
@@ -110,9 +141,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
               }}
               style={styles.tabItem}
             >
-              <View style={[styles.tabPill, focused && styles.tabPillActive]}>
-                <Icon name={tab.icon} size={21} color={focused ? colors.primary : colors.textTertiary} strokeWidth={focused ? 2.3 : 2} />
-              </View>
+              <Icon name={tab.icon} size={21} color={focused ? colors.gold : colors.textTertiary} strokeWidth={focused ? 2 : 1.7} />
               <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
             </Pressable>
           );
@@ -131,7 +160,7 @@ const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
 
 function MainTabs() {
   return (
-    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false }}>
+    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: colors.background } }}>
       <Tab.Screen name="HomeTab" component={DashboardScreen} />
       <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
       <Tab.Screen name="RemindersTab" component={RemindersScreen} />
@@ -168,7 +197,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <RootStack.Navigator
-        screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.background } }}
+        screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.background } }}
       >
         {!isAuthenticated ? (
           <RootStack.Group screenOptions={{ animation: 'fade' }}>
@@ -206,39 +235,65 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: spacing.lg,
+    alignItems: 'center',
   },
   tabBar: {
     flexDirection: 'row',
-    borderRadius: radius.xl,
-    backgroundColor: colors.backgroundRaised,
+    alignSelf: 'stretch',
+    height: TAB_BAR_HEIGHT,
+    borderRadius: radius.xl + 4,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    borderColor: colors.goldLine,
+    paddingHorizontal: spacing.sm,
+  },
+  tabBarTablet: {
+    alignSelf: 'center',
+    width: 560,
+  },
+  tabSheen: {
+    position: 'absolute',
+    top: 0,
+    left: '15%',
+    right: '15%',
+    height: 1,
+    backgroundColor: 'rgba(241,221,175,0.35)',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabIndicatorPill: {
+    width: '84%',
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.goldSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(217,188,130,0.25)',
+  },
+  tabIndicatorLine: {
+    position: 'absolute',
+    top: 0,
+    width: 22,
+    height: 2,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    backgroundColor: colors.gold,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    minHeight: 48,
-  },
-  tabPill: {
-    width: 48,
-    height: 30,
-    // Always carry a (transparent) fill and clip: on Android, a radius set
-    // before any background exists is not applied when the fill appears.
-    borderRadius: 15,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabPillActive: {
-    backgroundColor: colors.primarySoft,
+    gap: 4,
   },
   tabLabel: {
-    marginTop: 2,
+    ...font.semibold,
     fontSize: 10,
-    fontWeight: '600',
+    letterSpacing: 0.4,
     color: colors.textTertiary,
   },
   tabLabelActive: {

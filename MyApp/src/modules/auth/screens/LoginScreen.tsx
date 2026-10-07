@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, spacing } from '../../../theme';
+import { colors, font, spacing } from '../../../theme';
 import { TextField } from '../../../components/TextField';
 import { Button } from '../../../components/Button';
 import { getErrorMessage } from '../../../utils/apiError';
@@ -87,10 +87,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   link: {
+    ...font.bold,
     color: colors.primary,
-    fontWeight: '700',
   },
   footerText: {
+    ...font.medium,
     color: colors.textSecondary,
     fontSize: 14,
   },

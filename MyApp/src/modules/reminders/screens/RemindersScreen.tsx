@@ -4,7 +4,9 @@ import Toast from '@ant-design/react-native/lib/toast';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, radius, spacing, type as t } from '../../../theme';
+import { colors, font, radius, spacing, type as t } from '../../../theme';
+import { useLayout } from '../../../hooks/useLayout';
+import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
 import { Fab, IconButton } from '../../../components/Controls';
@@ -33,6 +35,7 @@ const dayOf = (r: Reminder) => toDateKey(new Date(r.remind_at));
 /** Reminders: pick a day (strip or calendar), see that day's reminders. */
 export function RemindersScreen() {
   const navigation = useNavigation<Nav>();
+  const { gutter } = useLayout();
   const { data, isLoading, isError, error, refetch, isFetching } = useListRemindersQuery();
   const todayKey = toDateKey(new Date());
   const [day, setDay] = useState(todayKey);
@@ -106,8 +109,9 @@ export function RemindersScreen() {
       refreshing={isFetching && !isLoading}
       footer={<Fab accessibilityLabel="Add reminder" onPress={() => navigation.navigate('ReminderEditor', { date: day })} />}
     >
-      <View style={styles.pad}>
+      <View style={[styles.pad, { paddingHorizontal: gutter }]}>
         <LargeTitle
+          eyebrow="Your day"
           title="Reminders"
           right={
             <DatePicker
@@ -126,9 +130,9 @@ export function RemindersScreen() {
 
       <DateStrip selected={day} today={todayKey} onSelect={setDay} marks={marks} daysBack={3} daysForward={30} />
 
-      <View style={styles.pad}>
+      <View style={[styles.pad, { paddingHorizontal: gutter }]}>
         <View style={styles.dayHead}>
-          <Text style={t.heading}>{dayTitle}</Text>
+          <Text style={styles.dayTitle}>{dayTitle}</Text>
           {day !== todayKey ? (
             <Pressable onPress={() => setDay(todayKey)} hitSlop={8} accessibilityRole="button">
               <Text style={styles.link}>Today</Text>
@@ -149,14 +153,16 @@ export function RemindersScreen() {
             onAction={() => navigation.navigate('ReminderEditor', { date: day })}
           />
         ) : (
-          items.map(r => (
-            <ReminderRow
-              key={r.id}
-              reminder={r}
-              onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
-              onToggle={() => toggleDone(r)}
-              onMore={() => setMenuFor(r)}
-            />
+          items.map((r, i) => (
+            <FadeIn key={r.id} index={i}>
+              <ReminderRow
+                reminder={r}
+                last={i === items.length - 1}
+                onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
+                onToggle={() => toggleDone(r)}
+                onMore={() => setMenuFor(r)}
+              />
+            </FadeIn>
           ))
         )}
       </View>
@@ -200,32 +206,55 @@ function CalendarButton({ onPress }: { onPress?: () => void }) {
   return <IconButton icon="calendar" accessibilityLabel="Pick a day from the calendar" onPress={() => onPress?.()} />;
 }
 
-function ReminderRow({ reminder: r, onPress, onToggle, onMore }: { reminder: Reminder; onPress: () => void; onToggle: () => void; onMore: () => void }) {
+/** One reminder on the day's timeline: serif time, a gold thread, then the card. */
+function ReminderRow({
+  reminder: r,
+  last,
+  onPress,
+  onToggle,
+  onMore,
+}: {
+  reminder: Reminder;
+  last: boolean;
+  onPress: () => void;
+  onToggle: () => void;
+  onMore: () => void;
+}) {
   const done = Boolean(r.completed_at);
   const late = !done && new Date(r.remind_at).getTime() < Date.now();
+  const [clock, meridiem] = formatClock(r.remind_at).split(' ');
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onMore}
-      accessibilityRole="button"
-      accessibilityLabel={`${r.title}, ${formatClock(r.remind_at)}${done ? ', done' : ''}`}
-      style={({ pressed }) => [styles.row, done && styles.rowDone, pressed && styles.pressed]}
-    >
-      <Text style={[styles.time, late && { color: colors.danger }]}>{formatClock(r.remind_at)}</Text>
-      <View style={styles.flex}>
-        <Text style={[t.bodyStrong, done && styles.strike]} numberOfLines={2}>
-          {r.title}
-        </Text>
-        {r.whatsapp_number ? (
-          <View style={styles.whatsapp}>
-            <Icon name="message" size={12} color={colors.textTertiary} />
-            <Text style={t.caption}>WhatsApp too</Text>
-          </View>
-        ) : null}
+    <View style={styles.line}>
+      <View style={styles.timeCol}>
+        <Text style={[styles.time, late && { color: colors.danger }, done && styles.timeDone]}>{clock}</Text>
+        {meridiem ? <Text style={styles.meridiem}>{meridiem}</Text> : null}
       </View>
-      <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel="More options" onPress={onMore} />
-      <Checkbox checked={done} onPress={onToggle} accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'} />
-    </Pressable>
+      <View style={styles.thread}>
+        <View style={[styles.node, done && styles.nodeDone, late && styles.nodeLate]} />
+        {last ? null : <View style={styles.threadLine} />}
+      </View>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onMore}
+        accessibilityRole="button"
+        accessibilityLabel={`${r.title}, ${formatClock(r.remind_at)}${done ? ', done' : ''}`}
+        style={({ pressed }) => [styles.row, done && styles.rowDone, pressed && styles.pressed]}
+      >
+        <View style={styles.flex}>
+          <Text style={[t.bodyStrong, done && styles.strike]} numberOfLines={2}>
+            {r.title}
+          </Text>
+          {r.whatsapp_number ? (
+            <View style={styles.whatsapp}>
+              <Icon name="message" size={12} color={colors.gold} strokeWidth={1.8} />
+              <Text style={t.caption}>WhatsApp too</Text>
+            </View>
+          ) : null}
+        </View>
+        <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel="More options" onPress={onMore} />
+        <Checkbox checked={done} onPress={onToggle} accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -246,31 +275,83 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  dayTitle: {
+    ...t.title,
   },
   link: {
+    ...font.bold,
     color: colors.primary,
-    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  line: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  timeCol: {
+    width: 62,
+    paddingTop: spacing.lg,
+    alignItems: 'flex-end',
+  },
+  time: {
+    ...font.serif,
+    fontSize: 20,
+    lineHeight: 21,
+    color: colors.text,
+  },
+  timeDone: {
+    color: colors.textTertiary,
+  },
+  meridiem: {
+    ...font.bold,
+    fontSize: 9.5,
+    letterSpacing: 1.4,
+    color: colors.textTertiary,
+  },
+  thread: {
+    width: 28,
+    alignItems: 'center',
+  },
+  node: {
+    marginTop: spacing.lg + 7,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    backgroundColor: colors.background,
+  },
+  nodeDone: {
+    borderColor: colors.success,
+    backgroundColor: colors.success,
+  },
+  nodeLate: {
+    borderColor: colors.danger,
+  },
+  threadLine: {
+    flex: 1,
+    width: 1,
+    marginTop: 4,
+    backgroundColor: colors.goldLine,
   },
   row: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.md,
+    marginBottom: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
   },
   rowDone: {
     opacity: 0.55,
-  },
-  time: {
-    width: 72,
-    color: colors.text,
-    fontWeight: '700',
   },
   strike: {
     textDecorationLine: 'line-through',

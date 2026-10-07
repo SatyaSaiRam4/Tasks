@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { colors, radius, spacing } from '../theme';
+import { colors, font, radius, spacing } from '../theme';
 import { Icon } from './Icon';
 
 /** A slim banner shown only while the device has no connection. */
@@ -31,14 +31,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.warningSoft,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glassStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
   },
   text: {
     flex: 1,
+    ...font.semibold,
     color: colors.warning,
     fontSize: 12,
-    fontWeight: '600',
   },
 });

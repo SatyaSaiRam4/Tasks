@@ -1,15 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, gradients, motion, radius, spacing, type as t } from '../theme';
+import { colors, motion, radius, spacing, type as t } from '../theme';
 import { useMotion } from '../hooks/useMotion';
+import { easeOut } from '../animations';
 import { Button } from './Button';
-import { Glow, Gradient } from './Gradient';
-import { Icon, type IconName } from './Icon';
+import { Emblem } from './Emblem';
+import { Gradient } from './Gradient';
+import { type IconName } from './Icon';
 
 // ---- FadeIn ------------------------------------------------------------------------
 
 /** Fades and lifts its children in; staggered by `index`. Instant under reduced motion. */
-export function FadeIn({ children, index = 0, style, distance = 12 }: { children: React.ReactNode; index?: number; style?: StyleProp<ViewStyle>; distance?: number }) {
+export function FadeIn({ children, index = 0, style, distance = 16 }: { children: React.ReactNode; index?: number; style?: StyleProp<ViewStyle>; distance?: number }) {
   const { reduced } = useMotion();
   const value = useRef(new Animated.Value(reduced ? 1 : 0)).current;
   useEffect(() => {
@@ -19,9 +21,9 @@ export function FadeIn({ children, index = 0, style, distance = 12 }: { children
     }
     Animated.timing(value, {
       toValue: 1,
-      duration: motion.slow,
+      duration: motion.slow + 120,
       delay: index * motion.stagger,
-      easing: Easing.out(Easing.cubic),
+      easing: easeOut,
       useNativeDriver: true,
     }).start();
   }, [index, reduced, value]);
@@ -31,21 +33,35 @@ export function FadeIn({ children, index = 0, style, distance = 12 }: { children
 
 // ---- Skeleton ------------------------------------------------------------------------
 
+/** A loading placeholder with a slow champagne shimmer sweeping across it. */
 export function Skeleton({ width = '100%', height = 16, rounded = radius.sm, style }: { width?: number | `${number}%`; height?: number; rounded?: number; style?: StyleProp<ViewStyle> }) {
   const { reduced } = useMotion();
-  const pulse = useRef(new Animated.Value(0.45)).current;
+  const sweep = useRef(new Animated.Value(0)).current;
+  const [w, setW] = useState(0);
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || !w) return;
     const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.9, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.45, duration: 700, useNativeDriver: true }),
-      ]),
+      Animated.timing(sweep, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse, reduced]);
-  return <Animated.View style={[{ width, height, borderRadius: rounded, backgroundColor: colors.surfaceHigh, opacity: pulse }, style]} />;
+  }, [sweep, reduced, w]);
+  const translateX = sweep.interpolate({ inputRange: [0, 1], outputRange: [-w, w] });
+  return (
+    <View
+      onLayout={e => setW(e.nativeEvent.layout.width)}
+      style={[{ width, height, borderRadius: rounded }, styles.skeleton, style]}
+    >
+      {w && !reduced ? (
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
+          <View style={styles.shimmerRow}>
+            <Gradient colors={['rgba(217,188,130,0)', 'rgba(217,188,130,0.07)']} direction="horizontal" style={styles.flex} />
+            <Gradient colors={['rgba(217,188,130,0.07)', 'rgba(217,188,130,0)']} direction="horizontal" style={styles.flex} />
+          </View>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
 }
 
 /** A ready-made skeleton for a list of cards. */
@@ -78,13 +94,8 @@ export function EmptyState({
 }) {
   return (
     <FadeIn style={[styles.empty, compact && styles.emptyCompact]}>
-      <View style={styles.emptyArt}>
-        <Glow color={colors.primary} size={160} intensity={0.35} style={StyleSheet.absoluteFill} />
-        <Gradient colors={gradients.surface} borderRadius={radius.xl} style={styles.emptyIcon}>
-          <Icon name={icon} size={30} color={colors.primary} />
-        </Gradient>
-      </View>
-      <Text style={[t.heading, styles.center]}>{title}</Text>
+      <Emblem icon={icon} size={compact ? 128 : 168} />
+      <Text style={[t.heading, styles.center, styles.emptyTitle]}>{title}</Text>
       {message ? <Text style={[t.body, styles.emptyMessage]}>{message}</Text> : null}
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} fullWidth={false} style={styles.emptyAction} icon="plus" />
@@ -96,10 +107,8 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View style={styles.empty} accessibilityRole="alert">
-      <View style={[styles.emptyIcon, styles.errorIcon]}>
-        <Icon name="alert" size={28} color={colors.danger} />
-      </View>
-      <Text style={[t.heading, styles.center]}>Something went wrong</Text>
+      <Emblem icon="alert" size={140} tint={colors.danger} ring={[colors.danger, '#8A4B5A']} />
+      <Text style={[t.heading, styles.center, styles.emptyTitle]}>Something went wrong</Text>
       <Text style={[t.body, styles.emptyMessage]}>{message}</Text>
       {onRetry ? <Button label="Try again" icon="refresh" variant="secondary" onPress={onRetry} fullWidth={false} style={styles.emptyAction} /> : null}
     </View>
@@ -107,41 +116,38 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   center: {
     textAlign: 'center',
   },
+  skeleton: {
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  shimmerRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
   empty: {
     alignItems: 'center',
-    paddingVertical: spacing.xxxl,
+    paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
   },
   emptyCompact: {
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.md,
   },
-  emptyArt: {
-    width: 160,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  errorIcon: {
-    backgroundColor: colors.dangerSoft,
-    marginBottom: spacing.lg,
+  emptyTitle: {
+    marginTop: spacing.xs,
   },
   emptyMessage: {
     marginTop: spacing.sm,
     color: colors.textSecondary,
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 320,
   },
   emptyAction: {
     marginTop: spacing.xl,

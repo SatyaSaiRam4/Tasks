@@ -23,7 +23,8 @@ import { CelebrationProvider } from './src/components/Celebration';
 import { CompletionProvider } from './src/modules/routines/CompletionProvider';
 import { BackgroundSync } from './src/modules/home/BackgroundSync';
 import { VaultAutoLock } from './src/modules/vault/VaultAutoLock';
-import { SatyaOrb } from './src/modules/satya/SatyaModel';
+import { MoonMark } from './src/components/Brand';
+import { Backdrop } from './src/layouts/Backdrop';
 
 // Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the dark theme.
 const antTheme = {
@@ -45,7 +46,7 @@ const antTheme = {
   radius_sm: radius.sm,
   radius_md: radius.md,
   radius_lg: radius.lg,
-  toast_fill: 'rgba(25, 29, 38, 0.97)',
+  toast_fill: 'rgba(14, 18, 34, 0.96)',
   primary_button_fill: colors.primary,
   primary_button_fill_tap: colors.primarySecondary,
 };
@@ -65,7 +66,10 @@ function AppContent() {
   if (!isBootstrapped) {
     return (
       <View style={styles.splash} accessibilityLabel="Loading Memo">
-        <SatyaOrb size={96} />
+        <Backdrop />
+        <View style={styles.splashMark}>
+          <MoonMark size={88} />
+        </View>
       </View>
     );
   }
@@ -111,6 +115,11 @@ const styles = StyleSheet.create({
   splash: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  splashMark: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

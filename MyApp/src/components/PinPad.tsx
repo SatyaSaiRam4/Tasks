@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, font, spacing } from '../theme';
 import { useMotion } from '../hooks/useMotion';
 import { Icon } from './Icon';
 
@@ -78,45 +78,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.lg,
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
   },
   dot: {
-    width: 14,
-    height: 14,
+    width: 13,
+    height: 13,
     borderRadius: 7,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
+    borderWidth: 1,
+    borderColor: colors.goldLine,
   },
   dotFilled: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.gold,
+    borderColor: colors.goldBright,
   },
   pad: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: spacing.md,
+    columnGap: spacing.xl,
+    rowGap: spacing.sm + 2,
     maxWidth: 300,
     alignSelf: 'center',
   },
   key: {
-    width: 80,
-    height: 64,
+    width: 66,
+    height: 66,
     alignItems: 'center',
     justifyContent: 'center',
   },
   keySurface: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    borderRadius: 33,
+    backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
   },
   keyPressed: {
-    backgroundColor: colors.surfaceHigh,
+    backgroundColor: colors.goldSoft,
+    borderColor: colors.goldLine,
   },
   keyText: {
+    ...font.serif,
     fontSize: 26,
-    fontWeight: '600',
+    lineHeight: 31,
     color: colors.text,
   },
 });
