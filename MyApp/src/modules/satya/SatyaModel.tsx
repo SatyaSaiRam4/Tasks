@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, gradients } from '../../theme';
+import { colors, font, gradients } from '../../theme';
 import { useMotion } from '../../hooks/useMotion';
 import { Glow, Gradient } from '../../components/Gradient';
 
@@ -34,7 +34,7 @@ export function SatyaModel({ size = 220, intro = 'short' }: { size?: number; int
 
   return (
     <View style={{ width: size, height: size }} accessible accessibilityLabel="Satya, your guide">
-      <Glow color={colors.primary} size={size * 1.25} intensity={0.32} style={[styles.glow, { left: -size * 0.125, top: -size * 0.125 }]} />
+      <Glow color={colors.gold} size={size * 1.25} intensity={0.32} style={[styles.glow, { left: -size * 0.125, top: -size * 0.125 }]} />
       {phase !== 'ready' ? <SatyaOrb size={size * 0.62} /> : null}
       {canRender3D && phase !== 'fallback' ? (
         <WebView
@@ -87,7 +87,7 @@ export function SatyaOrb({ size = 120 }: { size?: number }) {
   return (
     <View style={[StyleSheet.absoluteFill, styles.center]}>
       <Animated.View style={{ transform: [{ scale }, { translateY }] }}>
-        <Gradient colors={gradients.primary} borderRadius={size / 2} style={[styles.orb, { width: size, height: size }]}>
+        <Gradient colors={gradients.gold} borderRadius={size / 2} style={[styles.orb, { width: size, height: size }]}>
           <View style={[styles.orbInner, { width: size * 0.7, height: size * 0.7, borderRadius: size * 0.35 }]}>
             <Text style={[styles.orbText, { fontSize: size * 0.32 }]}>S</Text>
           </View>
@@ -116,15 +116,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orbInner: {
-    backgroundColor: 'rgba(7, 8, 11, 0.35)',
+    backgroundColor: '#101730',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   orbText: {
-    color: colors.white,
-    fontWeight: '800',
-    letterSpacing: -1,
+    ...font.serif,
+    color: colors.goldBright,
+    includeFontPadding: false,
   },
 });

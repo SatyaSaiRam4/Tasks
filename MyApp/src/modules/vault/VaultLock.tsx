@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, gradients, radius, spacing, type as t } from '../../theme';
+import { colors, font, spacing, type as t } from '../../theme';
 import { PinPad } from '../../components/PinPad';
-import { Glow, Gradient } from '../../components/Gradient';
-import { Icon } from '../../components/Icon';
+import { Emblem } from '../../components/Emblem';
 import { FadeIn } from '../../components/Feedback';
 import { getErrorMessage } from '../../utils/apiError';
 import { useSetupVaultMutation, useUnlockVaultMutation, type VaultStatus } from './vaultApi';
@@ -82,10 +81,7 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
   return (
     <FadeIn style={styles.root}>
       <View style={styles.lockArt}>
-        <Glow color={colors.primary} size={220} intensity={0.4} style={styles.glow} />
-        <Gradient colors={gradients.vault} borderRadius={radius.xxl} style={styles.lockIcon}>
-          <Icon name="lock" size={34} color={colors.primary} />
-        </Gradient>
+        <Emblem icon="lock" size={140} tint={colors.violet} iconColor={colors.goldBright} />
       </View>
       <Text style={[t.title, styles.center]}>{title}</Text>
       <Text style={[t.body, styles.subtitle]}>{subtitle}</Text>
@@ -111,17 +107,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glow: {
-    position: 'absolute',
-  },
-  lockIcon: {
-    width: 84,
-    height: 84,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
   center: {
     textAlign: 'center',
   },
@@ -139,8 +124,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   message: {
+    ...font.semibold,
     color: colors.danger,
     textAlign: 'center',
-    fontWeight: '600',
   },
 });

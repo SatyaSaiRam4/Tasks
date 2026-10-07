@@ -1,6 +1,8 @@
 import React, { useRef } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, gradients, radius, spacing, type as t } from '../../../theme';
+import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors, font, radius, spacing, type as t } from '../../../theme';
+import { Glow } from '../../../components/Gradient';
+import { useLoop } from '../../../animations';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -31,29 +33,25 @@ export function ConsistencyScreen() {
         <Skeleton height={160} rounded={radius.xl} />
       ) : (
         <>
-          <FadeIn>
-            <Card gradient={gradients.streak} gradientOpacity={[0.26, 0.06]}>
-              <View style={styles.heroRow}>
-                <View style={styles.flex}>
-                  <Text style={t.micro}>Current streak</Text>
-                  <View style={styles.bigRow}>
-                    <Icon name="flame" size={30} color={colors.streak} fill={s.today.secured ? colors.streak : 'none'} />
-                    <AnimatedNumber value={s.current_streak} style={styles.big} />
-                  </View>
-                  <Text style={t.caption}>{s.today.secured ? 'Today is done ✓' : s.today.required ? `${s.today.remaining} left today` : 'No tasks today'}</Text>
-                </View>
-                <View style={styles.best}>
-                  <Icon name="trophy" size={20} color={colors.streakGold} />
-                  <Text style={t.heading}>{s.best_streak}</Text>
-                  <Text style={t.caption}>Best</Text>
-                </View>
-              </View>
-            </Card>
+          <FadeIn style={styles.hero}>
+            <StreakFlame lit={s.today.secured} />
+            <AnimatedNumber value={s.current_streak} style={styles.big} />
+            <Text style={styles.unit}>day streak</Text>
+            <Text style={[styles.status, s.today.secured && { color: colors.success }]}>
+              {s.today.secured ? 'Today is done ✓' : s.today.required ? `${s.today.remaining} left today` : 'No tasks today'}
+            </Text>
           </FadeIn>
 
-          <FadeIn index={1} style={styles.grid}>
-            <Tile label="Days done" value={s.total_success_days} color={colors.success} />
-            <Tile label="Days missed" value={s.total_failed_days} color={colors.danger} />
+          <FadeIn index={1}>
+            <Card padded={false}>
+              <View style={styles.strip}>
+                <Tile icon="trophy" label="Best" value={s.best_streak} color={colors.goldBright} />
+                <View style={styles.stripDivider} />
+                <Tile icon="check-circle" label="Days done" value={s.total_success_days} color={colors.success} />
+                <View style={styles.stripDivider} />
+                <Tile icon="x" label="Days missed" value={s.total_failed_days} color={colors.danger} />
+              </View>
+            </Card>
           </FadeIn>
 
           <SectionHeader title="Calendar" />
@@ -79,8 +77,8 @@ export function ConsistencyScreen() {
             completions.data.map(c => (
               <Card key={c.id} style={styles.mbMd}>
                 <View style={styles.compRow}>
-                  <View style={[styles.compIcon, { backgroundColor: c.is_perfect ? colors.streakSoft : colors.surfaceAlt }]}>
-                    <Icon name={c.is_perfect ? 'trophy' : 'flag'} size={20} color={c.is_perfect ? colors.streakGold : colors.textSecondary} />
+                  <View style={[styles.compIcon, c.is_perfect && styles.compIconPerfect]}>
+                    <Icon name={c.is_perfect ? 'trophy' : 'flag'} size={19} color={c.is_perfect ? colors.goldBright : colors.textSecondary} strokeWidth={1.7} />
                   </View>
                   <View style={styles.flex}>
                     <Text style={t.bodyStrong}>{c.track_name}</Text>
@@ -94,7 +92,7 @@ export function ConsistencyScreen() {
             ))
           )}
 
-          <Text style={[t.caption, styles.mtMd]}>Tick all of a day’s tasks to keep your streak going.</Text>
+          <Text style={styles.footnote}>Tick all of a day’s tasks to keep your streak going.</Text>
         </>
       )}
       {history.isError ? <ErrorState message={getErrorMessage(history.error)} onRetry={history.refetch} /> : null}
@@ -102,12 +100,30 @@ export function ConsistencyScreen() {
   );
 }
 
-function Tile({ label, value, color, suffix }: { label: string; value: number; color: string; suffix?: string }) {
+function Tile({ icon, label, value, color }: { icon: 'trophy' | 'check-circle' | 'x'; label: string; value: number; color: string }) {
   return (
-    <Card style={styles.tile} contentStyle={styles.tileContent}>
-      <AnimatedNumber value={value} suffix={suffix} style={[styles.tileValue, { color }]} />
-      <Text style={t.caption}>{label}</Text>
-    </Card>
+    <View style={styles.tile}>
+      <Icon name={icon} size={15} color={color} strokeWidth={1.8} />
+      <AnimatedNumber value={value} style={styles.tileValue} />
+      <Text style={styles.tileLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/** The flame emblem: a gold-ringed medallion over a breathing ember glow. */
+function StreakFlame({ lit }: { lit: boolean }) {
+  const breathe = useLoop(3600);
+  const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.12] });
+  const opacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  return (
+    <View style={styles.flameWrap}>
+      <Animated.View style={[styles.flameGlow, { opacity, transform: [{ scale }] }]}>
+        <Glow color={colors.streak} size={200} intensity={lit ? 0.55 : 0.32} />
+      </Animated.View>
+      <View style={styles.flameMedal}>
+        <Icon name="flame" size={34} color={colors.streakGold} fill={lit ? colors.streak : 'none'} strokeWidth={1.6} />
+      </View>
+    </View>
   );
 }
 
@@ -115,50 +131,73 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  mtMd: {
-    marginTop: spacing.md,
-  },
   mbMd: {
     marginBottom: spacing.md,
   },
-  heroRow: {
-    flexDirection: 'row',
+  hero: {
     alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl,
   },
-  bigRow: {
-    flexDirection: 'row',
+  flameWrap: {
+    width: 200,
+    height: 120,
     alignItems: 'center',
-    gap: spacing.sm,
-    marginVertical: spacing.xs,
+    justifyContent: 'center',
+  },
+  flameGlow: {
+    position: 'absolute',
+  },
+  flameMedal: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10,13,24,0.8)',
+    borderWidth: 1,
+    borderColor: colors.goldLine,
   },
   big: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -1.5,
+    ...t.hero,
+    fontSize: 92,
+    lineHeight: 95,
+    color: colors.goldBright,
+    marginTop: spacing.sm,
   },
-  best: {
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+  unit: {
+    ...font.serifItalic,
+    fontSize: 20,
+    color: colors.textSecondary,
+    marginTop: -spacing.xs,
   },
-  grid: {
+  status: {
+    ...t.micro,
+    marginTop: spacing.lg,
+  },
+  strip: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.md,
+    alignItems: 'stretch',
+    paddingVertical: spacing.lg,
+  },
+  stripDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderStrong,
   },
   tile: {
-    width: '30.5%',
-    flexGrow: 1,
-  },
-  tileContent: {
-    padding: spacing.md,
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
   },
   tileValue: {
-    fontSize: 22,
-    fontWeight: '800',
+    ...font.serif,
+    fontSize: 26,
+    lineHeight: 31,
+    color: colors.text,
+  },
+  tileLabel: {
+    ...t.caption,
+    fontSize: 12,
   },
   compRow: {
     flexDirection: 'row',
@@ -166,20 +205,28 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   compIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  compIconPerfect: {
+    backgroundColor: colors.goldSoft,
+    borderColor: colors.goldLine,
   },
   bonus: {
-    color: colors.streakGold,
-    fontWeight: '800',
-    fontSize: 16,
+    ...font.serif,
+    color: colors.goldBright,
+    fontSize: 20,
   },
-  rule: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
+  footnote: {
+    ...t.aside,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing.xl,
   },
 });

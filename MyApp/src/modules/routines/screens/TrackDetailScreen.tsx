@@ -4,6 +4,8 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, type as t } from '../../../theme';
+import { Eyebrow } from '../../../components/ScreenHeader';
+import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { IconButton } from '../../../components/Controls';
@@ -111,7 +113,6 @@ export function TrackDetailScreen() {
       refreshing={track.isFetching || grid.isFetching}
     >
       <ScreenHeader
-        title={tr?.name}
         right={<IconButton icon="edit" accessibilityLabel="Edit category" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
       />
       {tr ? (
@@ -212,12 +213,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   hint: {
-    ...t.caption,
-    marginTop: spacing.sm,
+    ...t.aside,
+    fontSize: 13,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
   empty: {
-    ...t.body,
-    color: colors.textSecondary,
+    ...t.aside,
     marginBottom: spacing.md,
   },
   addRow: {
@@ -225,6 +227,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.sm,
     marginTop: spacing.xl,
+  },
+  addButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderColor: colors.goldLine,
   },
   delete: {
     marginTop: spacing.xl,

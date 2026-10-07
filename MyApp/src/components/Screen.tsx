@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { colors, GUTTER } from '../theme';
-import { Glow } from './Gradient';
+import { colors, CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH } from '../theme';
+import { useLayout } from '../hooks/useLayout';
+import { Backdrop } from '../layouts/Backdrop';
 import { OfflineBanner } from './OfflineBanner';
 
 interface ScreenProps {
@@ -13,8 +14,10 @@ interface ScreenProps {
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: Edge[];
-  /** Tints the ambient top glow, e.g. the Vault uses a deeper violet. */
+  /** Tints the moonlit glow of the night-sky backdrop, e.g. the Vault uses violet. */
   glowColor?: string;
+  /** Dashboard-style screens get a wider column on tablets and desktops. */
+  wide?: boolean;
   keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps'];
   footer?: React.ReactNode;
 }
@@ -32,11 +35,18 @@ export function Screen({
   refreshing = false,
   onRefresh,
   edges = ['top'],
-  glowColor = colors.primary,
+  glowColor = colors.moon,
+  wide = false,
   keyboardShouldPersistTaps = 'handled',
   footer,
 }: ScreenProps) {
-  const inner = [padded && styles.padded, contentStyle];
+  const { gutter } = useLayout();
+  const frame: ViewStyle = {
+    width: '100%',
+    maxWidth: (wide ? WIDE_CONTENT_MAX_WIDTH : CONTENT_MAX_WIDTH) + gutter * 2,
+    alignSelf: 'center',
+  };
+  const inner = [frame, padded && { paddingHorizontal: gutter }, contentStyle];
 
   // Only show the spinner for a refresh the user pulled for. `refreshing` is
   // usually a query's isFetching, which also flips on background refetches,
@@ -56,7 +66,7 @@ export function Screen({
     : undefined;
   return (
     <SafeAreaView style={styles.root} edges={edges}>
-      <Glow color={glowColor} size={520} intensity={0.16} style={styles.ambient} />
+      <Backdrop tint={glowColor} />
       <OfflineBanner />
       {scroll ? (
         <ScrollView
@@ -68,8 +78,8 @@ export function Screen({
               <RefreshControl
                 refreshing={pulled}
                 onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
+                tintColor={colors.gold}
+                colors={[colors.gold]}
                 progressBackgroundColor={colors.surfaceAlt}
               />
             ) : undefined
@@ -90,19 +100,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  ambient: {
-    position: 'absolute',
-    top: -300,
-    alignSelf: 'center',
-  },
   fill: {
     flex: 1,
   },
-  padded: {
-    paddingHorizontal: GUTTER,
-  },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 120,
+    paddingBottom: 140,
   },
 });

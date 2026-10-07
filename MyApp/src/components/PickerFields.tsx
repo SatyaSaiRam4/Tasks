@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
-import { colors, radius, spacing, type as t } from '../theme';
+import { colors, font, radius, spacing, type as t } from '../theme';
 import { formatClock, formatFullDate, formatDateTime, fromDateKey, toDateKey } from '../utils/date';
 import { Chip } from './Controls';
 import { Icon, type IconName } from './Icon';
@@ -27,7 +27,7 @@ function FieldShell({
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label ?? placeholder}: ${text ?? 'not set'}`} style={styles.field}>
-        <Icon name={icon} size={18} color={colors.textTertiary} />
+        <Icon name={icon} size={18} color={colors.gold} strokeWidth={1.7} />
         <Text style={[styles.value, !text && styles.placeholder]}>{text ?? placeholder}</Text>
         {text && onClear ? (
           <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel={`Clear ${label ?? ''}`} hitSlop={10}>
@@ -158,19 +158,21 @@ const styles = StyleSheet.create({
   label: {
     ...t.micro,
     marginBottom: spacing.sm,
+    marginLeft: 2,
   },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    gap: spacing.md,
+    minHeight: 56,
+    paddingHorizontal: spacing.lg + 2,
+    borderRadius: radius.md + 2,
+    backgroundColor: colors.glass,
     borderWidth: 1,
     borderColor: colors.border,
   },
   value: {
+    ...font.medium,
     flex: 1,
     color: colors.text,
     fontSize: 15,
@@ -180,6 +182,9 @@ const styles = StyleSheet.create({
   },
   preview: {
     textAlign: 'center',
+    fontSize: 52,
+    lineHeight: 58,
+    color: colors.goldBright,
     marginBottom: spacing.lg,
   },
   grid: {

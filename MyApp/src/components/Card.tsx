@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, radius, shadow, spacing } from '../theme';
-import { useMotion } from '../hooks/useMotion';
+import { colors, gradients, radius, shadow, spacing } from '../theme';
+import { usePressScale } from '../animations';
 import { Gradient } from './Gradient';
+
+type Tone = 'default' | 'glass' | 'feature';
 
 interface CardProps {
   children: React.ReactNode;
@@ -10,9 +12,14 @@ interface CardProps {
   contentStyle?: StyleProp<ViewStyle>;
   onPress?: () => void;
   onLongPress?: () => void;
-  /** Gradient fill instead of the flat surface. */
+  /** Gradient fill instead of the layered surface. */
   gradient?: [string, string] | readonly [string, string];
   gradientOpacity?: [number, number];
+  /**
+   * `default` is the layered midnight surface, `glass` a lighter translucent
+   * pane, `feature` a moonlit hero surface with a champagne edge.
+   */
+  tone?: Tone;
   /** A thin accent-colored edge on the left, e.g. a Track's color. */
   accent?: string;
   padded?: boolean;
@@ -22,8 +29,9 @@ interface CardProps {
 }
 
 /**
- * The base surface for every card: rounded, hairline-bordered, softly
- * elevated. Pressable cards scale down slightly on press.
+ * The base surface for every card: a layered midnight pane with a warm
+ * hairline edge and a faint light catching its top. Pressable cards sink
+ * slightly under the finger.
  */
 export function Card({
   children,
@@ -33,33 +41,36 @@ export function Card({
   onLongPress,
   gradient,
   gradientOpacity,
+  tone = 'default',
   accent,
   padded = true,
   elevated = true,
   accessibilityLabel,
   accessibilityHint,
 }: CardProps) {
-  const { reduced } = useMotion();
-  const scale = useRef(new Animated.Value(1)).current;
+  const press = usePressScale(0.975);
 
-  const animateTo = (value: number) => {
-    if (reduced) return;
-    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 40, bounciness: 4 }).start();
-  };
-
+  const fill = gradient ?? (tone === 'feature' ? gradients.moonlight : tone === 'glass' ? null : gradients.surface);
   const body = (
     <>
+      <View style={styles.sheen} pointerEvents="none" />
       {accent ? <View style={[styles.accent, { backgroundColor: accent }]} /> : null}
       <View style={[padded && styles.padded, contentStyle]}>{children}</View>
     </>
   );
 
-  const surface = gradient ? (
-    <Gradient colors={gradient} opacity={gradientOpacity} borderRadius={radius.lg} style={[styles.border, styles.fill]}>
+  const surface = fill ? (
+    <Gradient
+      colors={fill}
+      direction="vertical"
+      opacity={gradientOpacity}
+      borderRadius={radius.lg}
+      style={[styles.base, tone === 'feature' ? styles.featureBorder : styles.border, styles.fill]}
+    >
       {body}
     </Gradient>
   ) : (
-    <View style={[styles.surface, styles.border, styles.fill]}>{body}</View>
+    <View style={[styles.base, styles.glass, styles.border, styles.fill]}>{body}</View>
   );
 
   const outer = [elevated && shadow.card, styles.radius, style];
@@ -69,12 +80,12 @@ export function Card({
   }
 
   return (
-    <Animated.View style={[outer, { transform: [{ scale }] }]}>
+    <Animated.View style={[outer, { transform: [{ scale: press.scale }] }]}>
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
-        onPressIn={() => animateTo(0.97)}
-        onPressOut={() => animateTo(1)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
@@ -96,25 +107,40 @@ const styles = StyleSheet.create({
   fill: {
     flexGrow: 1,
   },
-  surface: {
-    backgroundColor: colors.surface,
+  base: {
     borderRadius: radius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  glass: {
+    backgroundColor: colors.glass,
   },
   border: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
+  featureBorder: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: '18%',
+    right: '18%',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(241,221,175,0.35)',
+  },
   padded: {
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
   accent: {
     position: 'absolute',
     left: 0,
-    top: 14,
-    bottom: 14,
-    width: 3,
-    borderTopRightRadius: 3,
-    borderBottomRightRadius: 3,
+    top: 16,
+    bottom: 16,
+    width: 2,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
   },
 });

@@ -5,9 +5,13 @@
  * completion and streaks, and red only for destructive actions. Screens use
  * semantic tokens from here, never raw hex values.
  *
- * The accent is applied once at startup (see applyAccent / index.js), before
- * any StyleSheet is created, so every screen picks it up consistently.
+ * `primary` is the interactive accent and is user-configurable (Settings →
+ * Accent). It is applied once at startup (see applyAccent / index.js), before
+ * any StyleSheet is created, so every screen picks it up consistently. The
+ * gold brand color (`colors.gold`) never changes.
  */
+
+import { Platform } from 'react-native';
 
 export const ACCENTS = {
   violet: { primary: '#6D5BD0', secondary: '#5274C8' },
@@ -79,10 +83,16 @@ const PALETTES = {
   },
 } as const;
 
-function withAlpha(hex: string, alpha: number): string {
+export function withAlpha(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
+
+/** Type families: the platform's own serif and sans faces, no bundled font files. */
+export const fonts = {
+  display: Platform.select({ ios: 'Georgia', default: 'serif' }),
+  sans: Platform.select({ ios: 'System', default: 'sans-serif' }),
+};
 
 export const colors = {
   ...PALETTES.light,
@@ -137,14 +147,14 @@ export function applyAccent(name: string | null | undefined): AccentName {
   const accent = ACCENTS[key];
   colors.primary = accent.primary;
   colors.primarySecondary = accent.secondary;
-  colors.primarySoft = withAlpha(accent.primary, 0.16);
-  colors.primaryGlow = withAlpha(accent.primary, 0.35);
+  colors.primarySoft = withAlpha(accent.primary, 0.14);
+  colors.primaryGlow = withAlpha(accent.primary, 0.32);
   gradients.primary = [accent.primary, accent.secondary];
   return key;
 }
 
 /** Per-Track colors users can pick from. */
-export const TRACK_COLORS = ['#8B7CFF', '#4DA3FF', '#2ED3A0', '#FFB347', '#FF6B9A', '#5BC0FF', '#C084FC', '#F97066'];
+export const TRACK_COLORS = ['#D9BC82', '#A3BEEB', '#93D2B6', '#E8AD66', '#E5AFBE', '#B1A3EC', '#8FC6E0', '#E6957F'];
 
 export const spacing = {
   xxs: 2,
@@ -155,13 +165,22 @@ export const spacing = {
   xl: 20,
   xxl: 28,
   xxxl: 40,
+  huge: 56,
 } as const;
 
-/** Horizontal page gutter used by every screen. */
+/** Horizontal page gutter used by every screen (phones). */
 export const GUTTER = 20;
 
 /** Height of the floating tab bar, excluding the bottom safe-area padding. */
-export const TAB_BAR_HEIGHT = 64;
+export const TAB_BAR_HEIGHT = 68;
+
+/** Layout breakpoints (dp) and the readable content width on large screens. */
+export const breakpoints = {
+  tablet: 700,
+  desktop: 1024,
+} as const;
+export const CONTENT_MAX_WIDTH = 760;
+export const WIDE_CONTENT_MAX_WIDTH = 1080;
 
 export const radius = {
   xs: 4,
@@ -174,15 +193,44 @@ export const radius = {
 } as const;
 
 export const fontSize = {
-  micro: 11,
+  micro: 10.5,
   caption: 13,
   body: 15,
-  subtitle: 17,
+  subtitle: 16,
   heading: 20,
   title: 26,
-  display: 34,
-  hero: 48,
+  display: 32,
+  hero: 52,
 } as const;
+
+/** Some serif faces default to old-style figures; numbers must read as numbers. */
+const LINING: ('lining-nums')[] = ['lining-nums'];
+
+const serif = (size: number, weight: '500' | '600' | '700' = '600') => ({
+  fontFamily: fonts.display,
+  fontVariant: LINING,
+  fontSize: size,
+  fontWeight: weight,
+  color: colors.text,
+});
+const sans = (size: number, weight: '400' | '500' | '600' | '700' | '800' = '400') => ({
+  fontFamily: fonts.sans,
+  fontSize: size,
+  fontWeight: weight,
+  color: colors.text,
+});
+
+/** Font family + weight for one-off styles, so nothing falls back to the system face. */
+export const font = {
+  regular: { fontFamily: fonts.sans, fontWeight: '400' as const },
+  medium: { fontFamily: fonts.sans, fontWeight: '500' as const },
+  semibold: { fontFamily: fonts.sans, fontWeight: '600' as const },
+  bold: { fontFamily: fonts.sans, fontWeight: '700' as const },
+  heavy: { fontFamily: fonts.sans, fontWeight: '800' as const },
+  serif: { fontFamily: fonts.display, fontWeight: '600' as const, fontVariant: LINING },
+  serifBold: { fontFamily: fonts.display, fontWeight: '700' as const, fontVariant: LINING },
+  serifItalic: { fontFamily: fonts.display, fontWeight: '500' as const, fontStyle: 'italic' as const, fontVariant: LINING },
+};
 
 export const type = {
   hero: { fontFamily: 'serif', fontSize: fontSize.hero, fontWeight: '800' as const, color: colors.text },
@@ -198,8 +246,12 @@ export const type = {
     fontWeight: '700' as const,
     letterSpacing: 0,
     textTransform: 'uppercase' as const,
-    color: colors.textTertiary,
+    color: withAlpha(colors.gold, 0.78),
   },
+  /** A serif italic aside, e.g. greetings and quiet notes. */
+  aside: { ...font.serifItalic, fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
+  /** Big serif numerals (streaks, counts). */
+  numeral: { ...serif(36, '600'), letterSpacing: -0.5 },
 };
 
 export const shadow = {
@@ -220,10 +272,11 @@ export const shadow = {
 };
 
 export const motion = {
-  fast: 150,
-  normal: 260,
-  slow: 420,
-  stagger: 60,
+  fast: 160,
+  normal: 280,
+  slow: 520,
+  stagger: 70,
+  ambient: 5200,
 };
 
 export const iconSize = {

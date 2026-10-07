@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -9,8 +9,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, fontSize, gradients, radius, spacing, TOUCH_TARGET } from '../theme';
-import { useMotion } from '../hooks/useMotion';
+import { colors, font, fontSize, gradients, radius, spacing, TOUCH_TARGET } from '../theme';
+import { usePressScale } from '../animations';
 import { Gradient } from './Gradient';
 import { Icon, type IconName } from './Icon';
 
@@ -32,13 +32,14 @@ interface ButtonProps {
   accessibilityHint?: string;
 }
 
-const HEIGHT: Record<Size, number> = { lg: 56, md: 48, sm: 38 };
-const LABEL: Record<Size, number> = { lg: fontSize.subtitle, md: fontSize.body, sm: fontSize.caption };
+const HEIGHT: Record<Size, number> = { lg: 58, md: 50, sm: 38 };
+const LABEL: Record<Size, number> = { lg: fontSize.body, md: 14.5, sm: fontSize.caption };
 
 /**
- * The one button used everywhere. `primary` is a gradient call to action,
- * `secondary` a quiet surface button, `ghost` text-only, `danger` for
- * destructive actions only, `success` for completion confirmations.
+ * The one button used everywhere, pill-shaped. `primary` is a champagne
+ * gradient call to action with dark ink, `secondary` a glass button with a
+ * hairline edge, `ghost` text-only, `danger` for destructive actions only,
+ * `success` for completion confirmations.
  */
 export function Button({
   label,
@@ -54,23 +55,17 @@ export function Button({
   accessibilityLabel,
   accessibilityHint,
 }: ButtonProps) {
-  const { reduced } = useMotion();
-  const scale = useRef(new Animated.Value(1)).current;
+  const press = usePressScale(0.97);
   const isDisabled = disabled || loading;
+  const filled = variant === 'primary' || variant === 'success';
 
-  const press = (to: number) => {
-    if (reduced || isDisabled) return;
-    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 50, bounciness: 5 }).start();
-  };
-
-  const textColor =
-    variant === 'primary' || variant === 'success'
-      ? colors.white
-      : variant === 'danger'
-        ? colors.danger
-        : variant === 'ghost'
-          ? colors.primary
-          : colors.text;
+  const textColor = filled
+    ? colors.onPrimary
+    : variant === 'danger'
+      ? colors.danger
+      : variant === 'ghost'
+        ? colors.primary
+        : colors.text;
 
   const content = (
     <View style={styles.row}>
@@ -78,11 +73,11 @@ export function Button({
         <ActivityIndicator size="small" color={textColor} />
       ) : (
         <>
-          {icon ? <Icon name={icon} size={size === 'sm' ? 16 : 18} color={textColor} /> : null}
+          {icon ? <Icon name={icon} size={size === 'sm' ? 15 : 17} color={textColor} strokeWidth={2} /> : null}
           <Text style={[styles.label, { color: textColor, fontSize: LABEL[size] }]} numberOfLines={1}>
             {label}
           </Text>
-          {iconRight ? <Icon name={iconRight} size={size === 'sm' ? 16 : 18} color={textColor} /> : null}
+          {iconRight ? <Icon name={iconRight} size={size === 'sm' ? 15 : 17} color={textColor} strokeWidth={2} /> : null}
         </>
       )}
     </View>
@@ -90,14 +85,16 @@ export function Button({
 
   const height = { height: HEIGHT[size], minHeight: Math.max(HEIGHT[size], size === 'sm' ? 0 : TOUCH_TARGET) };
   let body: React.ReactNode;
-  if (variant === 'primary' || variant === 'success') {
+  if (filled) {
     body = (
       <Gradient
         colors={variant === 'success' ? gradients.success : gradients.primary}
         direction="horizontal"
-        borderRadius={radius.md}
-        style={[styles.base, height]}
+        borderRadius={radius.pill}
+        style={[styles.base, styles.filled, height, size === 'sm' && styles.small]}
       >
+        {/* A soft highlight along the top edge, like light on satin. */}
+        <View style={styles.sheen} pointerEvents="none" />
         {content}
       </Gradient>
     );
@@ -107,6 +104,7 @@ export function Button({
         style={[
           styles.base,
           height,
+          size === 'sm' && styles.small,
           variant === 'secondary' && styles.secondary,
           variant === 'danger' && styles.danger,
           variant === 'ghost' && styles.ghost,
@@ -121,15 +119,15 @@ export function Button({
     <Animated.View
       style={[
         fullWidth ? styles.full : styles.inline,
-        { transform: [{ scale }] },
+        { transform: [{ scale: press.scale }] },
         isDisabled && styles.disabled,
         style,
       ]}
     >
       <Pressable
         onPress={onPress}
-        onPressIn={() => press(0.97)}
-        onPressOut={() => press(1)}
+        onPressIn={isDisabled ? undefined : press.onPressIn}
+        onPressOut={press.onPressOut}
         disabled={isDisabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
@@ -150,10 +148,25 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   base: {
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  small: {
+    paddingHorizontal: spacing.lg,
+  },
+  filled: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: '12%',
+    right: '12%',
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.55)',
   },
   row: {
     flexDirection: 'row',
@@ -162,21 +175,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   label: {
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    ...font.bold,
+    letterSpacing: 0.5,
   },
   secondary: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.goldLine,
   },
   danger: {
     backgroundColor: colors.dangerSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(236,135,150,0.3)',
   },
   ghost: {
     backgroundColor: colors.transparent,
   },
   disabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
 });

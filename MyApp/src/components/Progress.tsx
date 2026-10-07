@@ -1,13 +1,14 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Animated, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors, gradients, radius } from '../theme';
+import { gradients, radius } from '../theme';
+import { easeOut } from '../animations';
 import { useMotion } from '../hooks/useMotion';
 import { Gradient } from './Gradient';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-/** Circular progress (0..1) with a gradient stroke that animates to its value. */
+/** Circular progress (0..1): a fine champagne track and a gradient arc that sweeps to its value. */
 export function ProgressRing({
   progress,
   size = 120,
@@ -30,8 +31,8 @@ export function ProgressRing({
   useEffect(() => {
     Animated.timing(value, {
       toValue: Math.max(0, Math.min(1, progress)),
-      duration: reduced ? 0 : 900,
-      easing: Easing.out(Easing.cubic),
+      duration: reduced ? 0 : 1400,
+      easing: easeOut,
       useNativeDriver: false,
     }).start();
   }, [progress, reduced, value]);
@@ -49,7 +50,8 @@ export function ProgressRing({
             <Stop offset="1" stopColor={colorsPair[1]} />
           </LinearGradient>
         </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.surfaceHigh} strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(217,188,130,0.12)" strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r + stroke / 2 + 3} stroke="rgba(217,188,130,0.10)" strokeWidth={StyleSheet.hairlineWidth * 2} fill="none" />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
@@ -85,8 +87,8 @@ export function ProgressBar({
   useEffect(() => {
     Animated.timing(value, {
       toValue: Math.max(0, Math.min(1, progress)),
-      duration: reduced ? 0 : 700,
-      easing: Easing.out(Easing.cubic),
+      duration: reduced ? 0 : 1100,
+      easing: easeOut,
       useNativeDriver: false,
     }).start();
   }, [progress, reduced, value]);
@@ -120,7 +122,7 @@ export function AnimatedNumber({ value, style, suffix = '' }: { value: number; s
     anim.setValue(0);
     const start = from.current;
     const id = anim.addListener(({ value: t }) => setDisplay(Math.round(start + (value - start) * t)));
-    Animated.timing(anim, { toValue: 1, duration: 800, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => {
+    Animated.timing(anim, { toValue: 1, duration: 1200, easing: easeOut, useNativeDriver: false }).start(() => {
       from.current = value;
     });
     return () => anim.removeListener(id);
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   barTrack: {
-    backgroundColor: colors.surfaceHigh,
+    backgroundColor: 'rgba(217,188,130,0.10)',
     overflow: 'hidden',
     borderRadius: radius.pill,
   },

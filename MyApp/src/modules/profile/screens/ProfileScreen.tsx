@@ -3,7 +3,8 @@ import { Share, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../../app/hooks';
-import { colors, gradients, radius, spacing, type as t } from '../../../theme';
+import { colors, font, gradients, radius, spacing, type as t } from '../../../theme';
+import { Glow } from '../../../components/Gradient';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -28,7 +29,7 @@ export function ProfileScreen() {
 
   return (
     <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
-      <LargeTitle title="Profile" right={<IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />} />
+      <LargeTitle title="Profile" hideProfile />
       {isLoading ? (
         <>
           <Skeleton height={200} rounded={radius.xl} />
@@ -39,8 +40,12 @@ export function ProfileScreen() {
       ) : (
         <>
           <FadeIn>
-            <Gradient colors={gradients.surface} borderRadius={radius.xl} style={styles.hero}>
-              <Avatar name={data.me.display_name} emoji={data.me.avatar} size={76} />
+            <Gradient colors={gradients.moonlight} direction="vertical" borderRadius={radius.xl} style={styles.hero}>
+              <View style={styles.heroSheen} pointerEvents="none" />
+              <View style={styles.avatarWrap}>
+                <Glow color={colors.gold} size={190} intensity={0.22} style={styles.avatarGlow} />
+                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={96} />
+              </View>
               <Text style={[t.title, styles.name]}>{data.me.display_name}</Text>
               <View style={styles.idRow}>
                 <Text style={styles.id}>ID: {data.me.public_id}</Text>
@@ -58,14 +63,21 @@ export function ProfileScreen() {
                 label={data.me.settings.is_public_profile ? 'Public profile' : 'Private profile'}
                 color={data.me.settings.is_public_profile ? colors.success : colors.textSecondary}
                 background={data.me.settings.is_public_profile ? colors.successSoft : colors.surfaceHigh}
+                style={styles.centerSelf}
               />
             </Gradient>
           </FadeIn>
 
-          <FadeIn index={1} style={styles.grid}>
-            <Stat icon="flame" color={colors.streak} label="Day streak" value={data.stats.current_streak} />
-            <Stat icon="trophy" color={colors.streakGold} label="Best streak" value={data.stats.best_streak} />
-            <Stat icon="check-circle" color={colors.success} label="Days done" value={data.stats.total_success_days} />
+          <FadeIn index={1} style={styles.statsWrap}>
+            <Card padded={false}>
+              <View style={styles.grid}>
+                <Stat icon="flame" color={colors.streak} label="Day streak" value={data.stats.current_streak} />
+                <View style={styles.statDivider} />
+                <Stat icon="trophy" color={colors.streakGold} label="Best streak" value={data.stats.best_streak} />
+                <View style={styles.statDivider} />
+                <Stat icon="check-circle" color={colors.success} label="Days done" value={data.stats.total_success_days} />
+              </View>
+            </Card>
           </FadeIn>
 
           <SectionHeader title="Badges" action="See all" onAction={() => navigation.navigate('Achievements')} />
@@ -77,8 +89,10 @@ export function ProfileScreen() {
             <View style={styles.badges}>
               {data.achievements.slice(0, 8).map(a => (
                 <View key={a.code} style={styles.badge} accessible accessibilityLabel={a.title}>
-                  <Gradient colors={gradients.streak} borderRadius={radius.md} style={styles.badgeIcon}>
-                    <Icon name={achievementIcon(a.icon)} size={20} color={colors.white} />
+                  <Gradient colors={gradients.gold} borderRadius={28} style={styles.badgeIcon}>
+                    <View style={styles.badgeInner}>
+                      <Icon name={achievementIcon(a.icon)} size={20} color={colors.goldBright} strokeWidth={1.7} />
+                    </View>
                   </Gradient>
                   <Text style={styles.badgeText} numberOfLines={2}>
                     {a.title}
@@ -103,11 +117,11 @@ export function ProfileScreen() {
 
 function Stat({ icon, color, label, value }: { icon: 'flame' | 'trophy' | 'check-circle'; color: string; label: string; value: number }) {
   return (
-    <Card style={styles.stat} contentStyle={styles.statContent}>
-      <Icon name={icon} size={18} color={color} />
+    <View style={styles.stat}>
+      <Icon name={icon} size={16} color={color} strokeWidth={1.8} />
       <AnimatedNumber value={value} style={styles.statValue} />
-      <Text style={t.caption}>{label}</Text>
-    </Card>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -122,38 +136,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xxl,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.goldLine,
     gap: spacing.sm,
   },
+  heroSheen: {
+    position: 'absolute',
+    top: 0,
+    left: '20%',
+    right: '20%',
+    height: 1,
+    backgroundColor: 'rgba(241,221,175,0.45)',
+  },
+  centerSelf: {
+    alignSelf: 'center',
+  },
+  avatarWrap: {
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGlow: {
+    position: 'absolute',
+    left: -35,
+    top: -35,
+  },
   name: {
-    marginTop: spacing.sm,
+    ...t.display,
+    fontSize: 30,
+    textAlign: 'center',
   },
   idRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   id: {
-    color: colors.textSecondary,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    ...font.bold,
+    color: colors.gold,
+    fontSize: 12,
+    letterSpacing: 2,
+  },
+  statsWrap: {
+    marginTop: spacing.lg,
   },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderStrong,
   },
   stat: {
     flex: 1,
-  },
-  statContent: {
-    padding: spacing.md,
-    gap: 4,
+    alignItems: 'center',
+    gap: 2,
   },
   statValue: {
-    fontSize: 26,
-    fontWeight: '800',
+    ...font.serif,
+    fontSize: 28,
+    lineHeight: 33,
     color: colors.text,
+  },
+  statLabel: {
+    ...t.caption,
+    fontSize: 12,
   },
   badges: {
     flexDirection: 'row',
@@ -161,17 +208,24 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   badge: {
-    width: 74,
+    width: 76,
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   badgeIcon: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
+    padding: 1.5,
+  },
+  badgeInner: {
+    flex: 1,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#111830',
   },
   badgeText: {
+    ...font.medium,
     color: colors.textSecondary,
     fontSize: 11,
     textAlign: 'center',

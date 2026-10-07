@@ -50,7 +50,7 @@ export function Checkbox({
         <View
           style={[
             styles.box,
-            { width: size, height: size, borderRadius: size / 2, borderColor: color ?? colors.borderStrong },
+            { width: size, height: size, borderRadius: size / 2, borderColor: color ?? colors.goldLine },
             disabled && styles.disabled,
           ]}
         >
@@ -58,7 +58,7 @@ export function Checkbox({
             <Gradient colors={gradients.success} borderRadius={size / 2} style={StyleSheet.absoluteFill} />
           </Animated.View>
           <Animated.View style={{ opacity: fill }}>
-            <Icon name="check" size={size * 0.6} color={colors.white} strokeWidth={3} />
+            <Icon name="check" size={size * 0.58} color={colors.onPrimary} strokeWidth={2.8} />
           </Animated.View>
         </View>
       </Animated.View>
@@ -68,7 +68,7 @@ export function Checkbox({
 
 const styles = StyleSheet.create({
   box: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

@@ -23,7 +23,8 @@ import { CelebrationProvider } from './src/components/Celebration';
 import { CompletionProvider } from './src/modules/routines/CompletionProvider';
 import { BackgroundSync } from './src/modules/home/BackgroundSync';
 import { VaultAutoLock } from './src/modules/vault/VaultAutoLock';
-import { SatyaOrb } from './src/modules/satya/SatyaModel';
+import { MoonMark } from './src/components/Brand';
+import { Backdrop } from './src/layouts/Backdrop';
 
 // Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the selected theme.
 const antTheme = {
@@ -65,7 +66,10 @@ function AppContent() {
   if (!isBootstrapped) {
     return (
       <View style={styles.splash} accessibilityLabel="Loading Memo">
-        <SatyaOrb size={96} />
+        <Backdrop />
+        <View style={styles.splashMark}>
+          <MoonMark size={88} />
+        </View>
       </View>
     );
   }
@@ -110,6 +114,11 @@ const styles = StyleSheet.create({
   splash: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  splashMark: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, spacing, type as t } from '../../../theme';
+import { colors, font, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -107,9 +107,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   value: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
+    ...font.serif,
+    fontSize: 26,
+    lineHeight: 30,
+    color: colors.goldBright,
   },
   vault: {
     marginTop: spacing.xl,

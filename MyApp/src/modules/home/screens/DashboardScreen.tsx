@@ -11,6 +11,9 @@ import { Card } from '../../../components/Card';
 import { IconButton } from '../../../components/Controls';
 import { ErrorState, FadeIn, Skeleton } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
+import { Eyebrow, TopBar } from '../../../components/ScreenHeader';
+import { useLayout } from '../../../hooks/useLayout';
+import { useLoop } from '../../../animations';
 import { useCelebration } from '../../../components/Celebration';
 import { getErrorMessage } from '../../../utils/apiError';
 import { formatDayShort } from '../../../utils/date';
@@ -32,6 +35,7 @@ export function DashboardScreen() {
   const completions = useGetTrackCompletionsQuery();
   const { celebrate } = useCelebration();
   const celebrated = useRef(false);
+  const { isTablet } = useLayout();
 
   // Celebrate finished categories the user hasn't seen yet.
   useEffect(() => {
@@ -125,6 +129,8 @@ export function DashboardScreen() {
           </View>
         </Card>
       </FadeIn>
+    </>
+  );
 
       <View style={styles.destinationRow}>
         <Card
@@ -162,6 +168,20 @@ export function DashboardScreen() {
   );
 }
 
+/** The streak flame with a slow breathing halo; brighter once today is secured. */
+function FlameMark({ lit }: { lit: boolean }) {
+  const breathe = useLoop(3200);
+  const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] });
+  return (
+    <View style={styles.flame}>
+      <Animated.View style={[styles.flameGlow, { transform: [{ scale }] }]}>
+        <Glow color={colors.streak} size={44} intensity={lit ? 0.7 : 0.45} />
+      </Animated.View>
+      <Icon name="flame" size={18} color={colors.streak} fill={lit ? colors.streak : 'none'} strokeWidth={1.8} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   dashboard: {
     flexGrow: 1,
@@ -169,7 +189,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 132,
   },
-  header: {
+  skelEyebrow: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+  },
+  columns: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
