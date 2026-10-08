@@ -11,6 +11,7 @@ import { useLayout } from '../../../hooks/useLayout';
 import { spacing } from '../../../theme';
 import { useListTracksQuery } from '../routinesApi';
 import { CategoryCard } from '../components';
+import type { Track } from '../routinesApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -30,9 +31,9 @@ export function RoutinesScreen() {
       refreshing={tracks.isFetching}
       footer={tracks.data?.length ? <Fab accessibilityLabel="New category" onPress={newCategory} /> : null}
     >
-      <LargeTitle eyebrow="Your goals" title="Categories" />
+      <LargeTitle eyebrow="Your goals" title="Categories" subtitle={summary(tracks.data)} />
       {tracks.isLoading ? (
-        <SkeletonList count={3} height={76} />
+        <SkeletonList count={3} height={170} />
       ) : tracks.isError ? (
         <ErrorState message={getErrorMessage(tracks.error, 'Could not load your categories.')} onRetry={tracks.refetch} />
       ) : !tracks.data?.length ? (
@@ -54,6 +55,16 @@ export function RoutinesScreen() {
       )}
     </Screen>
   );
+}
+
+function summary(tracks: Track[] | undefined): string | undefined {
+  if (!tracks?.length) return undefined;
+  const active = tracks.filter(t => t.status === 'ACTIVE').length;
+  const due = tracks.reduce((n, t) => n + t.today_required, 0);
+  const done = tracks.reduce((n, t) => n + Math.min(t.today_completed, t.today_required), 0);
+  const parts = [`${active} active`];
+  if (due) parts.push(`${done} of ${due} tasks done today`);
+  return parts.join(' · ');
 }
 
 const styles = StyleSheet.create({

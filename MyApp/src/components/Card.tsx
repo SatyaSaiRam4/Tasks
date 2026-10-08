@@ -2,9 +2,9 @@ import React from 'react';
 import { Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, gradients, radius, shadow, spacing } from '../theme';
 import { usePressScale } from '../animations';
-import { Gradient } from './Gradient';
+import { Gradient, Sheen } from './Gradient';
 
-type Tone = 'default' | 'glass' | 'feature';
+type Tone = 'default' | 'glass' | 'hero' | 'feature';
 
 interface CardProps {
   children: React.ReactNode;
@@ -12,15 +12,17 @@ interface CardProps {
   contentStyle?: StyleProp<ViewStyle>;
   onPress?: () => void;
   onLongPress?: () => void;
-  /** Gradient fill instead of the layered surface. */
+  /** Gradient fill instead of the tone's own surface. */
   gradient?: [string, string] | readonly [string, string];
   gradientOpacity?: [number, number];
   /**
-   * `default` is the layered midnight surface, `glass` a lighter translucent
-   * pane, `feature` a moonlit hero surface with a champagne edge.
+   * `default` is the layered surface of the current theme, `glass` a light
+   * translucent pane, `hero` (alias `feature`) the cinematic midnight panel
+   * with a champagne edge — it stays dark in both themes, so its content
+   * uses the `hero*` text colors.
    */
   tone?: Tone;
-  /** A thin accent-colored edge on the left, e.g. a Track's color. */
+  /** A thin accent-colored edge on the left, e.g. a category's color. */
   accent?: string;
   padded?: boolean;
   elevated?: boolean;
@@ -29,9 +31,9 @@ interface CardProps {
 }
 
 /**
- * The base surface for every card: a layered midnight pane with a warm
- * hairline edge and a faint light catching its top. Pressable cards sink
- * slightly under the finger.
+ * The base surface for every card: a layered pane with a hairline edge and
+ * a faint light catching its top. Pressable cards sink slightly under the
+ * finger.
  */
 export function Card({
   children,
@@ -48,12 +50,13 @@ export function Card({
   accessibilityLabel,
   accessibilityHint,
 }: CardProps) {
-  const press = usePressScale(0.975);
+  const press = usePressScale(0.98);
+  const hero = tone === 'hero' || tone === 'feature';
 
-  const fill = gradient ?? (tone === 'feature' ? gradients.moonlight : tone === 'glass' ? null : gradients.surface);
+  const fill = gradient ?? (hero ? gradients.hero : tone === 'glass' ? null : gradients.surface);
   const body = (
     <>
-      <View style={styles.sheen} pointerEvents="none" />
+      <Sheen color={hero ? gradients.heroSheen : undefined} />
       {accent ? <View style={[styles.accent, { backgroundColor: accent }]} /> : null}
       <View style={[padded && styles.padded, contentStyle]}>{children}</View>
     </>
@@ -62,10 +65,10 @@ export function Card({
   const surface = fill ? (
     <Gradient
       colors={fill}
-      direction="vertical"
+      direction={hero ? 'diagonal' : 'vertical'}
       opacity={gradientOpacity}
       borderRadius={radius.lg}
-      style={[styles.base, tone === 'feature' ? styles.featureBorder : styles.border, styles.fill]}
+      style={[styles.base, hero ? styles.heroBorder : styles.border, styles.fill]}
     >
       {body}
     </Gradient>
@@ -89,7 +92,7 @@ export function Card({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
-        android_ripple={{ color: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(29,41,47,0.06)' }}
+        android_ripple={{ color: colors.goldSoft }}
         style={[styles.radius, styles.fill]}
       >
         {surface}
@@ -119,17 +122,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  featureBorder: {
+  heroBorder: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
-  },
-  sheen: {
-    position: 'absolute',
-    top: 0,
-    left: '18%',
-    right: '18%',
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(241,221,175,0.35)',
+    borderColor: colors.heroLine,
   },
   padded: {
     padding: spacing.xl,
@@ -137,8 +132,8 @@ const styles = StyleSheet.create({
   accent: {
     position: 'absolute',
     left: 0,
-    top: 16,
-    bottom: 16,
+    top: 18,
+    bottom: 18,
     width: 2,
     borderTopRightRadius: 2,
     borderBottomRightRadius: 2,

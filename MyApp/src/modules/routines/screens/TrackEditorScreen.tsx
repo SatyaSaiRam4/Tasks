@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, font, spacing } from '../../../theme';
+import { colors, font, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TextField } from '../../../components/TextField';
@@ -71,7 +71,8 @@ export function TrackEditorScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <ScreenHeader title={editing ? 'Edit category' : 'New category'} close />
+      <ScreenHeader title={editing ? 'Edit category' : 'New category'} subtitle="Category" close />
+      <Text style={styles.intro}>{editing ? 'Refine the name or the period of this goal.' : 'Name a goal and choose how long you’ll keep it.'}</Text>
 
       <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Gym" maxLength={80} autoFocus={!editing} />
 
@@ -85,8 +86,12 @@ export function TrackEditorScreen() {
       </View>
       {days > 0 ? (
         <View style={styles.duration}>
-          <Text style={styles.durationNum}>{days}</Text>
-          <Text style={styles.durationUnit}>{days === 1 ? 'day' : 'days'}</Text>
+          <View style={styles.durationRule} />
+          <View style={styles.durationInner}>
+            <Text style={styles.durationNum}>{days}</Text>
+            <Text style={styles.durationUnit}>{days === 1 ? 'day' : 'days'}</Text>
+          </View>
+          <View style={styles.durationRule} />
         </View>
       ) : null}
 
@@ -114,22 +119,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
+  intro: {
+    ...t.aside,
+    marginBottom: spacing.xxl,
+  },
   duration: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
     marginBottom: spacing.xxl,
+  },
+  durationRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.goldLine,
+  },
+  durationInner: {
+    alignItems: 'center',
   },
   durationNum: {
     ...font.serif,
-    fontSize: 36,
+    fontSize: 54,
+    lineHeight: 58,
     color: colors.goldBright,
   },
   durationUnit: {
-    ...font.serifItalic,
-    fontSize: 16,
+    ...t.micro,
     color: colors.textSecondary,
   },
   error: {

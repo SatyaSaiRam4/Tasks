@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, gradients, radius, spacing } from '../theme';
+import { useLayout } from '../hooks/useLayout';
+import { Gradient } from './Gradient';
 import { addDays, toDateKey, WEEKDAY_SHORT } from '../utils/date';
 
 export interface DayMark {
@@ -27,6 +29,7 @@ export function DateStrip({
   daysBack?: number;
   daysForward?: number;
 }) {
+  const { gutter } = useLayout();
   const days = useMemo(() => {
     const base = new Date(`${today}T00:00:00`);
     return Array.from({ length: daysBack + daysForward + 1 }, (_, i) => addDays(base, i - daysBack));
@@ -37,7 +40,7 @@ export function DateStrip({
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.strip}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingHorizontal: gutter }]}
       contentOffset={{ x: Math.max(0, (daysBack - 2) * (CELL + spacing.sm)), y: 0 }}
     >
       {days.map(d => {
@@ -64,6 +67,7 @@ export function DateStrip({
             accessibilityLabel={`${isToday ? 'Today, ' : ''}${WEEKDAY_SHORT[d.getDay()]} ${d.getDate()}${mark ? `, ${mark.completed} of ${mark.required} done` : ''}`}
             style={[styles.cell, isSelected && styles.cellSelected, !isSelected && isToday && styles.cellToday]}
           >
+            {isSelected ? <Gradient colors={gradients.primary} direction="diagonal" borderRadius={radius.pill} style={StyleSheet.absoluteFill} /> : null}
             <Text style={[styles.weekday, isSelected && styles.textSelected]}>{WEEKDAY_SHORT[d.getDay()].toUpperCase()}</Text>
             <Text style={[styles.day, isSelected && styles.textSelected]}>{d.getDate()}</Text>
             <View style={[styles.dot, { backgroundColor: dot ?? 'transparent' }, isSelected && dot ? styles.dotSelected : null]} />
@@ -83,20 +87,19 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.sm,
     paddingVertical: spacing.sm,
-    paddingHorizontal: 20,
   },
   cell: {
     width: CELL,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     alignItems: 'center',
     borderRadius: radius.pill,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    overflow: 'hidden',
   },
   cellSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.goldBright,
+    borderColor: 'rgba(255,255,255,0.45)',
   },
   cellToday: {
     borderColor: colors.goldLine,
@@ -110,8 +113,8 @@ const styles = StyleSheet.create({
   },
   day: {
     ...font.serif,
-    fontSize: 20,
-    lineHeight: 23,
+    fontSize: 23,
+    lineHeight: 26,
     color: colors.text,
     marginTop: 2,
   },

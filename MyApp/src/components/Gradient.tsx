@@ -1,10 +1,11 @@
 import React, { useId } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { gradients } from '../theme';
 
 interface GradientProps {
   colors: [string, string] | readonly [string, string];
-  /** Angle-ish direction: 'diagonal' (top-left → bottom-right), 'vertical', 'horizontal'. */
+  /** 'diagonal' (top-left → bottom-right), 'vertical', 'horizontal'. */
   direction?: 'diagonal' | 'vertical' | 'horizontal';
   opacity?: [number, number];
   style?: StyleProp<ViewStyle>;
@@ -24,7 +25,7 @@ export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], sty
   const d = DIRECTIONS[direction];
   return (
     <View style={[{ borderRadius, overflow: 'hidden' }, style]}>
-      <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={`g${id}`} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}>
             <Stop offset="0" stopColor={colors[0]} stopOpacity={opacity[0]} />
@@ -38,7 +39,7 @@ export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], sty
   );
 }
 
-/** A soft radial glow, used behind hero elements (Satya, streak flame). */
+/** A soft radial glow, used behind hero elements (streak flame, avatars, emblems). */
 export function Glow({ color, size, style, intensity = 0.55 }: { color: string; size: number; style?: StyleProp<ViewStyle>; intensity?: number }) {
   const id = useId().replace(/:/g, '');
   return (
@@ -47,6 +48,7 @@ export function Glow({ color, size, style, intensity = 0.55 }: { color: string; 
         <Defs>
           <RadialGradient id={`r${id}`} cx="50%" cy="50%" r="50%">
             <Stop offset="0" stopColor={color} stopOpacity={intensity} />
+            <Stop offset="0.5" stopColor={color} stopOpacity={intensity * 0.32} />
             <Stop offset="1" stopColor={color} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -55,3 +57,26 @@ export function Glow({ color, size, style, intensity = 0.55 }: { color: string; 
     </View>
   );
 }
+
+/** A hairline that fades in from both ends: the light catching a raised edge. */
+export function Sheen({ color, inset = '16%', style }: { color?: [string, string]; inset?: `${number}%`; style?: StyleProp<ViewStyle> }) {
+  const pair = color ?? gradients.sheen;
+  return (
+    <View pointerEvents="none" style={[styles.sheen, { left: inset, right: inset }, style]}>
+      <Gradient colors={pair} direction="horizontal" style={styles.flex} />
+      <Gradient colors={[pair[1], pair[0]]} direction="horizontal" style={styles.flex} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    height: 1,
+    flexDirection: 'row',
+  },
+});

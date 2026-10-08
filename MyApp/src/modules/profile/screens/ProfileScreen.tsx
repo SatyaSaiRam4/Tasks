@@ -3,7 +3,7 @@ import { Share, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../../app/hooks';
-import { colors, font, gradients, radius, spacing, type as t } from '../../../theme';
+import { brand, colors, font, gradients, radius, spacing, type as t } from '../../../theme';
 import { Glow } from '../../../components/Gradient';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
@@ -11,13 +11,13 @@ import { Card } from '../../../components/Card';
 import { Avatar, IconButton, Pill, SectionHeader } from '../../../components/Controls';
 import { AnimatedNumber } from '../../../components/Progress';
 import { ErrorState, FadeIn, Skeleton } from '../../../components/Feedback';
-import { Gradient } from '../../../components/Gradient';
+import { Gradient, Sheen } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
 import { ListGroup, ListRow } from '../../../components/ListRow';
 import { getErrorMessage } from '../../../utils/apiError';
 import { selectIsAdmin } from '../../auth/authSlice';
 import { useGetMyProfileQuery } from '../../users/usersApi';
-import { achievementIcon } from '../../streaks/screens/AchievementsScreen';
+import { AchievementBadge } from '../../streaks/screens/AchievementsScreen';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -29,7 +29,7 @@ export function ProfileScreen() {
 
   return (
     <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
-      <LargeTitle title="Profile" hideProfile />
+      <LargeTitle eyebrow="Member" title="Profile" hideProfile />
       {isLoading ? (
         <>
           <Skeleton height={200} rounded={radius.xl} />
@@ -40,20 +40,22 @@ export function ProfileScreen() {
       ) : (
         <>
           <FadeIn>
-            <Gradient colors={gradients.moonlight} direction="vertical" borderRadius={radius.xl} style={styles.hero}>
-              <View style={styles.heroSheen} pointerEvents="none" />
+            <Gradient colors={gradients.hero} direction="diagonal" borderRadius={radius.xl} style={styles.hero}>
+              <Glow color={brand.azure} size={420} intensity={0.14} style={styles.heroGlowA} />
+              <Glow color={brand.champagne} size={360} intensity={0.12} style={styles.heroGlowB} />
+              <Sheen color={gradients.heroSheen} inset="20%" />
               <View style={styles.avatarWrap}>
-                <Glow color={colors.gold} size={190} intensity={0.22} style={styles.avatarGlow} />
-                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={96} />
+                <Glow color={brand.champagne} size={200} intensity={0.3} style={styles.avatarGlow} />
+                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={104} />
               </View>
               <Text style={[t.title, styles.name]}>{data.me.display_name}</Text>
               <View style={styles.idRow}>
-                <Text style={styles.id}>ID: {data.me.public_id}</Text>
+                <Text style={styles.id}>{data.me.public_id}</Text>
                 <IconButton
                   icon="copy"
                   variant="plain"
-                  size={16}
-                  color={colors.textSecondary}
+                  size={15}
+                  color={colors.heroTextSecondary}
                   accessibilityLabel="Share your User ID"
                   onPress={() => Share.share({ message: `Find me on Memo: ${data.me.public_id}` })}
                 />
@@ -61,8 +63,8 @@ export function ProfileScreen() {
               <Pill
                 icon={data.me.settings.is_public_profile ? 'users' : 'lock'}
                 label={data.me.settings.is_public_profile ? 'Public profile' : 'Private profile'}
-                color={data.me.settings.is_public_profile ? colors.success : colors.textSecondary}
-                background={data.me.settings.is_public_profile ? colors.successSoft : colors.surfaceHigh}
+                color={data.me.settings.is_public_profile ? brand.jade : colors.heroTextSecondary}
+                background={colors.heroGlass}
                 style={styles.centerSelf}
               />
             </Gradient>
@@ -83,17 +85,13 @@ export function ProfileScreen() {
           <SectionHeader title="Badges" action="See all" onAction={() => navigation.navigate('Achievements')} />
           {data.achievements.length === 0 ? (
             <Card onPress={() => navigation.navigate('Achievements')}>
-              <Text style={[t.body, { color: colors.textSecondary }]}>Badges show up here as you keep your streak going. Your first one comes after your first full day.</Text>
+              <Text style={styles.emptyBadges}>Badges show up here as you keep your streak going. Your first one comes after your first full day.</Text>
             </Card>
           ) : (
             <View style={styles.badges}>
               {data.achievements.slice(0, 8).map(a => (
                 <View key={a.code} style={styles.badge} accessible accessibilityLabel={a.title}>
-                  <Gradient colors={gradients.gold} borderRadius={28} style={styles.badgeIcon}>
-                    <View style={styles.badgeInner}>
-                      <Icon name={achievementIcon(a.icon)} size={20} color={colors.goldBright} strokeWidth={1.7} />
-                    </View>
-                  </Gradient>
+                  <AchievementBadge icon={a.icon} size={60} />
                   <Text style={styles.badgeText} numberOfLines={2}>
                     {a.title}
                   </Text>
@@ -104,7 +102,8 @@ export function ProfileScreen() {
 
           <SectionHeader title="More" />
           <ListGroup>
-            <ListRow icon="calendar" title="Streak history" onPress={() => navigation.navigate('Consistency')} />
+            <ListRow icon="flame" title="Streak & progress" subtitle="History, milestones and calendar" onPress={() => navigation.navigate('Consistency')} />
+            <ListRow icon="award" title="Achievements" subtitle="Your badge collection" onPress={() => navigation.navigate('Achievements')} />
             <ListRow icon="users" title="Find friends" subtitle="See a friend’s streak by their User ID" onPress={() => navigation.navigate('Discover')} />
             <ListRow icon="settings" title="Settings" onPress={() => navigation.navigate('Settings')} last={!isAdmin} />
             {isAdmin ? <ListRow icon="shield" title="Admin panel" onPress={() => navigation.navigate('AdminDashboard')} last /> : null}
@@ -134,37 +133,43 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    padding: spacing.xxl,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xxl,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
     gap: spacing.sm,
   },
-  heroSheen: {
+  heroGlowA: {
     position: 'absolute',
-    top: 0,
-    left: '20%',
-    right: '20%',
-    height: 1,
-    backgroundColor: 'rgba(241,221,175,0.45)',
+    top: -200,
+    left: -160,
+  },
+  heroGlowB: {
+    position: 'absolute',
+    bottom: -200,
+    right: -140,
   },
   centerSelf: {
     alignSelf: 'center',
   },
   avatarWrap: {
-    width: 120,
-    height: 120,
+    width: 128,
+    height: 128,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarGlow: {
     position: 'absolute',
-    left: -35,
-    top: -35,
+    left: -36,
+    top: -36,
   },
   name: {
     ...t.display,
-    fontSize: 30,
+    fontSize: 36,
+    lineHeight: 40,
     textAlign: 'center',
+    color: colors.heroText,
+    marginTop: spacing.sm,
   },
   idRow: {
     flexDirection: 'row',
@@ -172,16 +177,16 @@ const styles = StyleSheet.create({
   },
   id: {
     ...font.bold,
-    color: colors.gold,
-    fontSize: 12,
-    letterSpacing: 2,
+    color: brand.champagne,
+    fontSize: 11.5,
+    letterSpacing: 2.4,
   },
   statsWrap: {
     marginTop: spacing.lg,
   },
   grid: {
     flexDirection: 'row',
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.lg + 2,
   },
   statDivider: {
     width: StyleSheet.hairlineWidth,
@@ -190,44 +195,37 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   statValue: {
     ...font.serif,
-    fontSize: 28,
-    lineHeight: 33,
+    fontSize: 30,
+    lineHeight: 34,
     color: colors.text,
   },
   statLabel: {
     ...t.caption,
-    fontSize: 12,
+    fontSize: 11.5,
+  },
+  emptyBadges: {
+    ...t.aside,
+    fontSize: 16,
   },
   badges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   badge: {
-    width: 76,
+    width: 78,
     alignItems: 'center',
     gap: 8,
   },
-  badgeIcon: {
-    width: 56,
-    height: 56,
-    padding: 1.5,
-  },
-  badgeInner: {
-    flex: 1,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111830',
-  },
   badgeText: {
-    ...font.medium,
+    ...font.semibold,
     color: colors.textSecondary,
     fontSize: 11,
+    lineHeight: 14,
     textAlign: 'center',
   },
 });

@@ -5,7 +5,7 @@ import { useMotion } from '../hooks/useMotion';
 import { Gradient } from './Gradient';
 import { Icon } from './Icon';
 
-/** The completion circle used on Actions. Pops when it becomes checked. */
+/** The completion circle used on tasks and reminders. Pops with a soft ring when checked. */
 export function Checkbox({
   checked,
   onPress,
@@ -24,18 +24,26 @@ export function Checkbox({
   const { reduced } = useMotion();
   const scale = useRef(new Animated.Value(1)).current;
   const fill = useRef(new Animated.Value(checked ? 1 : 0)).current;
+  const ring = useRef(new Animated.Value(0)).current;
   const first = useRef(true);
 
   useEffect(() => {
-    Animated.timing(fill, { toValue: checked ? 1 : 0, duration: reduced ? 0 : 220, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(fill, { toValue: checked ? 1 : 0, duration: reduced ? 0 : 240, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     if (checked && !first.current && !reduced) {
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.25, duration: 120, useNativeDriver: true }),
-        Animated.spring(scale, { toValue: 1, useNativeDriver: true, bounciness: 12 }),
+      ring.setValue(0);
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scale, { toValue: 1.2, duration: 120, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: 1, useNativeDriver: true, bounciness: 12 }),
+        ]),
+        Animated.timing(ring, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]).start();
     }
     first.current = false;
-  }, [checked, fill, scale, reduced]);
+  }, [checked, fill, scale, ring, reduced]);
+
+  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] });
+  const ringOpacity = ring.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.6, 0] });
 
   return (
     <Pressable
@@ -47,6 +55,13 @@ export function Checkbox({
       accessibilityLabel={accessibilityLabel}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.ring,
+            { width: size, height: size, borderRadius: size / 2, borderColor: colors.success, opacity: ringOpacity, transform: [{ scale: ringScale }] },
+          ]}
+        />
         <View
           style={[
             styles.box,
@@ -58,7 +73,7 @@ export function Checkbox({
             <Gradient colors={gradients.success} borderRadius={size / 2} style={StyleSheet.absoluteFill} />
           </Animated.View>
           <Animated.View style={{ opacity: fill }}>
-            <Icon name="check" size={size * 0.58} color={colors.onPrimary} strokeWidth={2.8} />
+            <Icon name="check" size={size * 0.56} color={colors.onPrimary} strokeWidth={2.6} />
           </Animated.View>
         </View>
       </Animated.View>
@@ -72,6 +87,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  ring: {
+    position: 'absolute',
+    borderWidth: 1.5,
   },
   disabled: {
     opacity: 0.5,

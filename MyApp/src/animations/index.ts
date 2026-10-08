@@ -10,13 +10,16 @@ import { motion } from '../theme';
 /** The luxury ease: quick start, long soft landing. */
 export const easeOut = Easing.bezier(0.16, 1, 0.3, 1);
 
+/** A gentler in-out curve for ambient loops. */
+export const easeInOut = Easing.inOut(Easing.sin);
+
 /** Press feedback: a gentle scale-down while a finger is on the element. */
 export function usePressScale(to = 0.97) {
   const { reduced } = useMotion();
   const scale = useRef(new Animated.Value(1)).current;
   const animate = (value: number) => {
     if (reduced) return;
-    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 40, bounciness: 3 }).start();
+    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 40, bounciness: value === 1 ? 6 : 0 }).start();
   };
   return {
     scale,
@@ -26,7 +29,7 @@ export function usePressScale(to = 0.97) {
 }
 
 /**
- * A 0 → 1 → 0 ambient loop (breathing glows, twinkling stars, shimmer).
+ * A 0 → 1 → 0 ambient loop (breathing glows, drifting light, shimmer).
  * Stays at `rest` under reduced motion.
  */
 export function useLoop(duration: number = motion.ambient, { rest = 0.5, pingPong = true }: { rest?: number; pingPong?: boolean } = {}) {
@@ -40,8 +43,8 @@ export function useLoop(duration: number = motion.ambient, { rest = 0.5, pingPon
     const loop = pingPong
       ? Animated.loop(
           Animated.sequence([
-            Animated.timing(value, { toValue: 1, duration: duration / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-            Animated.timing(value, { toValue: 0, duration: duration / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(value, { toValue: 1, duration: duration / 2, easing: easeInOut, useNativeDriver: true }),
+            Animated.timing(value, { toValue: 0, duration: duration / 2, easing: easeInOut, useNativeDriver: true }),
           ]),
         )
       : Animated.loop(Animated.timing(value, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }));
@@ -63,4 +66,12 @@ export function useEntrance(delay = 0, duration: number = motion.slow) {
     Animated.timing(value, { toValue: 1, duration, delay, easing: easeOut, useNativeDriver: true }).start();
   }, [delay, duration, reduced, value]);
   return value;
+}
+
+/** Fade + rise style for an entrance value from useEntrance. */
+export function riseStyle(value: Animated.Value, distance = 14) {
+  return {
+    opacity: value,
+    transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }) }],
+  };
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, font, gradients, radius, spacing, type as t } from '../../../theme';
+import { brand, colors, font, gradients, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -11,7 +11,7 @@ import { Gradient } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
 import { errorStatus, getErrorMessage } from '../../../utils/apiError';
 import { useGetMeQuery, useLazySearchUserQuery, useUpdateSettingsMutation } from '../../users/usersApi';
-import { achievementIcon } from '../../streaks/screens/AchievementsScreen';
+import { AchievementBadge } from '../../streaks/screens/AchievementsScreen';
 
 const RECENT_KEY = '@rememberly/recent_friend_searches';
 
@@ -42,25 +42,28 @@ export function DiscoverScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Find friends" />
+      <ScreenHeader title="Find friends" subtitle="Community" />
+      <Text style={styles.intro}>Look up a friend by their User ID to see the streak they’ve chosen to share.</Text>
 
       {/* Your own ID, and whether friends can find you */}
-      <Card style={styles.mb}>
+      <Card tone="hero" style={styles.mb}>
         <View style={styles.row}>
           <View style={styles.flex}>
-            <Text style={t.micro}>Your ID</Text>
+            <Text style={[t.micro, { color: brand.champagne }]}>Your ID</Text>
             <Text style={styles.myId}>{me.data?.public_id ?? '…'}</Text>
           </View>
           <IconButton
             icon="copy"
+            color={colors.heroText}
+            style={styles.heroButton}
             accessibilityLabel="Share your ID"
             onPress={() => me.data && Share.share({ message: `Find me on Memo: ${me.data.public_id}` })}
           />
         </View>
         <View style={[styles.row, styles.toggleRow]}>
           <View style={styles.flex}>
-            <Text style={t.bodyStrong}>Let friends find me</Text>
-            <Text style={t.caption}>{isPublic ? 'Friends can see your streak.' : 'Nobody can find you right now.'}</Text>
+            <Text style={[t.bodyStrong, { color: colors.heroText }]}>Let friends find me</Text>
+            <Text style={[t.caption, { color: colors.heroTextSecondary }]}>{isPublic ? 'Friends can see your streak.' : 'Nobody can find you right now.'}</Text>
           </View>
           <Toggle
             value={isPublic}
@@ -126,8 +129,8 @@ export function DiscoverScreen() {
               </View>
 
               {data.current_streak !== null || data.best_streak !== null ? (
-                <Gradient colors={gradients.moonlight} direction="vertical" borderRadius={radius.lg} style={styles.streak}>
-                  <Icon name="flame" size={28} color={colors.streak} strokeWidth={1.6} />
+                <Gradient colors={gradients.hero} direction="diagonal" borderRadius={radius.lg} style={styles.streak}>
+                  <Icon name="flame" size={28} color={brand.ember} strokeWidth={1.6} />
                   {data.current_streak !== null ? (
                     <Text style={styles.streakNum}>
                       {data.current_streak} <Text style={styles.streakUnit}>day streak</Text>
@@ -143,11 +146,7 @@ export function DiscoverScreen() {
                 <View style={styles.badges}>
                   {data.achievements.slice(0, 6).map(a => (
                     <View key={a.code} style={styles.badge} accessible accessibilityLabel={a.title}>
-                      <Gradient colors={gradients.gold} borderRadius={22} style={styles.badgeIcon}>
-                        <View style={styles.badgeInner}>
-                          <Icon name={achievementIcon(a.icon)} size={17} color={colors.goldBright} strokeWidth={1.7} />
-                        </View>
-                      </Gradient>
+                      <AchievementBadge icon={a.icon} size={46} />
                       <Text style={styles.badgeText} numberOfLines={2}>
                         {a.title}
                       </Text>
@@ -175,12 +174,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  intro: {
+    ...t.aside,
+    marginBottom: spacing.xl,
+  },
+  heroButton: {
+    backgroundColor: colors.heroGlass,
+    borderColor: colors.heroLine,
+  },
   myId: {
     ...t.heading,
-    fontSize: 23,
-    color: colors.goldBright,
-    letterSpacing: 1.2,
-    marginTop: 2,
+    fontSize: 26,
+    lineHeight: 30,
+    color: brand.champagneLight,
+    letterSpacing: 1.4,
+    marginTop: 4,
   },
   publicId: {
     ...font.bold,
@@ -193,7 +201,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
+    borderTopColor: colors.heroLine,
   },
   search: {
     flexDirection: 'row',
@@ -203,9 +211,9 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg + 2,
     paddingRight: 7,
     borderRadius: radius.pill,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.goldLine,
   },
   searchInput: {
     ...font.semibold,
@@ -220,7 +228,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryFill,
   },
   goOff: {
     opacity: 0.35,
@@ -241,23 +249,23 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginTop: spacing.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
   },
   streakNum: {
     ...font.serif,
     flex: 1,
-    fontSize: 33,
-    lineHeight: 36,
-    color: colors.goldBright,
+    fontSize: 36,
+    lineHeight: 40,
+    color: brand.champagneLight,
   },
   streakUnit: {
     ...font.serifItalic,
-    fontSize: 15,
-    color: colors.textSecondary,
+    fontSize: 16,
+    color: colors.heroTextSecondary,
   },
   best: {
     ...font.bold,
-    color: colors.streakGold,
+    color: brand.champagne,
   },
   hidden: {
     marginTop: spacing.lg,
@@ -272,18 +280,6 @@ const styles = StyleSheet.create({
     width: 64,
     alignItems: 'center',
     gap: 4,
-  },
-  badgeIcon: {
-    width: 44,
-    height: 44,
-    padding: 1.5,
-  },
-  badgeInner: {
-    flex: 1,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111830',
   },
   badgeText: {
     ...t.caption,

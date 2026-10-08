@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.glassStrong,
+    backgroundColor: colors.warningSoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.goldLine,
   },

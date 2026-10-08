@@ -81,7 +81,7 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
   return (
     <FadeIn style={styles.root}>
       <View style={styles.lockArt}>
-        <Emblem icon="lock" size={140} tint={colors.violet} iconColor={colors.goldBright} />
+        <Emblem icon="lock" size={170} tint={colors.violet} />
       </View>
       <Text style={[t.title, styles.center]}>{title}</Text>
       <Text style={[t.body, styles.subtitle]}>{subtitle}</Text>
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   lockArt: {
-    height: 140,
+    height: 170,
     alignItems: 'center',
     justifyContent: 'center',
   },

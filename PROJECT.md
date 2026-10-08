@@ -108,8 +108,19 @@ models call these **Track** and **Action**, respectively.
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
   `MyApp/src/config/env.ts`.
-- Design tokens, themes, and accents live in `MyApp/src/theme/`. Reusable UI
-  components are in `MyApp/src/components/`.
+- The "Midnight & Champagne" design system lives in `MyApp/src/theme/`:
+  `palette.ts` (brand colors, dark and light themes, accents),
+  `typography.ts` (Cormorant Garamond display and Manrope UI type),
+  `tokens.ts` (spacing, radius, motion, layout) and `index.ts` (the
+  semantic `colors`, `gradients`, `type` and `shadow` tokens applied at
+  startup). Reusable UI components are in `MyApp/src/components/`, the
+  ambient backdrop in `MyApp/src/layouts/`, and shared motion in
+  `MyApp/src/animations/`. Dark is the default theme.
+- The bundled fonts are in `MyApp/assets/fonts` (SIL Open Font License),
+  which Android packages as assets. iOS currently falls back to the system
+  serif and sans until the fonts are added to the Xcode project.
+- Phones use a floating tab bar, tablets a centered tab bar with two-column
+  layouts, and desktop-width windows a navigation rail on the left.
 - Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
   reminder/task alarms and the streak warning while signed in.
 - Satya's model is rendered in a WebView from the mobile app's bundled assets.

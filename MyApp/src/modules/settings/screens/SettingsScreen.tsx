@@ -5,11 +5,25 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../../app/hooks';
-import { ACCENTS, colors, font, radius, spacing, type AccentName, type ThemeMode, type as t } from '../../../theme';
+import {
+  ACCENTS,
+  colors,
+  DEFAULT_ACCENT,
+  DEFAULT_THEME,
+  font,
+  gradients,
+  radius,
+  spacing,
+  type AccentName,
+  type ThemeMode,
+  type as t,
+} from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { Wordmark } from '../../../components/Brand';
 import { ScreenHeader } from '../../../components/ScreenHeader';
-import { SectionHeader, Toggle } from '../../../components/Controls';
+import { Avatar, Segmented, SectionHeader, Toggle } from '../../../components/Controls';
+import { Card } from '../../../components/Card';
+import { Gradient } from '../../../components/Gradient';
 import { ListGroup, ListRow } from '../../../components/ListRow';
 import { ConfirmSheet, SelectSheet, Sheet } from '../../../components/Sheet';
 import { TextField } from '../../../components/TextField';
@@ -58,8 +72,8 @@ export function SettingsScreen() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
-  const [accent, setAccent] = useState<AccentName>('amber');
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [accent, setAccent] = useState<AccentName>(DEFAULT_ACCENT);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME);
 
   useEffect(() => {
     AsyncStorage.getMany([ACCENT_STORAGE_KEY, THEME_STORAGE_KEY])
@@ -122,9 +136,21 @@ export function SettingsScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title="Settings" subtitle="Preferences" />
 
-      <SectionHeader title="Account" style={styles.firstSection} />
+      <Card tone="hero" contentStyle={styles.member}>
+        <Avatar name={me.data.display_name} emoji={me.data.avatar} size={58} />
+        <View style={styles.flex}>
+          <Text style={styles.memberName} numberOfLines={1}>
+            {me.data.display_name}
+          </Text>
+          <Text style={styles.memberEmail} numberOfLines={1}>
+            {me.data.email}
+          </Text>
+        </View>
+      </Card>
+
+      <SectionHeader title="Account" />
       <ListGroup>
         <ListRow icon="user" title="Display name" value={me.data.display_name} onPress={() => { setName(me.data!.display_name); setSheet('name'); }} />
         <ListRow icon="tag" title="User ID" value={me.data.public_id} />
@@ -138,37 +164,37 @@ export function SettingsScreen() {
       <ListGroup>
         <View style={styles.themeRow}>
           <Text style={t.bodyStrong}>Color theme</Text>
-          <View style={styles.themeSegment} accessibilityRole="radiogroup">
-            {(['light', 'dark'] as const).map(mode => (
-              <Pressable
-                key={mode}
-                onPress={() => pickTheme(mode)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: themeMode === mode }}
-                accessibilityLabel={`${mode} theme`}
-                style={[styles.themeOption, themeMode === mode && styles.themeOptionOn]}
-              >
-                <Text style={[t.bodyStrong, themeMode === mode && styles.themeTextOn]}>
-                  {mode === 'light' ? 'Light' : 'Dark'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <Segmented
+            options={[
+              { value: 'dark', label: 'Dark' },
+              { value: 'light', label: 'Light' },
+            ]}
+            value={themeMode}
+            onChange={mode => pickTheme(mode as ThemeMode)}
+            style={styles.themeSegment}
+          />
           <Text style={[t.caption, styles.themeHint]}>Applies the next time you open the app</Text>
         </View>
         <View style={styles.accentRow}>
           <Text style={t.bodyStrong}>Accent color</Text>
-          <View style={styles.swatches}>
+          <View style={styles.swatches} accessibilityRole="radiogroup">
             {(Object.keys(ACCENTS) as AccentName[]).map(key => (
               <Pressable
                 key={key}
                 onPress={() => pickAccent(key)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: accent === key }}
-                accessibilityLabel={`${key} accent`}
-                style={[styles.swatch, { backgroundColor: ACCENTS[key].primary }, accent === key && styles.swatchOn]}
+                accessibilityLabel={`${ACCENTS[key].label} accent`}
+                style={styles.swatchItem}
               >
-                {accent === key ? <Icon name="check" size={14} color={colors.onPrimary} strokeWidth={2.6} /> : null}
+                <View style={[styles.swatchRing, accent === key && styles.swatchRingOn]}>
+                  <Gradient colors={[ACCENTS[key].bright, ACCENTS[key].primary]} borderRadius={17} style={styles.swatch}>
+                    {accent === key ? <Icon name="check" size={14} color={colors.onPrimary} strokeWidth={2.6} /> : null}
+                  </Gradient>
+                </View>
+                <Text style={[styles.swatchLabel, accent === key && styles.swatchLabelOn]} numberOfLines={1}>
+                  {ACCENTS[key].label}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -199,6 +225,9 @@ export function SettingsScreen() {
                 accessibilityState={{ selected: s.confirmation_mode === mode }}
                 style={[styles.mode, s.confirmation_mode === mode && styles.modeOn]}
               >
+                {s.confirmation_mode === mode ? (
+                  <Gradient colors={gradients.primary} direction="diagonal" borderRadius={radius.md} style={StyleSheet.absoluteFill} />
+                ) : null}
                 <Text style={[t.bodyStrong, s.confirmation_mode === mode && { color: colors.onPrimary }]}>{mode === 'STANDARD' ? 'Standard' : 'Quick'}</Text>
                 <Text style={[t.caption, s.confirmation_mode === mode && styles.modeCaptionOn]}>
                   {mode === 'STANDARD' ? '“Did you actually complete this?”' : 'One-tap confirm'}
@@ -251,6 +280,7 @@ export function SettingsScreen() {
 
       <View style={styles.version}>
         <Wordmark />
+        <Text style={styles.versionTag}>Your days, beautifully kept</Text>
         <Text style={[t.micro, styles.versionText]}>Version 2.1</Text>
       </View>
 
@@ -328,64 +358,80 @@ export function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  firstSection: {
-    marginTop: spacing.sm,
+  flex: {
+    flex: 1,
+  },
+  member: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.xl,
+  },
+  memberName: {
+    ...t.heading,
+    color: colors.heroText,
+  },
+  memberEmail: {
+    ...font.medium,
+    fontSize: 13,
+    color: colors.heroTextSecondary,
+    marginTop: 2,
   },
   mtXs: {
     marginTop: 4,
   },
   accentRow: {
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
   },
   themeRow: {
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
   },
   themeSegment: {
-    flexDirection: 'row',
     marginTop: spacing.md,
-    padding: 3,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-  },
-  themeOption: {
-    flex: 1,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-  },
-  themeOptionOn: {
-    backgroundColor: colors.primary,
-  },
-  themeTextOn: {
-    color: colors.white,
   },
   themeHint: {
     marginTop: spacing.sm,
   },
   swatches: {
     flexDirection: 'row',
-    gap: spacing.md,
+    justifyContent: 'space-between',
     marginTop: spacing.md,
   },
+  swatchItem: {
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  swatchRing: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  swatchRingOn: {
+    borderColor: colors.gold,
+  },
   swatch: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(5,6,11,0.6)',
   },
-  swatchOn: {
-    borderColor: colors.goldBright,
+  swatchLabel: {
+    ...font.semibold,
+    fontSize: 10.5,
+    color: colors.textTertiary,
+  },
+  swatchLabelOn: {
+    color: colors.text,
   },
   modeBlock: {
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
   },
@@ -398,17 +444,17 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.md + 2,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     gap: 2,
+    overflow: 'hidden',
   },
   modeOn: {
-    backgroundColor: colors.primary,
-    borderColor: colors.goldBright,
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   modeCaptionOn: {
-    color: 'rgba(10,11,16,0.7)',
+    color: 'rgba(11,15,26,0.7)',
   },
   note: {
     marginTop: spacing.sm,
@@ -418,9 +464,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.huge,
-    opacity: 0.7,
+  },
+  versionTag: {
+    ...t.aside,
+    fontSize: 15,
   },
   versionText: {
-    ...font.bold,
+    color: colors.textTertiary,
   },
 });

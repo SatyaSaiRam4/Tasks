@@ -97,8 +97,8 @@ export function VaultEntryScreen() {
 
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
-      <Screen edges={['top', 'bottom']} glowColor={colors.primary}>
-        <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} close />
+      <Screen edges={['top', 'bottom']} glowColor={colors.violet}>
+        <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} subtitle="Private vault" close />
         {entryId && existing.isLoading ? (
           <Skeleton height={300} rounded={radius.lg} />
         ) : (
@@ -130,12 +130,12 @@ export function VaultEntryScreen() {
             {deleted ? (
               <View style={styles.actions}>
                 <Button label="Restore" variant="secondary" onPress={() => moveToDeleted(true)} loading={flagging} />
-                <Button label="Delete forever" variant="ghost" onPress={() => setConfirm('erase')} />
+                <Button label="Delete forever" icon="trash" variant="dangerGhost" onPress={() => setConfirm('erase')} />
               </View>
             ) : (
               <View style={styles.actions}>
                 <Button label="Save" size="lg" onPress={save} loading={creating || updating} />
-                {entryId ? <Button label="Delete" variant="ghost" onPress={() => setConfirm('delete')} /> : null}
+                {entryId ? <Button label="Delete" icon="trash" variant="dangerGhost" onPress={() => setConfirm('delete')} /> : null}
               </View>
             )}
           </>
@@ -173,7 +173,8 @@ const styles = StyleSheet.create({
   },
   title: {
     ...t.display,
-    fontSize: 30,
+    fontSize: 34,
+    lineHeight: 40,
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.goldLine,
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.xl,
     borderRadius: radius.lg,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },

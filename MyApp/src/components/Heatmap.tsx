@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, font, spacing, type as t } from '../theme';
+import { colors, font, spacing, type as t, withAlpha } from '../theme';
 
 export interface HeatmapDay {
   date: string; // YYYY-MM-DD
@@ -21,7 +21,7 @@ function cellColor(status: string): string {
     case 'NO_ACTIONS':
       return colors.surfaceHigh;
     default:
-      return 'rgba(217,188,130,0.06)';
+      return withAlpha(colors.gold, 0.08);
   }
 }
 
@@ -67,7 +67,7 @@ export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]
               // Fixed to the cell width: the month label may overflow into the
               // next columns, but must not widen this one.
               <View key={wi} style={{ width: cell, marginRight: gap }}>
-                <Text style={styles.month} numberOfLines={1}>
+                <Text style={styles.month}>
                   {showMonth && firstDay ? MONTHS[new Date(`${firstDay.date}T00:00:00`).getMonth()] : ''}
                 </Text>
                 {week.map((day, di) => (
@@ -77,7 +77,7 @@ export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]
                       width: cell,
                       height: cell,
                       marginBottom: gap,
-                      borderRadius: cell / 2,
+                      borderRadius: cell * 0.32,
                       backgroundColor: day ? cellColor(day.status) : 'transparent',
                       opacity: day && day.status === 'FUTURE' ? 0.35 : 1,
                     }}
@@ -121,14 +121,17 @@ const styles = StyleSheet.create({
   weekday: {
     ...t.micro,
     fontSize: 9,
-    width: 12,
+    letterSpacing: 0,
+    width: 14,
+    color: colors.textTertiary,
   },
   month: {
     ...t.micro,
     fontSize: 9,
+    letterSpacing: 0.6,
     height: 14,
     marginBottom: 4,
-    width: 30,
+    width: 40,
   },
   legend: {
     flexDirection: 'row',
@@ -142,9 +145,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendSwatch: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 10,
+    height: 10,
+    borderRadius: 3,
   },
   legendText: {
     ...font.medium,

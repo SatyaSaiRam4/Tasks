@@ -4,12 +4,14 @@ import Toast from '@ant-design/react-native/lib/toast';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, font, radius, spacing, type as t } from '../../../theme';
+import { brand, colors, font, radius, spacing, type as t, withAlpha } from '../../../theme';
 import { useLayout } from '../../../hooks/useLayout';
 import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
-import { Fab, IconButton } from '../../../components/Controls';
+import { Fab, IconButton, Medallion, SectionHeader } from '../../../components/Controls';
+import { Card } from '../../../components/Card';
+import { Glow } from '../../../components/Gradient';
 import { Checkbox } from '../../../components/Checkbox';
 import { DateStrip, type DayMark } from '../../../components/DateStrip';
 import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
@@ -17,7 +19,7 @@ import { ConfirmSheet, Sheet } from '../../../components/Sheet';
 import { Button } from '../../../components/Button';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
-import { formatClock, formatFullDate, fromDateKey, relativeDayLabel, toDateKey } from '../../../utils/date';
+import { formatClock, formatDateTime, formatFullDate, fromDateKey, relativeDayLabel, toDateKey } from '../../../utils/date';
 import { cancelReminderNotification, scheduleReminderNotification } from '../../../notifications';
 import {
   useDeleteReminderMutation,
@@ -26,6 +28,8 @@ import {
   useSnoozeReminderMutation,
   type Reminder,
 } from '../remindersApi';
+import { useListTracksQuery } from '../../routines/routinesApi';
+import { categoryColor } from '../../routines/components';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -58,6 +62,28 @@ export function RemindersScreen() {
     }
     return out;
   }, [data]);
+
+  const tracks = useListTracksQuery();
+  const trackNames = useMemo(() => new Map((tracks.data ?? []).map(tr => [tr.id, tr.name])), [tracks.data]);
+
+  // The assistant's brief: what's left today and what comes next.
+  const brief = useMemo(() => {
+    const open = (data ?? []).filter(r => !r.completed_at);
+    const todayOpen = open.filter(r => dayOf(r) === todayKey);
+    const next = open
+      .filter(r => new Date(r.remind_at).getTime() > Date.now())
+      .sort((a, b) => a.remind_at.localeCompare(b.remind_at))[0];
+    return { todayOpen: todayOpen.length, next };
+  }, [data, todayKey]);
+
+  const upcoming = useMemo(
+    () =>
+      (data ?? [])
+        .filter(r => !r.completed_at && dayOf(r) > day && new Date(r.remind_at).getTime() > Date.now())
+        .sort((a, b) => a.remind_at.localeCompare(b.remind_at))
+        .slice(0, 5),
+    [data, day],
+  );
 
   const items = useMemo(
     () => (data ?? []).filter(r => dayOf(r) === day).sort((a, b) => a.remind_at.localeCompare(b.remind_at)),
@@ -111,8 +137,9 @@ export function RemindersScreen() {
     >
       <View style={[styles.pad, { paddingHorizontal: gutter }]}>
         <LargeTitle
-          eyebrow="Your day"
+          eyebrow="Your assistant"
           title="Reminders"
+          hideNotifications
           right={
             <DatePicker
               value={fromDateKey(day)}
@@ -127,6 +154,28 @@ export function RemindersScreen() {
           }
         />
       </View>
+
+      {data ? (
+        <View style={[styles.pad, { paddingHorizontal: gutter }]}>
+          <FadeIn style={styles.briefWrap}>
+            <Card tone="hero" contentStyle={styles.brief}>
+              <Glow color={brand.azure} size={300} intensity={0.16} style={styles.briefGlow} />
+              <Medallion icon="bell" size={50} color={brand.champagne} filled />
+              <View style={styles.flex}>
+                <Text style={styles.briefEyebrow}>Today’s brief</Text>
+                <Text style={styles.briefTitle}>
+                  {brief.todayOpen === 0
+                    ? 'Your day is clear'
+                    : `${brief.todayOpen} ${brief.todayOpen === 1 ? 'reminder' : 'reminders'} today`}
+                </Text>
+                <Text style={styles.briefNext} numberOfLines={2}>
+                  {brief.next ? `Next: ${brief.next.title} · ${formatDateTime(brief.next.remind_at)}` : 'Nothing else is scheduled.'}
+                </Text>
+              </View>
+            </Card>
+          </FadeIn>
+        </View>
+      ) : null}
 
       <DateStrip selected={day} today={todayKey} onSelect={setDay} marks={marks} daysBack={3} daysForward={30} />
 
@@ -157,6 +206,7 @@ export function RemindersScreen() {
             <FadeIn key={r.id} index={i}>
               <ReminderRow
                 reminder={r}
+                category={r.track_id ? trackNames.get(r.track_id) : undefined}
                 last={i === items.length - 1}
                 onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
                 onToggle={() => toggleDone(r)}
@@ -165,6 +215,35 @@ export function RemindersScreen() {
             </FadeIn>
           ))
         )}
+
+        {!isLoading && !isError && upcoming.length ? (
+          <>
+            <SectionHeader title="Coming up" />
+            <Card padded={false}>
+              {upcoming.map((r, i) => (
+                <Pressable
+                  key={r.id}
+                  onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${r.title}, ${formatDateTime(r.remind_at)}`}
+                  style={({ pressed }) => [styles.upRow, i < upcoming.length - 1 && styles.upDivider, pressed && styles.pressed]}
+                >
+                  <View style={styles.upDate}>
+                    <Text style={styles.upDay}>{fromDateKey(dayOf(r)).getDate()}</Text>
+                    <Text style={styles.upMonth}>{relativeDayLabel(dayOf(r), todayKey).split(',')[0]}</Text>
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={t.bodyStrong} numberOfLines={1}>
+                      {r.title}
+                    </Text>
+                    <Text style={t.caption}>{formatClock(r.remind_at)}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+                </Pressable>
+              ))}
+            </Card>
+          </>
+        ) : null}
       </View>
 
       <Sheet visible={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.title}>
@@ -177,7 +256,7 @@ export function RemindersScreen() {
         <Button
           label="Delete"
           icon="trash"
-          variant="ghost"
+          variant="dangerGhost"
           onPress={() => {
             setConfirmDelete(menuFor);
             setMenuFor(null);
@@ -209,12 +288,14 @@ function CalendarButton({ onPress }: { onPress?: () => void }) {
 /** One reminder on the day's timeline: serif time, a gold thread, then the card. */
 function ReminderRow({
   reminder: r,
+  category,
   last,
   onPress,
   onToggle,
   onMore,
 }: {
   reminder: Reminder;
+  category?: string;
   last: boolean;
   onPress: () => void;
   onToggle: () => void;
@@ -244,16 +325,35 @@ function ReminderRow({
           <Text style={[t.bodyStrong, done && styles.strike]} numberOfLines={2}>
             {r.title}
           </Text>
-          {r.whatsapp_number ? (
-            <View style={styles.whatsapp}>
-              <Icon name="message" size={12} color={colors.gold} strokeWidth={1.8} />
-              <Text style={t.caption}>WhatsApp too</Text>
+          {r.note ? (
+            <Text style={[t.caption, styles.note]} numberOfLines={1}>
+              {r.note}
+            </Text>
+          ) : null}
+          {category || r.whatsapp_number || r.priority === 'HIGH' || late ? (
+            <View style={styles.tags}>
+              {late ? <Tag label="Overdue" color={colors.danger} /> : null}
+              {r.priority === 'HIGH' ? <Tag label="Priority" color={colors.streak} /> : null}
+              {category ? <Tag label={category} color={categoryColor(category)} dot /> : null}
+              {r.whatsapp_number ? <Tag label="WhatsApp" color={colors.success} icon /> : null}
             </View>
           ) : null}
         </View>
         <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel="More options" onPress={onMore} />
         <Checkbox checked={done} onPress={onToggle} accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'} />
       </Pressable>
+    </View>
+  );
+}
+
+function Tag({ label, color, dot, icon }: { label: string; color: string; dot?: boolean; icon?: boolean }) {
+  return (
+    <View style={[styles.tag, { borderColor: withAlpha(color, 0.4), backgroundColor: withAlpha(color, 0.1) }]}>
+      {dot ? <View style={[styles.tagDot, { backgroundColor: color }]} /> : null}
+      {icon ? <Icon name="message" size={10} color={color} strokeWidth={2} /> : null}
+      <Text style={[styles.tagText, { color: colors.isDark ? color : colors.text }]} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -270,6 +370,39 @@ const styles = StyleSheet.create({
   },
   mtSm: {
     marginTop: spacing.sm,
+  },
+  briefWrap: {
+    marginBottom: spacing.md,
+  },
+  brief: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.xl,
+  },
+  briefGlow: {
+    position: 'absolute',
+    top: -150,
+    right: -120,
+  },
+  briefEyebrow: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: brand.champagne,
+  },
+  briefTitle: {
+    ...t.heading,
+    color: colors.heroText,
+    marginTop: 4,
+  },
+  briefNext: {
+    ...font.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.heroTextSecondary,
+    marginTop: 4,
   },
   dayHead: {
     flexDirection: 'row',
@@ -291,14 +424,14 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   timeCol: {
-    width: 62,
-    paddingTop: spacing.lg,
+    width: 58,
+    paddingTop: spacing.lg + 2,
     alignItems: 'flex-end',
   },
   time: {
     ...font.serif,
-    fontSize: 20,
-    lineHeight: 21,
+    fontSize: 22,
+    lineHeight: 24,
     color: colors.text,
   },
   timeDone: {
@@ -306,7 +439,7 @@ const styles = StyleSheet.create({
   },
   meridiem: {
     ...font.bold,
-    fontSize: 9.5,
+    fontSize: 9,
     letterSpacing: 1.4,
     color: colors.textTertiary,
   },
@@ -315,10 +448,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   node: {
-    marginTop: spacing.lg + 7,
+    marginTop: spacing.lg + 8,
     width: 11,
     height: 11,
-    borderRadius: 6,
+    borderRadius: 3,
+    transform: [{ rotate: '45deg' }],
     borderWidth: 1.5,
     borderColor: colors.gold,
     backgroundColor: colors.background,
@@ -333,7 +467,7 @@ const styles = StyleSheet.create({
   threadLine: {
     flex: 1,
     width: 1,
-    marginTop: 4,
+    marginTop: 6,
     backgroundColor: colors.goldLine,
   },
   row: {
@@ -341,12 +475,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     paddingLeft: spacing.lg,
     paddingRight: spacing.md,
     marginBottom: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
@@ -356,10 +490,61 @@ const styles = StyleSheet.create({
   strike: {
     textDecorationLine: 'line-through',
   },
-  whatsapp: {
+  note: {
+    marginTop: 2,
+  },
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: spacing.sm,
+  },
+  tag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    maxWidth: 160,
+  },
+  tagDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  tagText: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+  },
+  upRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg + 2,
+    paddingVertical: spacing.md + 2,
+  },
+  upDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  upDate: {
+    width: 64,
+    alignItems: 'center',
+  },
+  upDay: {
+    ...font.serif,
+    fontSize: 26,
+    lineHeight: 28,
+    color: colors.goldBright,
+  },
+  upMonth: {
+    ...font.bold,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.textTertiary,
   },
 });

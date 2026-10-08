@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
-import { colors, font, radius, spacing, type as t } from '../theme';
+import { colors, font, spacing, type as t } from '../theme';
 import { formatClock, formatFullDate, formatDateTime, fromDateKey, toDateKey } from '../utils/date';
 import { Chip } from './Controls';
 import { Icon, type IconName } from './Icon';
 import { Sheet } from './Sheet';
 import { Button } from './Button';
+import { fieldStyles } from './TextField';
 
 function FieldShell({
   label,
@@ -15,6 +16,7 @@ function FieldShell({
   placeholder,
   onPress,
   onClear,
+  chevron = true,
 }: {
   label?: string;
   icon: IconName;
@@ -22,20 +24,28 @@ function FieldShell({
   placeholder: string;
   onPress?: () => void;
   onClear?: () => void;
+  chevron?: boolean;
 }) {
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label ?? placeholder}: ${text ?? 'not set'}`} style={styles.field}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${label ?? placeholder}: ${text ?? 'not set'}`}
+        style={({ pressed }) => [styles.field, pressed && styles.fieldPressed]}
+      >
         <Icon name={icon} size={18} color={colors.gold} strokeWidth={1.7} />
-        <Text style={[styles.value, !text && styles.placeholder]}>{text ?? placeholder}</Text>
+        <Text style={[styles.value, !text && styles.placeholder]} numberOfLines={1}>
+          {text ?? placeholder}
+        </Text>
         {text && onClear ? (
           <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel={`Clear ${label ?? ''}`} hitSlop={10}>
             <Icon name="x" size={16} color={colors.textTertiary} />
           </Pressable>
-        ) : (
+        ) : chevron ? (
           <Icon name="chevron-down" size={16} color={colors.textTertiary} />
-        )}
+        ) : null}
       </Pressable>
     </View>
   );
@@ -74,6 +84,7 @@ export function DateField({
         text={value ? formatFullDate(value) : null}
         placeholder={placeholder}
         onClear={clearable ? () => onChange(null) : undefined}
+        chevron={false}
       />
     </DatePicker>
   );
@@ -126,8 +137,9 @@ export function TimeField({
         onClear={() => onChange(null)}
       />
       <Sheet visible={open} onClose={() => setOpen(false)} title="Pick a time">
-        <Text style={[t.display, styles.preview]}>
-          {hour12}:{String(minute).padStart(2, '0')} {pm ? 'PM' : 'AM'}
+        <Text style={styles.preview}>
+          {hour12}:{String(minute).padStart(2, '0')}
+          <Text style={styles.previewMeridiem}> {pm ? 'PM' : 'AM'}</Text>
         </Text>
         <Text style={styles.label}>Hour</Text>
         <View style={styles.grid}>
@@ -155,37 +167,34 @@ const styles = StyleSheet.create({
   wrap: {
     marginBottom: spacing.lg,
   },
-  label: {
-    ...t.micro,
-    marginBottom: spacing.sm,
-    marginLeft: 2,
-  },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: 56,
-    paddingHorizontal: spacing.lg + 2,
-    borderRadius: radius.md + 2,
-    backgroundColor: colors.glass,
-    borderWidth: 1,
-    borderColor: colors.border,
+  label: fieldStyles.label,
+  field: fieldStyles.field,
+  fieldPressed: {
+    borderColor: colors.goldLine,
+    backgroundColor: colors.goldSoft,
   },
   value: {
     ...font.medium,
     flex: 1,
     color: colors.text,
-    fontSize: 15,
+    fontSize: 14.5,
   },
   placeholder: {
     color: colors.textTertiary,
   },
   preview: {
+    ...t.hero,
     textAlign: 'center',
-    fontSize: 52,
-    lineHeight: 58,
+    fontSize: 60,
+    lineHeight: 66,
     color: colors.goldBright,
     marginBottom: spacing.lg,
+  },
+  previewMeridiem: {
+    ...font.bold,
+    fontSize: 16,
+    letterSpacing: 2,
+    color: colors.textSecondary,
   },
   grid: {
     flexDirection: 'row',

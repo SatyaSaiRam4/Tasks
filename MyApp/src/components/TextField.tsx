@@ -13,7 +13,7 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   minHeight?: number;
 }
 
-/** Labeled glass input with a champagne focus edge, inline error, optional icon and show/hide for secrets. */
+/** Labeled input with a champagne focus edge, inline error, optional icon and show/hide for secrets. */
 export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFieldProps>(function TextField(
   { label, error, hint, icon, secureToggle, secureTextEntry, multiline, minHeight, onFocus, onBlur, ...rest },
   ref,
@@ -32,12 +32,12 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
           Boolean(error) && styles.errored,
         ]}
       >
-        {icon ? <Icon name={icon} size={18} color={focused ? colors.primary : colors.textTertiary} strokeWidth={1.8} /> : null}
+        {icon ? <Icon name={icon} size={18} color={focused ? colors.gold : colors.textTertiary} strokeWidth={1.7} /> : null}
         <TextInput
           ref={ref}
           placeholderTextColor={colors.textTertiary}
-          selectionColor={colors.primary}
-          cursorColor={colors.primary}
+          selectionColor={colors.gold}
+          cursorColor={colors.gold}
           secureTextEntry={secureToggle ? hidden : secureTextEntry}
           multiline={multiline}
           textAlignVertical={multiline ? 'top' : 'center'}
@@ -60,7 +60,7 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
             accessibilityRole="button"
             accessibilityLabel={hidden ? 'Show' : 'Hide'}
           >
-            <Icon name={hidden ? 'eye' : 'eye-off'} size={18} color={focused ? colors.textSecondary : colors.textTertiary} strokeWidth={1.8} />
+            <Icon name={hidden ? 'eye' : 'eye-off'} size={18} color={focused ? colors.textSecondary : colors.textTertiary} strokeWidth={1.7} />
           </Pressable>
         ) : null}
       </View>
@@ -75,10 +75,8 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
   );
 });
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginBottom: spacing.lg,
-  },
+/** The shared look of every input-like field (also used by the picker fields). */
+export const fieldStyles = StyleSheet.create({
   label: {
     ...t.micro,
     marginBottom: spacing.sm,
@@ -90,14 +88,22 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: 56,
     paddingHorizontal: spacing.lg + 2,
-    borderRadius: radius.md + 2,
-    backgroundColor: colors.glass,
+    borderRadius: radius.md,
+    backgroundColor: colors.glassStrong,
     borderWidth: 1,
     borderColor: colors.border,
   },
+});
+
+const styles = StyleSheet.create({
+  wrap: {
+    marginBottom: spacing.lg,
+  },
+  label: fieldStyles.label,
+  field: fieldStyles.field,
   focused: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.gold,
+    backgroundColor: colors.goldSoft,
   },
   errored: {
     borderColor: colors.danger,
@@ -108,6 +114,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: fontSize.body,
     paddingVertical: 0,
+    minHeight: 24,
   },
   multiline: {
     ...font.regular,

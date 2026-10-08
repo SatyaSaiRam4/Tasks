@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Dimensions, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, gradients, radius, spacing, type as t } from '../theme';
+import { brand, colors, gradients, radius, spacing, type as t } from '../theme';
 import { Emblem } from './Emblem';
 import { Eyebrow } from './ScreenHeader';
 import { useMotion } from '../hooks/useMotion';
 import { Button } from './Button';
-import { Gradient } from './Gradient';
+import { Glow, Gradient, Sheen } from './Gradient';
 import { type IconName } from './Icon';
 
 export interface CelebrationSpec {
@@ -60,7 +60,7 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
         angle: (i / PARTICLES) * Math.PI * 2 + Math.random() * 0.4,
         dist: 120 + Math.random() * 160,
         size: 3 + Math.random() * 5,
-        color: [colors.goldBright, colors.gold, colors.text, colors.streakGold, colors.moon][i % 5],
+        color: [brand.champagneLight, brand.champagne, brand.ivory, colors.streak, colors.azure][i % 5],
         star: i % 3 === 0,
       })),
     [],
@@ -76,7 +76,8 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
   }, [appear, burst, reduced]);
 
   const ring = spec.tone === 'streak' ? gradients.streak : spec.tone === 'success' ? gradients.success : gradients.gold;
-  const accent = spec.tone === 'streak' ? colors.streak : spec.tone === 'success' ? colors.success : colors.gold;
+  // The card is always midnight, so use the bright (dark-theme) tones on it.
+  const accent = spec.tone === 'streak' ? brand.ember : spec.tone === 'success' ? brand.jade : brand.champagne;
   const scale = appear.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
 
   return (
@@ -105,8 +106,9 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
           );
         })}
         <Animated.View style={[styles.card, { opacity: appear, transform: [{ scale }] }]} accessibilityViewIsModal>
-          <Gradient colors={gradients.moonlight} direction="vertical" style={StyleSheet.absoluteFill} />
-          <View style={styles.sheen} pointerEvents="none" />
+          <Gradient colors={gradients.hero} direction="diagonal" style={StyleSheet.absoluteFill} />
+          <Glow color={accent} size={420} intensity={0.22} style={styles.cardGlow} />
+          <Sheen color={gradients.heroSheen} inset="20%" />
           <View style={styles.iconArea}>
             <Emblem icon={spec.icon} size={190} tint={accent} ring={ring} />
           </View>
@@ -119,8 +121,8 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
             <View style={styles.stats}>
               {spec.stats.map(s => (
                 <View key={s.label} style={styles.stat}>
-                  <Text style={[t.heading, styles.center]}>{s.value}</Text>
-                  <Text style={[t.caption, styles.center]}>{s.label}</Text>
+                  <Text style={[t.heading, styles.center, styles.statValue]}>{s.value}</Text>
+                  <Text style={[t.caption, styles.center, styles.statLabel]}>{s.label}</Text>
                 </View>
               ))}
             </View>
@@ -135,7 +137,7 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(2,3,8,0.9)',
+    backgroundColor: colors.scrim,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
@@ -146,18 +148,15 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     paddingTop: spacing.lg,
     borderRadius: radius.xxl,
-    backgroundColor: colors.backgroundRaised,
+    backgroundColor: brand.midnight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
     overflow: 'hidden',
   },
-  sheen: {
+  cardGlow: {
     position: 'absolute',
-    top: 0,
-    left: '20%',
-    right: '20%',
-    height: 1,
-    backgroundColor: 'rgba(241,221,175,0.5)',
+    top: -160,
+    alignSelf: 'center',
   },
   iconArea: {
     alignItems: 'center',
@@ -172,25 +171,34 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: spacing.sm,
-    fontSize: 36,
-    lineHeight: 40,
+    fontSize: 38,
+    lineHeight: 42,
+    color: colors.heroText,
   },
   subtitle: {
     textAlign: 'center',
-    color: colors.textSecondary,
+    color: colors.heroTextSecondary,
     marginTop: spacing.sm,
   },
   stats: {
     flexDirection: 'row',
     marginTop: spacing.xl,
     borderRadius: radius.lg,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.heroGlass,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.heroLine,
     paddingVertical: spacing.lg,
   },
   stat: {
     flex: 1,
+  },
+  statValue: {
+    color: brand.champagneLight,
+    fontSize: 30,
+    lineHeight: 34,
+  },
+  statLabel: {
+    color: colors.heroTextSecondary,
   },
   cta: {
     marginTop: spacing.xxl,

@@ -3,14 +3,16 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppSelector } from '../app/hooks';
 import { selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, hitSlop, spacing, type as t } from '../theme';
-import { useEntrance } from '../animations';
+import { colors, hitSlop, spacing, type as t, withAlpha } from '../theme';
+import { riseStyle, useEntrance } from '../animations';
+import { useLayout } from '../hooks/useLayout';
 import { Wordmark } from './Brand';
 import { Avatar, IconButton } from './Controls';
+import { Gradient } from './Gradient';
 
 /**
- * Header for pushed screens: back/close button, a centered serif title,
- * optional right actions. Tab roots use LargeTitle instead.
+ * Header for pushed screens: back/close button, a centered serif title and
+ * an optional right action. Tab roots use TopBar + LargeTitle instead.
  */
 export function ScreenHeader({
   title,
@@ -34,14 +36,14 @@ export function ScreenHeader({
         onPress={onBack ?? (() => navigation.goBack())}
       />
       <View style={styles.titles}>
-        {title ? (
-          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
-            {title}
-          </Text>
-        ) : null}
         {subtitle ? (
           <Text style={styles.subtitle} numberOfLines={1}>
             {subtitle}
+          </Text>
+        ) : null}
+        {title ? (
+          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
+            {title}
           </Text>
         ) : null}
       </View>
@@ -50,27 +52,40 @@ export function ScreenHeader({
   );
 }
 
+type Navigate = { navigate: (...args: unknown[]) => void };
+
 /**
  * The brand bar at the top of every tab: the Memo mark on the left, then
- * any screen actions, Settings and the Profile avatar on the right.
+ * screen actions, Notifications (Reminders), Settings and the Profile
+ * avatar on the right. With the desktop rail the mark lives in the rail.
  */
 export function TopBar({
   actions,
   hideProfile = false,
   hideSettings = false,
+  hideNotifications = false,
 }: {
   actions?: React.ReactNode;
   hideProfile?: boolean;
   hideSettings?: boolean;
+  hideNotifications?: boolean;
 }) {
   // Loosely typed: this bar is rendered inside both tab and stack screens.
-  const navigation = useNavigation<{ navigate: (...args: unknown[]) => void }>();
+  const navigation = useNavigation<Navigate>();
   const user = useAppSelector(selectCurrentUser);
+  const { hasRail } = useLayout();
   return (
-    <View style={styles.topBar}>
-      <Wordmark />
+    <View style={[styles.topBar, hasRail && styles.topBarRail]}>
+      {hasRail ? <View /> : <Wordmark size="sm" />}
       <View style={styles.topActions}>
         {actions}
+        {hideNotifications ? null : (
+          <IconButton
+            icon="bell"
+            accessibilityLabel="Reminders"
+            onPress={() => navigation.navigate('Main', { screen: 'RemindersTab' })}
+          />
+        )}
         {hideSettings ? null : (
           <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
         )}
@@ -81,7 +96,7 @@ export function TopBar({
             accessibilityRole="button"
             accessibilityLabel="Profile"
           >
-            <Avatar name={user.display_name} emoji={user.avatar} size={40} />
+            <Avatar name={user.display_name} emoji={user.avatar} size={42} />
           </Pressable>
         )}
       </View>
@@ -93,29 +108,33 @@ export function TopBar({
 export function LargeTitle({
   eyebrow,
   title,
+  subtitle,
   right,
   topBar = true,
   topBarActions,
   hideProfile,
+  hideNotifications,
 }: {
   eyebrow?: string;
   title: string;
+  subtitle?: string;
   right?: React.ReactNode;
   topBar?: boolean;
   topBarActions?: React.ReactNode;
   hideProfile?: boolean;
+  hideNotifications?: boolean;
 }) {
-  const enter = useEntrance(0, 700);
-  const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
+  const enter = useEntrance(60, 760);
   return (
     <View>
-      {topBar ? <TopBar actions={topBarActions} hideProfile={hideProfile} /> : null}
-      <Animated.View style={[styles.large, { opacity: enter, transform: [{ translateY }] }]}>
+      {topBar ? <TopBar actions={topBarActions} hideProfile={hideProfile} hideNotifications={hideNotifications} /> : null}
+      <Animated.View style={[styles.large, riseStyle(enter, 16)]}>
         <View style={styles.flex}>
           {eyebrow ? <Eyebrow label={eyebrow} /> : null}
           <Text style={[t.display, styles.largeTitle]} accessibilityRole="header">
             {title}
           </Text>
+          {subtitle ? <Text style={styles.largeSubtitle}>{subtitle}</Text> : null}
         </View>
         {right ? <View style={styles.largeRight}>{right}</View> : null}
       </Animated.View>
@@ -124,10 +143,14 @@ export function LargeTitle({
 }
 
 /** A small champagne eyebrow with a leading rule: "—— TODAY". */
-export function Eyebrow({ label, color }: { label: string; color?: string }) {
+export function Eyebrow({ label, color, style }: { label: string; color?: string; style?: object }) {
   return (
-    <View style={styles.eyebrow}>
-      <View style={[styles.eyebrowRule, color ? { backgroundColor: color } : null]} />
+    <View style={[styles.eyebrow, style]}>
+      <Gradient
+        colors={[withAlpha(color ?? colors.gold, 0), color ?? colors.gold]}
+        direction="horizontal"
+        style={styles.eyebrowRule}
+      />
       <Text style={[t.micro, color ? { color } : null]}>{label}</Text>
     </View>
   );
@@ -142,7 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   titles: {
     flex: 1,
@@ -150,11 +173,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...t.heading,
-    fontSize: 20,
+    fontSize: 22,
+    lineHeight: 26,
+    textAlign: 'center',
   },
   subtitle: {
-    ...t.caption,
-    marginTop: 1,
+    ...t.micro,
+    fontSize: 9.5,
+    marginBottom: 2,
   },
   right: {
     minWidth: 44,
@@ -169,6 +195,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
+  topBarRail: {
+    paddingTop: spacing.sm,
+  },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,11 +206,15 @@ const styles = StyleSheet.create({
   large: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   largeTitle: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
+  },
+  largeSubtitle: {
+    ...t.aside,
+    marginTop: spacing.xs,
   },
   largeRight: {
     flexDirection: 'row',
@@ -194,8 +227,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   eyebrowRule: {
-    width: 18,
+    width: 22,
     height: 1,
-    backgroundColor: colors.goldLine,
   },
 });

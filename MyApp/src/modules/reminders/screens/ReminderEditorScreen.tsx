@@ -4,6 +4,7 @@ import Toast from '@ant-design/react-native/lib/toast';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { colors, spacing, type as t } from '../../../theme';
+import { useLayout } from '../../../hooks/useLayout';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TextField } from '../../../components/TextField';
@@ -48,6 +49,8 @@ function defaultTime(): string {
 /** Add or edit a reminder: what, which day, what time, and optional WhatsApp. */
 export function ReminderEditorScreen() {
   const navigation = useNavigation();
+  const { gutter } = useLayout();
+  const padStyle = { paddingHorizontal: gutter };
   const params = useRoute<RouteProp<RootStackParamList, 'ReminderEditor'>>().params;
   const reminderId = params?.reminderId;
   const editing = Boolean(reminderId);
@@ -115,8 +118,8 @@ export function ReminderEditorScreen() {
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>
-      <View style={styles.pad}>
-        <ScreenHeader title={editing ? 'Edit reminder' : 'New reminder'} close />
+      <View style={padStyle}>
+        <ScreenHeader title={editing ? 'Edit reminder' : 'New reminder'} subtitle="Reminder" close />
         <TextField label="Remind me to" value={title} onChangeText={setTitle} placeholder="e.g. Call mom" maxLength={200} autoFocus={!editing} />
 
         <View style={styles.dayHead}>
@@ -135,14 +138,16 @@ export function ReminderEditorScreen() {
       </View>
       <DateStrip selected={day} today={todayKey} onSelect={setDay} daysBack={0} daysForward={30} />
 
-      <View style={styles.pad}>
+      <View style={padStyle}>
         <View style={styles.mtLg}>
           <TimeField label="Time" value={time} onChange={setTime} placeholder="Pick a time" />
         </View>
 
+        <Text style={[styles.label, styles.section]}>Delivery</Text>
         <ListGroup>
           <ListRow
             icon="message"
+            subtitle="In addition to the notification on this device"
             iconColor={colors.success}
             title="Also send on WhatsApp"
             right={<Toggle value={whatsapp} onChange={setWhatsapp} accessibilityLabel="Also send on WhatsApp" />}
@@ -157,7 +162,7 @@ export function ReminderEditorScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button label={editing ? 'Save' : 'Set reminder'} onPress={save} loading={creating || updating} size="lg" style={styles.mtLg} />
-        {editing ? <Button label="Delete reminder" variant="ghost" onPress={() => setConfirmDelete(true)} style={styles.mtSm} /> : null}
+        {editing ? <Button label="Delete reminder" icon="trash" variant="dangerGhost" onPress={() => setConfirmDelete(true)} style={styles.mtSm} /> : null}
       </View>
 
       <ConfirmSheet
@@ -196,8 +201,9 @@ function CalendarButton({ onPress }: { onPress?: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  pad: {
-    paddingHorizontal: 20,
+  section: {
+    marginBottom: spacing.sm,
+    marginLeft: 2,
   },
   label: {
     ...t.micro,
@@ -215,6 +221,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   error: {
+    ...t.caption,
     color: colors.danger,
     marginTop: spacing.md,
   },

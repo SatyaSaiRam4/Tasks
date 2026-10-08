@@ -83,13 +83,14 @@ const styles = StyleSheet.create({
   dot: {
     width: 13,
     height: 13,
-    borderRadius: 7,
+    borderRadius: 3,
     borderWidth: 1,
     borderColor: colors.goldLine,
+    transform: [{ rotate: '45deg' }],
   },
   dotFilled: {
     backgroundColor: colors.gold,
-    borderColor: colors.goldBright,
+    borderColor: colors.gold,
   },
   pad: {
     flexDirection: 'row',
@@ -108,7 +109,7 @@ const styles = StyleSheet.create({
   },
   keySurface: {
     borderRadius: 33,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
@@ -118,8 +119,8 @@ const styles = StyleSheet.create({
   },
   keyText: {
     ...font.serif,
-    fontSize: 26,
-    lineHeight: 31,
+    fontSize: 30,
+    lineHeight: 34,
     color: colors.text,
   },
 });

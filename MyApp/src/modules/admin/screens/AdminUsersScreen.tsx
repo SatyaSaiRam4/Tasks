@@ -48,7 +48,7 @@ export function AdminUsersScreen() {
 
   return (
     <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
-      <ScreenHeader title="Users" subtitle={data ? `${data.length} accounts` : undefined} />
+      <ScreenHeader title="Users" subtitle={data ? `${data.length} accounts` : 'Admin'} />
       <TextField icon="search" value={search} onChangeText={setSearch} placeholder="Search name, email or User ID" autoCapitalize="none" />
       {isLoading ? (
         <SkeletonList count={5} height={110} />
@@ -64,7 +64,7 @@ export function AdminUsersScreen() {
               <View style={styles.row}>
                 <Avatar name={u.display_name} size={42} />
                 <View style={styles.flex}>
-                  <Text style={t.bodyStrong}>
+                  <Text style={styles.name}>
                     {u.display_name}
                     {self ? ' (you)' : ''}
                   </Text>
@@ -112,6 +112,11 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: spacing.md,
+  },
+  name: {
+    ...t.heading,
+    fontSize: 20,
+    lineHeight: 24,
   },
   row: {
     flexDirection: 'row',

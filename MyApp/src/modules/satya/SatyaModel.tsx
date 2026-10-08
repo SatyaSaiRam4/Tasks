@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, font, gradients } from '../../theme';
+import { brand, colors, font, gradients } from '../../theme';
 import { useMotion } from '../../hooks/useMotion';
 import { Glow, Gradient } from '../../components/Gradient';
 
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orbInner: {
-    backgroundColor: '#101730',
+    backgroundColor: brand.midnight,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   orbText: {
     ...font.serif,
-    color: colors.goldBright,
+    color: brand.champagneLight,
     includeFontPadding: false,
   },
 });

@@ -26,12 +26,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, font, radius, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
+import { brand, colors, font, gradients, radius, RAIL_WIDTH, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
 import { Icon, type IconName } from '../components/Icon';
-import { Gradient } from '../components/Gradient';
+import { Glow, Gradient, Sheen } from '../components/Gradient';
+import { Wordmark } from '../components/Brand';
+import { Avatar } from '../components/Controls';
 import { useMotion } from '../hooks/useMotion';
-import { useLayout } from '../hooks/useLayout';
-import { easeOut } from '../animations';
+import { RailContext, useLayout } from '../hooks/useLayout';
 
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
@@ -94,18 +95,32 @@ const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = 
   ProfileTab: { label: 'Profile', icon: 'user' },
 };
 
+/** Navigation chrome: the floating bar on phones and tablets, the rail on desktop. */
+function TabBar(props: BottomTabBarProps) {
+  const { hasRail } = useLayout();
+  return hasRail ? <NavRail {...props} /> : <FloatingTabBar {...props} />;
+}
+
+function pressTab({ state, navigation }: BottomTabBarProps, index: number) {
+  const route = state.routes[index];
+  const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+  if (state.index !== index && !event.defaultPrevented) navigation.navigate(route.name);
+}
+
 /**
- * A floating glass tab bar. A champagne pill glides to the active tab;
- * the active icon turns gold. On tablets the bar is centered at a fixed width.
+ * A floating obsidian glass bar. A satin champagne pill glides to the
+ * active tab and its icon lifts slightly; on tablets the bar is centered at
+ * a fixed width. It stays midnight in both themes, like a jewellery case.
  */
-function TabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar(props: BottomTabBarProps) {
+  const { state } = props;
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
   const { isTablet } = useLayout();
   const [barWidth, setBarWidth] = useState(0);
   const x = useRef(new Animated.Value(state.index)).current;
   useEffect(() => {
-    Animated.timing(x, { toValue: state.index, duration: reduced ? 0 : 420, easing: easeOut, useNativeDriver: true }).start();
+    Animated.spring(x, { toValue: state.index, useNativeDriver: true, speed: reduced ? 1000 : 14, bounciness: reduced ? 0 : 5 }).start();
   }, [state.index, reduced, x]);
   const slot = barWidth ? (barWidth - spacing.sm * 2) / state.routes.length : 0;
 
@@ -116,14 +131,16 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         accessibilityRole="tablist"
         onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
       >
-        <Gradient colors={['#151C34', '#090C17']} direction="vertical" borderRadius={radius.xl + 4} style={StyleSheet.absoluteFill} />
-        <View style={styles.tabSheen} pointerEvents="none" />
+        <Gradient colors={gradients.hero} direction="vertical" borderRadius={radius.xl} style={StyleSheet.absoluteFill} />
+        <Sheen color={gradients.heroSheen} inset="12%" />
         {slot ? (
           <Animated.View
             pointerEvents="none"
             style={[styles.tabIndicator, { width: slot, transform: [{ translateX: Animated.multiply(x, slot) }] }]}
           >
-            <View style={styles.tabIndicatorPill} />
+            <View style={styles.tabIndicatorPill}>
+              <Glow color={brand.champagne} size={84} intensity={0.28} style={styles.tabIndicatorGlow} />
+            </View>
             <View style={styles.tabIndicatorLine} />
           </Animated.View>
         ) : null}
@@ -136,18 +153,71 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={tab.label}
-              onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-              }}
+              onPress={() => pressTab(props, index)}
               style={styles.tabItem}
             >
-              <Icon name={tab.icon} size={21} color={focused ? colors.gold : colors.textTertiary} strokeWidth={focused ? 2 : 1.7} />
-              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
+              <Icon name={tab.icon} size={21} color={focused ? brand.champagneLight : colors.heroTextTertiary} strokeWidth={focused ? 1.9 : 1.6} />
+              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} numberOfLines={1}>
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
+    </View>
+  );
+}
+
+/** The desktop navigation rail: brand, the five destinations, and the signed-in member. */
+function NavRail(props: BottomTabBarProps) {
+  const { state } = props;
+  const user = useAppSelector(selectCurrentUser);
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.rail, { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xl }]} accessibilityRole="tablist">
+      <Gradient colors={gradients.hero} direction="vertical" style={StyleSheet.absoluteFill} />
+      <View style={styles.railEdge} />
+      <View style={styles.railBrand}>
+        <Wordmark light />
+      </View>
+      <Text style={styles.railSection}>Navigate</Text>
+      {state.routes.map((route, index) => {
+        const focused = state.index === index;
+        const tab = TABS[route.name as keyof MainTabParamList];
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={tab.label}
+            onPress={() => pressTab(props, index)}
+            style={({ pressed }) => [styles.railItem, focused && styles.railItemActive, pressed && !focused && styles.railItemPressed]}
+          >
+            {focused ? <View style={styles.railMarker} /> : null}
+            <Icon name={tab.icon} size={19} color={focused ? brand.champagneLight : colors.heroTextSecondary} strokeWidth={focused ? 1.9 : 1.6} />
+            <Text style={[styles.railLabel, focused && styles.railLabelActive]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+      <View style={styles.flex} />
+      {user ? (
+        <Pressable
+          onPress={() => pressTab(props, state.routes.findIndex(r => r.name === 'ProfileTab'))}
+          accessibilityRole="button"
+          accessibilityLabel="Profile"
+          style={styles.railMember}
+        >
+          <Avatar name={user.display_name} emoji={user.avatar} size={40} />
+          <View style={styles.flex}>
+            <Text style={styles.railName} numberOfLines={1}>
+              {user.display_name}
+            </Text>
+            <Text style={styles.railMeta} numberOfLines={1}>
+              {user.public_id}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -160,14 +230,25 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
 
 function MainTabs() {
+  const { isDesktop } = useLayout();
   return (
-    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: colors.background } }}>
-      <Tab.Screen name="HomeTab" component={DashboardScreen} />
-      <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
-      <Tab.Screen name="RemindersTab" component={RemindersScreen} />
-      <Tab.Screen name="VaultTab" component={VaultScreen} />
-      <Tab.Screen name="ProfileTab" component={ProfileScreen} />
-    </Tab.Navigator>
+    <RailContext.Provider value={isDesktop}>
+      <Tab.Navigator
+        tabBar={renderTabBar}
+        screenOptions={{
+          headerShown: false,
+          animation: 'shift',
+          sceneStyle: { backgroundColor: colors.background },
+          tabBarPosition: isDesktop ? 'left' : 'bottom',
+        }}
+      >
+        <Tab.Screen name="HomeTab" component={DashboardScreen} />
+        <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
+        <Tab.Screen name="RemindersTab" component={RemindersScreen} />
+        <Tab.Screen name="VaultTab" component={VaultScreen} />
+        <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+      </Tab.Navigator>
+    </RailContext.Provider>
   );
 }
 
@@ -230,6 +311,9 @@ export function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   tabWrap: {
     position: 'absolute',
     left: 0,
@@ -242,23 +326,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignSelf: 'stretch',
     height: TAB_BAR_HEIGHT,
-    borderRadius: radius.xl + 4,
-    backgroundColor: colors.glassStrong,
+    borderRadius: radius.xl,
+    backgroundColor: brand.midnight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
     paddingHorizontal: spacing.sm,
   },
   tabBarTablet: {
     alignSelf: 'center',
-    width: 560,
-  },
-  tabSheen: {
-    position: 'absolute',
-    top: 0,
-    left: '15%',
-    right: '15%',
-    height: 1,
-    backgroundColor: 'rgba(241,221,175,0.35)',
+    width: 580,
   },
   tabIndicator: {
     position: 'absolute',
@@ -269,35 +345,127 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabIndicatorPill: {
-    width: '84%',
-    height: 52,
+    width: '86%',
+    height: 54,
     borderRadius: radius.lg,
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.heroGoldSoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(217,188,130,0.25)',
+    borderColor: colors.heroGoldLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  tabIndicatorGlow: {
+    position: 'absolute',
+    top: -30,
   },
   tabIndicatorLine: {
     position: 'absolute',
     top: 0,
-    width: 22,
+    width: 24,
     height: 2,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
-    backgroundColor: colors.gold,
+    backgroundColor: brand.champagne,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 5,
   },
   tabLabel: {
     ...font.semibold,
     fontSize: 10,
-    letterSpacing: 0.4,
-    color: colors.textTertiary,
+    letterSpacing: 0.6,
+    color: colors.heroTextTertiary,
   },
   tabLabelActive: {
-    color: colors.text,
+    ...font.bold,
+    color: colors.heroText,
+  },
+  rail: {
+    width: RAIL_WIDTH,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: brand.midnight,
+  },
+  railEdge: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.heroLine,
+  },
+  railBrand: {
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xxxl,
+  },
+  railSection: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.heroTextTertiary,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  railItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    height: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+  },
+  railItemActive: {
+    backgroundColor: colors.heroGoldSoft,
+    borderColor: colors.heroGoldLine,
+  },
+  railItemPressed: {
+    backgroundColor: colors.heroGlass,
+  },
+  railMarker: {
+    position: 'absolute',
+    left: -spacing.lg,
+    top: 12,
+    bottom: 12,
+    width: 2,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+    backgroundColor: brand.champagne,
+  },
+  railLabel: {
+    ...font.semibold,
+    fontSize: 14,
+    color: colors.heroTextSecondary,
+  },
+  railLabelActive: {
+    color: colors.heroText,
+  },
+  railMember: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.heroGlass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.heroLine,
+  },
+  railName: {
+    ...font.semibold,
+    fontSize: 14,
+    color: colors.heroText,
+  },
+  railMeta: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: brand.champagne,
+    marginTop: 2,
   },
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { gradients, radius } from '../theme';
+import { colors, gradients, radius, withAlpha } from '../theme';
 import { easeOut } from '../animations';
 import { useMotion } from '../hooks/useMotion';
 import { Gradient } from './Gradient';
@@ -14,12 +14,14 @@ export function ProgressRing({
   size = 120,
   stroke = 10,
   colorsPair = gradients.primary,
+  trackColor,
   children,
 }: {
   progress: number;
   size?: number;
   stroke?: number;
   colorsPair?: readonly [string, string];
+  trackColor?: string;
   children?: React.ReactNode;
 }) {
   const { reduced } = useMotion();
@@ -43,15 +45,15 @@ export function ProgressRing({
 
   return (
     <View style={{ width: size, height: size }} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Svg width={size} height={size} style={styles.rotate}>
         <Defs>
           <LinearGradient id={`ring${id}`} x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor={colorsPair[0]} />
             <Stop offset="1" stopColor={colorsPair[1]} />
           </LinearGradient>
         </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(217,188,130,0.12)" strokeWidth={stroke} fill="none" />
-        <Circle cx={size / 2} cy={size / 2} r={r + stroke / 2 + 3} stroke="rgba(217,188,130,0.10)" strokeWidth={StyleSheet.hairlineWidth * 2} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor ?? withAlpha(colors.gold, 0.12)} strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r + stroke / 2 + 3} stroke={withAlpha(colors.gold, 0.14)} strokeWidth={1} fill="none" />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
@@ -141,8 +143,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  rotate: {
+    transform: [{ rotate: '-90deg' }],
+  },
   barTrack: {
-    backgroundColor: 'rgba(217,188,130,0.10)',
+    backgroundColor: withAlpha(colors.gold, 0.12),
     overflow: 'hidden',
     borderRadius: radius.pill,
   },
