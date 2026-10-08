@@ -1,197 +1,205 @@
-# Memo — Daily Tasks, Streaks, Reminders & a Private Vault
+# Memo
 
-A personal app that helps you **do your daily tasks**, **keep a streak going**,
-**never forget time-based things**, and **keep private notes safe**. The
-design is premium and dark, and every screen is kept **simple on purpose**:
-only what's needed, nothing extra. A small guide character, **Satya**, shows
-new users around.
+Memo is a personal routines and wellbeing app for organizing goals into
+categories, completing scheduled tasks, building streaks, setting reminders,
+and keeping private notes in an encrypted Vault. Satya is the in-app guide.
 
-It has two parts that run separately:
-- **Backend**: a FastAPI server. It stores everything in a PostgreSQL database,
-  decides streaks, and sends WhatsApp reminders.
-- **MyApp**: a React Native app for Android. This is the app people use on
-  their phone.
+The workspace contains two separately run applications:
 
-> In the code, a Category is called a **Track** and a Task an **Action**
-> (`tracks/`, `actions/`). The app only shows the words Category and Task.
+- `Backend/`: FastAPI service backed by PostgreSQL.
+- `MyApp/`: React Native mobile client with Android and iOS native projects.
 
----
+The app uses **Category** and **Task** in its interface. Backend code and API
+models call these **Track** and **Action**, respectively.
 
-## 1. The main features
+## Features
 
 ### Categories and tasks
-- A **category** is a goal with a period, e.g. "Gym, 4 Oct → 2 Nov".
-  Creating one asks for just a **name** and the **dates**.
-- Inside it you add **tasks** by name only (e.g. "Workout"). Every task gets a
-  box to tick every day.
-- Each category shows a **table with borders**: tasks down the side, days
-  across the top (scrolls sideways, opens at today). Only **today's** box can
-  be ticked; past days show ✓ or ✗ and are locked, future days are empty.
-- Ticking asks **"Did you do it today?"** so streaks stay honest. A "quick"
-  mode in Settings ticks straight away.
-- Tap a task's name to rename or delete it.
 
-### Streaks
-- A day counts when **all of that day's tasks** are ticked. A day with no tasks
-  neither extends nor breaks the streak.
-- The **server** decides streaks, in the user's own timezone, so changing the
-  phone's clock doesn't help. Finished days are never rewritten.
-- Missing a day resets the streak, with gentle wording, not guilt.
-- Extras: a calendar of done/missed days, badges, an evening "streak at risk"
-  notification, and bonus points for finishing a whole category perfectly.
+- Categories have a name and a start/end date. They group tasks around a goal.
+- The current mobile flow adds a task by name and uses daily recurrence.
+  Backend task records and API schemas also support recurrence rules, optional
+  times, priorities, descriptions, steps, and reminder settings.
+- A category detail shows a task-by-day completion grid. Completions are
+  editable for today; past days are retained as history.
+- Completing a task requires confirmation. Settings offers Standard and Quick
+  confirmation modes.
+- Categories and tasks can be edited or deleted. Category date changes preserve
+  already-finished days.
 
-### Reminders
-- Pick a **day** from a strip of days (or any date from the calendar button)
-  and see that day's reminders.
-- A reminder is just **what**, **which day** and **what time**, with an
-  optional **WhatsApp** message (through MSG91) besides the push notification.
-- Tick to complete; ••• to snooze (1 hour / tomorrow) or delete.
+### Streaks and achievements
 
-### Vault: private notes
-- Notes with a title and text, **encrypted** in the database, behind their own
-  **4-digit PIN**. After 5 wrong PINs it locks for 5 minutes, and it locks
-  itself when you leave the app.
-- Search, add, edit, delete. Deleted notes can be restored from
-  "Deleted notes" or erased for good.
-- Vault notes **never** appear on Home, in notifications or on a profile.
+- The backend calculates streaks using the user's saved timezone. A day is
+  secured when all required tasks due that day are complete; days with no
+  required tasks do not extend or break a streak.
+- Today's progress is provisional until the day is finalized. A background
+  worker finalizes ended days and awards eligible achievements and category
+  completion bonuses.
+- The app includes streak history, achievement badges, and an optional local
+  evening streak warning.
 
-### Everything else
-- **Home**: "Good evening, Name" in the header, one short tip from Satya, the
-  streak card, then two tabs: **Categories** and **Reminders**.
-- **Satya's tour**: shown once after sign-up (replay it from Settings). The
-  real app stays visible but dimmed and untouchable, while a small Satya at
-  the bottom explains each tab in a speech bubble, like a game tutorial.
-- **Profile**: name, User ID, day streak, best streak, days done and badges.
-- **Find friends**: search a friend's **User ID** to see their streak. Nobody
-  can find you unless you turn on **"Let friends find me"** (off by default).
-- **Settings**: account, accent color, motion, notifications, privacy, Vault
-  PIN and auto-lock, Satya on/off, replay tour.
-- **Auth**: login, register, forgot/reset password, change password.
-- **Admin panel** (admin account only): users and app-wide stats. It never
-  shows Vault content.
+### Reminders and notifications
 
----
+- Reminders have a title, optional note, date/time, priority, and optional link
+  to a category. The Reminders tab supports date selection, completion,
+  snoozing, editing, and deletion.
+- Reminder, task, and streak-warning notifications are scheduled locally on
+  the device. Android exact-time delivery may require the system's Alarms &
+  reminders permission.
+- A reminder can also be sent over WhatsApp through MSG91 when configured.
+  WhatsApp delivery is independent of local notifications.
 
-## 2. How it's built
+### Private Vault
 
-### Backend (`Backend/`)
-- **FastAPI + SQLAlchemy** on PostgreSQL (hosted on Supabase).
-- **One folder per feature** in `app/modules/`: `auth`, `users`, `tracks`,
-  `actions`, `streaks`, `achievements`, `reminders`, `vault`, `dashboard`,
-  `admin`. Each has the same files: `models.py` (tables), `schemas.py`
-  (request/response shapes), `service.py` (logic) and `router.py`
-  (endpoints).
-- **Streak engine**: `app/modules/streaks/engine.py`. It finalizes past
-  days, counts today provisionally, and calculates bonuses.
-- **Database changes go through Alembic migrations** (`Backend/alembic/`).
-  The app no longer creates tables by itself.
-- **Security**:
-  - Passwords and the Vault PIN are hashed with Argon2.
-  - Login uses short-lived JWT access tokens plus rotating refresh tokens.
-  - The Vault uses its own short-lived token, sent in the `X-Vault-Token`
-    header.
-  - Vault content is encrypted with Fernet. The keys live in `.env`,
-    never in the database.
-  - Login, password reset and user search are rate-limited.
-- **Background jobs** (`app/workers/reminder_worker.py`):
-  - Sends due WhatsApp reminders.
-  - Finalizes streaks every 15 minutes.
-- **Tests**: `Backend/tests/` (36 tests: streak rules, the category table, anti-cheat, privacy,
-  Vault security, password reset, reminders).
+- Vault entries are encrypted with Fernet before storage. The Vault requires a
+  separate PIN and issues a short-lived Vault session token.
+- Five failed PIN attempts trigger a five-minute lockout by default. The app
+  locks the Vault on leaving the foreground, session expiry, or the selected
+  inactivity timeout.
+- Users can search, edit, soft-delete, restore, and permanently delete notes.
+  Vault content is excluded from public profiles and notification bodies.
+- The encryption key is not stored in the database. Losing all configured
+  keys makes existing Vault entries unreadable; keep secure backups.
 
-### Frontend (`MyApp/`)
-- **React Native (not Expo)**, Android, New Architecture.
-- **Redux Toolkit + RTK Query**: each feature has an `xApi.ts` file that
-  talks to the backend.
-- **Navigation lives in one file**: `src/navigation/RootNavigator.tsx`. It
-  holds 5 tabs (Home, Routines, Reminders, Vault, Profile) plus the screens
-  pushed on top of them.
-- **Design system**: colors, spacing, typography and the 5 accent colors are
-  defined once in `src/theme/index.ts`. Shared building blocks live in
-  `src/components/` (Card, Button, TextField, Sheet, ProgressRing, Heatmap,
-  PinPad, DateStrip…), so every screen looks the same.
-- **Satya** (`src/modules/satya/`) renders the model in a WebView using
-  Google's `model-viewer`, bundled offline. No internet is needed.
-- **Notifications**: `react-native-notify-kit` schedules on-device
-  notifications for reminders, actions and the evening streak warning.
+### Accounts, profiles, and settings
 
----
+- Authentication includes registration, login, refresh-token rotation, logout,
+  password changes, and password reset flows.
+- Profiles show a public User ID, current and best streaks, successful days,
+  and achievements. Friends can be searched by User ID only when the account
+  has enabled profile discovery; individual streak and achievement visibility
+  can also be controlled in Settings.
+- Settings include display name, light/dark theme, accent color, animation and
+  reduced-motion controls, notification preferences, completion confirmation,
+  profile visibility, Vault PIN and auto-lock, and Satya preferences/tour.
+- Admin-only screens provide app statistics and user management. Admin routes
+  do not provide access to Vault contents.
 
-## 3. Running it yourself
+## Architecture
 
 ### Backend
+
+- FastAPI app entry point: `Backend/app/main.py`; API routes are mounted under
+  `/api/v1` by `Backend/app/api/router.py`.
+- SQLAlchemy models and feature logic live in `Backend/app/modules/`: `auth`,
+  `users`, `tracks`, `actions`, `streaks`, `achievements`, `reminders`,
+  `vault`, `dashboard`, and `admin`.
+- Database schema changes are managed by Alembic in `Backend/alembic/`. Apply
+  migrations explicitly; application startup does not create tables.
+- Authentication uses Argon2 password hashing, JWT access tokens, and rotating
+  refresh tokens. Vault requests use a separate token in `X-Vault-Token`.
+- Vault payloads are Fernet-encrypted. Login, password reset, and user search
+  are rate-limited.
+- `Backend/app/workers/reminder_worker.py` runs an in-process scheduler for
+  WhatsApp delivery and streak finalization. Local push notifications are not
+  sent by this worker.
+- Health endpoints: `/health/live` and `/health/ready`.
+
+### Mobile app
+
+- React Native 0.87, React 19, TypeScript, and the React Native New
+  Architecture. Android and iOS native project files are present. Node.js
+  22.11 or newer is required by `package.json`.
+- Navigation and the five main tabs (Home, Categories, Reminders, Vault,
+  Profile) are defined in `MyApp/src/navigation/RootNavigator.tsx`.
+- Feature modules in `MyApp/src/modules/` include auth, home, routines,
+  reminders, streaks, vault, profile, discover, settings, admin, onboarding,
+  users, and Satya.
+- Redux Toolkit and RTK Query manage client state and API requests. Shared API
+  configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
+  `MyApp/src/config/env.ts`.
+- Design tokens, themes, and accents live in `MyApp/src/theme/`. Reusable UI
+  components are in `MyApp/src/components/`.
+- Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
+  reminder/task alarms and the streak warning while signed in.
+- Satya's model is rendered in a WebView from the mobile app's bundled assets.
+
+## Setup
+
+### Backend
+
+Use Python 3.12 or another version supported by the pinned dependencies, and
+provide a PostgreSQL database. From the repository root:
+
 ```bash
 cd Backend
-cp .env.example .env              # then fill in real values (see below)
-source myenv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head              # create/upgrade the database tables
+cp -n .env.example .env
+# Edit .env with your database credentials and secrets.
+source myenv/bin/activate   # or create and activate your own virtualenv
+pip install -r requirements-dev.txt
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-**`.env`** is never committed. `.env.example` explains every variable. The
-important ones:
-- `HOST`, `PORT`, `DATABASE`, `USER`, `PASSWORD`: the database. Required.
-- `JWT_SECRET`: signs login tokens. Changing it logs everyone out.
-- `VAULT_ENCRYPTION_KEYS`: encrypts the Vault. Generate one with
-  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
-  > ⚠️ **Back this key up somewhere outside the database.** If it's lost,
-  > every Vault entry is lost with it. To rotate it, put a new key **first**
-  > and keep the old one after a comma.
-- `MSG91_*`: optional. Without them, reminders still work as push
-  notifications, just without WhatsApp.
-- `SMTP_*` or `RESEND_*`: optional. Needed to email password-reset codes.
-- `TRACK_BONUS_*`: tune the bonus for finishing a whole category.
+The required database variables are `HOST`, `PORT`, `DATABASE`, `USER`, and
+`PASSWORD`. Set a unique random `JWT_SECRET` in production. Configure
+`VAULT_ENCRYPTION_KEYS` before using the Vault; generate a Fernet key with:
 
-Run the tests with `./myenv/bin/python -m pytest`. They need a separate test
-database (see `tests/conftest.py`).
-
-### Frontend
 ```bash
-cd MyApp
-npm install
-npx react-native start            # Metro bundler, keep it running
-npx react-native run-android      # in a second terminal
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-### Changing Satya's 3D model
-Replace `MyApp/assets/models/model.glb` with any `.glb` file, ideally a rigged
-character with an animation named "Idle", then **rebuild** the app
-(`run-android`). A reload isn't enough, because the model is packaged into
-the app. The current file is a placeholder cartoon figure.
+The first comma-separated Vault key encrypts new data; all configured keys can
+decrypt existing data, which supports key rotation. Back up keys securely
+outside the database. `MSG91_*` enables optional WhatsApp sending. SMTP/Resend
+variables configure email delivery; consult `.env.example` for all supported
+settings. Set explicit production admin credentials with `ADMIN_NAME`,
+`ADMIN_EMAIL`, and `ADMIN_PASSWORD`; do not use the example defaults.
 
----
+Run backend tests only against a dedicated, disposable database. The test
+harness truncates its tables between tests. Set `TEST_DATABASE_URL` to that
+database before running:
 
-## 4. What's verified
+```bash
+TEST_DATABASE_URL="postgresql+psycopg2://user:password@localhost:5432/memo_test" \
+  python -m pytest
+```
 
-Tested live on an Android emulator:
-- ✅ Home: header greeting, Satya tip, streak card, Categories / Reminders tabs
-- ✅ Category table: add a task, tick today → "Did you do it today?" →
-  celebration; the table, Home and Profile all update
-- ✅ New category form (name + dates)
-- ✅ Reminders: day strip with dots, add for another day, list per day
-- ✅ Vault lock screen; Find friends search (a private ID isn't found)
-- ✅ Profile, streak history calendar
-- ✅ Satya's tour over the dimmed app (moves through the tabs; Skip / Done)
-- ✅ Earlier: register flow, Vault PIN setup/unlock, encrypted notes,
-  WhatsApp reminders through MSG91, migration with all data kept
+The test database schema must be migrated before the run. The harness default
+is a local database at `127.0.0.1:55432/rememberly_test`; never point it at a
+production or personal data database.
 
-Not yet tested on the device after the simplification: the unlocked Vault
-list and note editor, renaming/deleting a task, Admin screens, password reset
-by email.
+### Mobile app
 
-## 5. Known quirks
+Set `API_BASE_URL` in `MyApp/src/config/env.ts` to reach the backend:
 
-- **Satya can take a few seconds to appear on the emulator**, which renders
-  3D in software. Real phones are faster. If loading takes over 8 seconds,
-  the orb stays.
-- **Today counts right away once it's secured** (streak, totals and
-  consistency %). It becomes permanent when the day ends. If you undo a
-  completion the same day, it's taken back. Achievements are awarded when
-  the day is finalized, not the moment it's secured.
-- A WhatsApp number linked to the same account as the sending business
-  number (`916304909776`) won't receive messages from it. This is a Meta-side
-  restriction, not a bug.
-- The `main` branch code expects the **old** database layout. After running
-  this branch's migration, go back with `alembic downgrade` (or the backup in
-  `db_backups/`) before running `main` again.
+- Android emulator: default `http://10.0.2.2:8000/api/v1`.
+- iOS simulator: `http://localhost:8000/api/v1`.
+- Physical device: use the development machine's LAN address and start the
+  backend with `--host 0.0.0.0`.
+
+From `MyApp/`, install dependencies and start Metro:
+
+```bash
+npm install
+npm start
+```
+
+In a second terminal, run a native target:
+
+```bash
+npm run android
+# or
+npm run ios
+```
+
+iOS builds require Xcode and CocoaPods dependencies. From `MyApp/`, run
+`bundle install`; then install pods from `MyApp/ios/` with
+`bundle exec pod install` when setting up or changing native dependencies.
+
+## Tests and checks
+
+From `Backend/`, run `python -m pytest` with a dedicated `TEST_DATABASE_URL`.
+From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
+
+## Important operational notes
+
+- Keep real credentials in `Backend/.env`; do not commit them. The example
+  admin password and default JWT secret are not suitable for production.
+- Back up `VAULT_ENCRYPTION_KEYS` separately from the database. Database
+  backups alone cannot recover Vault content if every key is lost.
+- The backend worker runs inside each API process. Deploy a single worker
+  instance, or otherwise ensure multiple API processes do not duplicate
+  scheduled WhatsApp sends.
+- On Android 12 and later, exact local reminder delivery may require granting
+  the app the system-level Alarms & reminders permission.

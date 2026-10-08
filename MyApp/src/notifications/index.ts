@@ -50,7 +50,7 @@ export async function hasNotificationPermission(): Promise<boolean> {
 async function schedule(id: string, channelId: string, title: string, body: string, at: Date): Promise<void> {
   if (at.getTime() <= Date.now()) return;
   await notifee.createTriggerNotification(
-    { id, title, body, android: { channelId, pressAction: { id: 'default' } } },
+    { id, title, body, android: { channelId, smallIcon: 'ic_notification', pressAction: { id: 'default' } } },
     { type: TriggerType.TIMESTAMP, timestamp: at.getTime(), alarmManager: true },
   );
 }
