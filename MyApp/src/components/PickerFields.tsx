@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
-import { colors, font, spacing, type as t } from '../theme';
+import { colors, font, radius, spacing, type as t } from '../theme';
 import { formatClock, formatFullDate, formatDateTime, fromDateKey, toDateKey } from '../utils/date';
 import { Chip } from './Controls';
 import { Icon, type IconName } from './Icon';
@@ -100,9 +100,14 @@ export function DateTimeField({ label, value, onChange }: { label?: string; valu
 }
 
 const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
-/** A time of day ("HH:MM:00") picked from hour/minute/AM-PM chips. */
+function parseTime(value: string | null): { hour12: number; minute: number; pm: boolean } {
+  const [h, m] = value ? value.split(':').map(Number) : [8, 0];
+  return { hour12: h % 12 === 0 ? 12 : h % 12, minute: m, pm: h >= 12 };
+}
+
+/** A time of day ("HH:MM:00") picked from hour, any minute, and AM/PM. */
 export function TimeField({
   label,
   value,
@@ -115,10 +120,19 @@ export function TimeField({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const initial = value ? value.split(':').map(Number) : [8, 0];
-  const [hour12, setHour12] = useState(initial[0] % 12 === 0 ? 12 : initial[0] % 12);
-  const [minute, setMinute] = useState(initial[1] - (initial[1] % 5));
-  const [pm, setPm] = useState(initial[0] >= 12);
+  const [hour12, setHour12] = useState(() => parseTime(value).hour12);
+  const [minute, setMinute] = useState(() => parseTime(value).minute);
+  const [pm, setPm] = useState(() => parseTime(value).pm);
+
+  // Start from the field's current value every time the picker opens (the
+  // value can change after mount, e.g. when an existing reminder loads).
+  const openPicker = () => {
+    const t = parseTime(value);
+    setHour12(t.hour12);
+    setMinute(t.minute);
+    setPm(t.pm);
+    setOpen(true);
+  };
 
   const commit = () => {
     const h24 = (hour12 % 12) + (pm ? 12 : 0);
@@ -133,31 +147,47 @@ export function TimeField({
         icon="clock"
         text={value ? formatClock(value) : null}
         placeholder={placeholder}
-        onPress={() => setOpen(true)}
+        onPress={openPicker}
         onClear={() => onChange(null)}
       />
       <Sheet visible={open} onClose={() => setOpen(false)} title="Pick a time">
-        <Text style={styles.preview}>
-          {hour12}:{String(minute).padStart(2, '0')}
-          <Text style={styles.previewMeridiem}> {pm ? 'PM' : 'AM'}</Text>
-        </Text>
-        <Text style={styles.label}>Hour</Text>
-        <View style={styles.grid}>
-          {HOURS.map(h => (
-            <Chip key={h} label={String(h)} selected={h === hour12} onPress={() => setHour12(h)} />
-          ))}
-        </View>
-        <Text style={styles.label}>Minute</Text>
-        <View style={styles.grid}>
-          {MINUTES.map(m => (
-            <Chip key={m} label={String(m).padStart(2, '0')} selected={m === minute} onPress={() => setMinute(m)} />
-          ))}
-        </View>
-        <View style={[styles.grid, styles.period]}>
-          <Chip label="AM" selected={!pm} onPress={() => setPm(false)} />
-          <Chip label="PM" selected={pm} onPress={() => setPm(true)} />
-        </View>
-        <Button label="Set time" onPress={commit} size="lg" style={styles.commit} />
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={styles.scroll}>
+          <Text style={styles.preview} accessibilityLiveRegion="polite">
+            {hour12}:{String(minute).padStart(2, '0')}
+            <Text style={styles.previewMeridiem}> {pm ? 'PM' : 'AM'}</Text>
+          </Text>
+          <View style={[styles.grid, styles.period]}>
+            <Chip label="AM" selected={!pm} onPress={() => setPm(false)} />
+            <Chip label="PM" selected={pm} onPress={() => setPm(true)} />
+          </View>
+          <Text style={styles.label}>Hour</Text>
+          <View style={styles.grid}>
+            {HOURS.map(h => (
+              <Chip key={h} label={String(h)} selected={h === hour12} onPress={() => setHour12(h)} />
+            ))}
+          </View>
+          <Text style={styles.label}>Minute</Text>
+          <View style={styles.minutes}>
+            {MINUTES.map(m => {
+              const selected = m === minute;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => setMinute(m)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${m} minutes`}
+                  style={({ pressed }) => [styles.minute, m % 5 === 0 && styles.minuteMajor, selected && styles.minuteOn, pressed && styles.minutePressed]}
+                >
+                  <Text style={[styles.minuteText, m % 5 === 0 && styles.minuteTextMajor, selected && styles.minuteTextOn]}>
+                    {String(m).padStart(2, '0')}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Button label="Set time" onPress={commit} size="lg" style={styles.commit} />
+        </ScrollView>
       </Sheet>
     </>
   );
@@ -204,6 +234,49 @@ const styles = StyleSheet.create({
   },
   period: {
     justifyContent: 'center',
+  },
+  scroll: {
+    flexGrow: 0,
+  },
+  minutes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: spacing.lg,
+  },
+  minute: {
+    width: '8.4%',
+    minWidth: 28,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: colors.glass,
+  },
+  minuteMajor: {
+    backgroundColor: colors.glassStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  minuteOn: {
+    backgroundColor: colors.primaryFill,
+    borderColor: colors.primaryFill,
+  },
+  minutePressed: {
+    opacity: 0.7,
+  },
+  minuteText: {
+    ...font.medium,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  minuteTextMajor: {
+    ...font.bold,
+    color: colors.text,
+  },
+  minuteTextOn: {
+    ...font.bold,
+    color: colors.onPrimary,
   },
   commit: {
     marginTop: spacing.sm,

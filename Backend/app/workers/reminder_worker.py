@@ -64,6 +64,12 @@ def start_reminder_worker() -> None:
     global _scheduler
     if _scheduler is not None:
         return
+    if not is_configured():
+        logger.warning(
+            "MSG91 WhatsApp is not configured: set MSG91_AUTH_KEY, MSG91_WHATSAPP_INTEGRATED_NUMBER, "
+            "MSG91_WHATSAPP_TEMPLATE_NAME and MSG91_WHATSAPP_NAMESPACE in Backend/.env. "
+            "Reminders will not be sent on WhatsApp until then."
+        )
     _scheduler = BackgroundScheduler(timezone="UTC")
     _scheduler.add_job(_poll_due_reminders, "interval", seconds=REMINDER_POLL_SECONDS, id="reminder_whatsapp_poll")
     _scheduler.add_job(

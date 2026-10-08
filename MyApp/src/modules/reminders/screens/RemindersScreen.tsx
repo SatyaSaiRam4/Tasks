@@ -335,7 +335,7 @@ function ReminderRow({
               {late ? <Tag label="Overdue" color={colors.danger} /> : null}
               {r.priority === 'HIGH' ? <Tag label="Priority" color={colors.streak} /> : null}
               {category ? <Tag label={category} color={categoryColor(category)} dot /> : null}
-              {r.whatsapp_number ? <Tag label="WhatsApp" color={colors.success} icon /> : null}
+              {r.whatsapp_number ? <Tag label={WHATSAPP_LABEL[r.whatsapp_status]} color={r.whatsapp_status === 'FAILED' ? colors.danger : colors.success} icon /> : null}
             </View>
           ) : null}
         </View>
@@ -345,6 +345,13 @@ function ReminderRow({
     </View>
   );
 }
+
+const WHATSAPP_LABEL: Record<Reminder['whatsapp_status'], string> = {
+  PENDING: 'WhatsApp scheduled',
+  SENT: 'WhatsApp sent',
+  FAILED: 'WhatsApp failed',
+  NOT_REQUESTED: 'WhatsApp',
+};
 
 function Tag({ label, color, dot, icon }: { label: string; color: string; dot?: boolean; icon?: boolean }) {
   return (
@@ -507,7 +514,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
-    maxWidth: 160,
+    maxWidth: 180,
   },
   tagDot: {
     width: 5,
