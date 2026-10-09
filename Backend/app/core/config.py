@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 # override=True ensures .env values take precedence over existing system
 # env vars (e.g. the system-defined USER variable on Linux)
-load_dotenv()
+load_dotenv(override=True)
 
 
 # ---------------------------------------------------------------------------

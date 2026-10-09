@@ -28,26 +28,26 @@
         opacity: 1;
         transform: scale(1) translateY(0);
       }
-      model-viewer.float {
-        animation: float 4.5s ease-in-out infinite;
-      }
-      @keyframes float {
-        0%,
-        100% {
-          translate: 0 0;
-        }
-        50% {
-          translate: 0 -8px;
-        }
+      #puppet {
+        width: 100%;
+        height: 100%;
+        transform-origin: 50% 92%;
+        will-change: transform;
       }
     </style>
   </head>
   <body>
     <!--
       Satya. The model file is MyApp/assets/models/model.glb; replace it with
-      any GLB (ideally rigged, with an "Idle" animation) and rebuild the app.
-      Embedded animations play automatically, preferring one named "idle".
+      any GLB and rebuild the app. Embedded animations play automatically,
+      preferring one named "idle".
+
+      The current model is a glove puppet with no skeleton, so Satya is
+      animated as a whole puppet here: an idle sway and breath, plus gestures
+      the app triggers with window.satya.play(name): talk, wave, hop, nod,
+      spin, lookLeft, lookRight, cheer.
     -->
+    <div id="puppet">
     <model-viewer
       id="mv"
       alt="Satya, your guide"
@@ -64,8 +64,10 @@
       shadow-softness="1"
       environment-image="neutral"
       camera-orbit="0deg 78deg 105%"
+      interpolation-decay="20"
       field-of-view="28deg"
     ></model-viewer>
+    </div>
     <script src="model-viewer-umd.min.js"></script>
     <script>
       (function () {
@@ -91,10 +93,90 @@
         }
 
         mv.style.transitionDuration = reduced ? '0ms' : longIntro ? '1100ms' : '450ms';
-        if (!reduced) {
-          mv.setAttribute('auto-rotate', '');
-          mv.setAttribute('auto-rotate-delay', '0');
-          mv.setAttribute('rotation-per-second', '10deg');
+        var puppet = document.getElementById('puppet');
+
+        // ---- Puppet motion ----------------------------------------------------
+        var DURATION = { talk: 1800, wave: 1400, hop: 900, nod: 1000, spin: 1400, lookLeft: 1300, lookRight: 1300, cheer: 1700 };
+        var gesture = null;
+        var started = 0;
+        var queue = [];
+
+        function bump(p) {
+          return Math.sin(Math.PI * Math.min(1, Math.max(0, p)));
+        }
+        function ease(p) {
+          return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        }
+
+        function play(name) {
+          if (reduced || !DURATION[name]) return;
+          if (gesture) {
+            queue.push(name);
+            return;
+          }
+          gesture = name;
+          started = performance.now();
+        }
+        window.satya = {
+          play: play,
+          // Replace whatever is playing, e.g. when a new tour step starts.
+          now: function (name) {
+            queue = [];
+            gesture = null;
+            play(name);
+          },
+        };
+
+        function frame(now) {
+          var t = now / 1000;
+          // Idle: a slow look around, breathing and a soft bob.
+          var yaw = 14 * Math.sin(t * 0.55);
+          var pitch = 0;
+          var roll = 3 * Math.sin(t * 0.9);
+          var y = 1.5 * Math.sin(t * 1.8);
+          var sx = 1;
+          var sy = 1 + 0.015 * Math.sin(t * 1.8);
+
+          if (gesture) {
+            var p = (now - started) / DURATION[gesture];
+            if (p >= 1) {
+              gesture = null;
+              if (queue.length) play(queue.shift());
+            } else if (gesture === 'talk') {
+              var beat = Math.abs(Math.sin(p * Math.PI * 9));
+              y -= 3 * beat;
+              sy += 0.05 * beat;
+              sx -= 0.02 * beat;
+              roll += 4 * Math.sin(p * Math.PI * 4);
+            } else if (gesture === 'wave') {
+              roll += 18 * Math.sin(p * Math.PI * 6) * (1 - p);
+              yaw += 10 * bump(p);
+            } else if (gesture === 'hop' || gesture === 'cheer') {
+              var hp = gesture === 'cheer' ? Math.min(1, p * 1.6) : p;
+              var air = hp > 0.15 && hp < 0.85 ? bump((hp - 0.15) / 0.7) : 0;
+              var land = hp <= 0.15 ? bump(hp / 0.15) : hp >= 0.85 ? bump((hp - 0.85) / 0.15) : 0;
+              y -= 22 * air;
+              sy += 0.1 * air - 0.12 * land;
+              sx += 0.08 * land - 0.04 * air;
+              if (gesture === 'cheer') yaw += 360 * ease(p);
+            } else if (gesture === 'nod') {
+              pitch += 14 * Math.sin(p * Math.PI * 4) * (1 - p);
+            } else if (gesture === 'spin') {
+              yaw += 360 * ease(p);
+              y -= 6 * bump(p);
+            } else if (gesture === 'lookLeft' || gesture === 'lookRight') {
+              yaw += (gesture === 'lookLeft' ? -42 : 42) * bump(p);
+              roll += (gesture === 'lookLeft' ? -6 : 6) * bump(p);
+            }
+          }
+
+          // Turning moves the camera around Satya's middle (the model's own
+          // origin is off-center, so rotating the model would swing it
+          // sideways); the side-to-side tilt is a plain 2D rotation.
+          mv.cameraOrbit = (-yaw).toFixed(2) + 'deg ' + (78 - pitch).toFixed(2) + 'deg 105%';
+          puppet.style.transform =
+            'translateY(' + y.toFixed(2) + '%) rotate(' + roll.toFixed(2) + 'deg) scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')';
+          requestAnimationFrame(frame);
         }
 
         mv.addEventListener('load', function () {
@@ -108,8 +190,11 @@
           }
           requestAnimationFrame(function () {
             mv.classList.add('ready');
-            if (!reduced) mv.classList.add('float');
           });
+          if (!reduced) {
+            requestAnimationFrame(frame);
+            play(params.get('gesture') || (longIntro ? 'wave' : 'nod'));
+          }
           post('loaded');
         });
         mv.addEventListener('error', function () {

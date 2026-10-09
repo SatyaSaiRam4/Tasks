@@ -3,10 +3,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../../components/Screen';
-import { LargeTitle } from '../../../components/ScreenHeader';
+import { TopBar } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
 import { Button } from '../../../components/Button';
-import { Fab, SectionHeader } from '../../../components/Controls';
+import { Fab } from '../../../components/Controls';
 import { ProgressRing } from '../../../components/Progress';
 import { ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
 import { getErrorMessage } from '../../../utils/apiError';
@@ -18,15 +18,13 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const SECTIONS: { title: string; match: (tr: Track) => boolean }[] = [
-  { title: 'Active plans', match: tr => tr.status === 'ACTIVE' },
-  { title: 'Starting soon', match: tr => tr.status === 'UPCOMING' },
-  { title: 'Finished', match: tr => tr.status === 'ENDED' || tr.status === 'ARCHIVED' },
-];
+/** Active plans first, then upcoming, then finished. */
+const ORDER: Record<Track['status'], number> = { ACTIVE: 0, UPCOMING: 1, ENDED: 2, ARCHIVED: 3 };
 
 /**
- * The Plans tab: today's progress across every plan, then the plans grouped
- * as active, starting soon and finished. New users see how plans work first.
+ * The Plans tab: today's progress across every plan, then one list of plans
+ * (each card says if it is running, starting soon or finished). New users
+ * see how plans work first.
  */
 export function RoutinesScreen() {
   const navigation = useNavigation<Nav>();
@@ -34,7 +32,7 @@ export function RoutinesScreen() {
   const newPlan = () => navigation.navigate('TrackEditor');
   const { columns, wideWidth } = useLayout();
   const cell = columns > 1 ? { width: (wideWidth - (columns - 1) * spacing.lg) / columns } : null;
-  const plans = tracks.data ?? [];
+  const plans = [...(tracks.data ?? [])].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
 
   return (
     <Screen
@@ -43,7 +41,7 @@ export function RoutinesScreen() {
       refreshing={tracks.isFetching}
       footer={plans.length ? <Fab accessibilityLabel="New plan" onPress={newPlan} /> : null}
     >
-      <LargeTitle title="Plans" subtitle="Your goals, and the small tasks you do for them each day." />
+      <TopBar />
       {tracks.isLoading ? (
         <SkeletonList count={3} height={96} />
       ) : tracks.isError ? (
@@ -58,22 +56,13 @@ export function RoutinesScreen() {
           <FadeIn>
             <TodaySummary plans={plans} />
           </FadeIn>
-          {SECTIONS.map(section => {
-            const list = plans.filter(section.match);
-            if (!list.length) return null;
-            return (
-              <View key={section.title}>
-                <SectionHeader title={`${section.title} · ${list.length}`} style={styles.section} />
-                <View style={columns > 1 ? styles.grid : null}>
-                  {list.map((track, i) => (
-                    <FadeIn key={track.id} index={i + 1} style={cell}>
-                      <CategoryCard track={track} onPress={() => navigation.navigate('TrackDetail', { trackId: track.id })} />
-                    </FadeIn>
-                  ))}
-                </View>
-              </View>
-            );
-          })}
+          <View style={[styles.list, columns > 1 && styles.grid]}>
+            {plans.map((track, i) => (
+              <FadeIn key={track.id} index={i + 1} style={cell}>
+                <CategoryCard track={track} onPress={() => navigation.navigate('TrackDetail', { trackId: track.id })} />
+              </FadeIn>
+            ))}
+          </View>
         </>
       )}
     </Screen>
@@ -116,9 +105,8 @@ const styles = StyleSheet.create({
   start: {
     marginTop: spacing.xl,
   },
-  section: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
+  list: {
+    marginTop: spacing.lg,
   },
   grid: {
     flexDirection: 'row',

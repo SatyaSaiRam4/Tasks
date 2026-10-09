@@ -12,6 +12,9 @@ const LOAD_TIMEOUT_MS = 8000;
 
 type Phase = 'loading' | 'ready' | 'fallback';
 
+/** Whole-puppet moves Satya can make (see assets/web/satya/index.html). */
+export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft' | 'lookRight' | 'cheer';
+
 /**
  * Satya, rendered from the bundled GLB through <model-viewer> in a WebView.
  * Never blocks the screen: a shimmering figure shows while it loads, and an
@@ -19,11 +22,28 @@ type Phase = 'loading' | 'ready' | 'fallback';
  * loading takes too long.
  *
  * `intro="long"` plays the fuller entrance (first visit); "short" otherwise.
+ * `gesture` makes Satya move; change `gestureKey` to replay the same move.
  */
-export function SatyaModel({ size = 220, intro = 'short' }: { size?: number; intro?: 'long' | 'short' }) {
+export function SatyaModel({
+  size = 220,
+  intro = 'short',
+  gesture,
+  gestureKey = 0,
+}: {
+  size?: number;
+  intro?: 'long' | 'short';
+  gesture?: SatyaGesture;
+  gestureKey?: number;
+}) {
   const { reduced } = useMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const web = useRef<React.ComponentRef<typeof WebView>>(null);
+
+  useEffect(() => {
+    if (phase !== 'ready' || !gesture) return;
+    web.current?.injectJavaScript(`window.satya && window.satya.now(${JSON.stringify(gesture)}); true;`);
+  }, [phase, gesture, gestureKey]);
 
   useEffect(() => {
     timer.current = setTimeout(() => setPhase(p => (p === 'loading' ? 'fallback' : p)), LOAD_TIMEOUT_MS);
@@ -41,6 +61,7 @@ export function SatyaModel({ size = 220, intro = 'short' }: { size?: number; int
       {phase === 'loading' ? <SatyaSkeleton size={size} /> : phase === 'fallback' ? <SatyaOrb size={size * 0.62} /> : null}
       {canRender3D && phase !== 'fallback' ? (
         <WebView
+          ref={web}
           source={{ uri }}
           style={[StyleSheet.absoluteFill, styles.web, phase !== 'ready' && styles.hidden]}
           containerStyle={styles.web}

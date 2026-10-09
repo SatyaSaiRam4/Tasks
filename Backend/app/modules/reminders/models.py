@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -46,6 +46,8 @@ class Reminder(Base):
         default=WhatsAppStatus.NOT_REQUESTED,
         nullable=False,
     )
+    # Ring like an alarm on the device (looping sound, full screen) instead of a plain notification.
+    alarm_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     # LOW / NORMAL / HIGH
     priority: Mapped[str] = mapped_column(String(8), default="NORMAL", server_default="NORMAL", nullable=False)
     track_id: Mapped[uuid.UUID | None] = mapped_column(

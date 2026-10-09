@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAppSelector } from '../../../app/hooks';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { alarmChanged, storyOpened } from '../../../app/preferencesSlice';
 import {
   ACCENTS,
   colors,
@@ -21,7 +22,7 @@ import {
 import { Screen } from '../../../components/Screen';
 import { Wordmark } from '../../../components/Brand';
 import { ScreenHeader } from '../../../components/ScreenHeader';
-import { Avatar, Segmented, SectionHeader, Toggle } from '../../../components/Controls';
+import { Avatar, Chip, ChipRow, Segmented, SectionHeader, Toggle } from '../../../components/Controls';
 import { Card } from '../../../components/Card';
 import { Gradient } from '../../../components/Gradient';
 import { ListGroup, ListRow } from '../../../components/ListRow';
@@ -32,7 +33,15 @@ import { ErrorState, SkeletonList } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
 import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from '../../../utils/storage';
-import { openExactAlarmSettings } from '../../../notifications';
+import {
+  ALARM_LENGTHS,
+  ALARM_SOUNDS,
+  loadAlarmPreferences,
+  openExactAlarmSettings,
+  saveAlarmPreferences,
+  testAlarm,
+  type AlarmPreferences,
+} from '../../../notifications';
 import { useLogoutAllMutation, useLogoutMutation } from '../../auth/authApi';
 import { selectRefreshToken } from '../../auth/authSlice';
 import { useChangeVaultPinMutation, useGetVaultStatusQuery } from '../../vault/vaultApi';
@@ -74,6 +83,19 @@ export function SettingsScreen() {
   const [pinError, setPinError] = useState<string | null>(null);
   const [accent, setAccent] = useState<AccentName>(DEFAULT_ACCENT);
   const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME);
+  const dispatch = useAppDispatch();
+  const [alarm, setAlarm] = useState<AlarmPreferences | null>(null);
+
+  useEffect(() => {
+    loadAlarmPreferences().then(setAlarm);
+  }, []);
+
+  const pickAlarm = (next: AlarmPreferences) => {
+    setAlarm(next);
+    saveAlarmPreferences(next)
+      .then(() => dispatch(alarmChanged()))
+      .catch(() => undefined);
+  };
 
   useEffect(() => {
     AsyncStorage.getMany([ACCENT_STORAGE_KEY, THEME_STORAGE_KEY])
@@ -211,6 +233,38 @@ export function SettingsScreen() {
         <ListRow icon="clock" title="Exact alarms" subtitle="Allow on-time delivery on Android 12+" onPress={() => openExactAlarmSettings().catch(() => undefined)} last />
       </ListGroup>
 
+      <SectionHeader title="Alarm" />
+      <ListGroup>
+        <View style={styles.modeBlock}>
+          <Text style={t.bodyStrong}>Alarm sound</Text>
+          <Text style={[t.caption, styles.mtXs]}>For reminders set to “Ring like an alarm”.</Text>
+          <ChipRow style={styles.alarmChips}>
+            {ALARM_SOUNDS.map(sound => (
+              <Chip
+                key={sound.id}
+                label={sound.label}
+                icon="bell"
+                selected={alarm?.sound === sound.id}
+                onPress={() => alarm && pickAlarm({ ...alarm, sound: sound.id })}
+              />
+            ))}
+          </ChipRow>
+          <Text style={[t.bodyStrong, styles.mtMd]}>Rings for</Text>
+          <ChipRow style={styles.alarmChips}>
+            {ALARM_LENGTHS.map(seconds => (
+              <Chip key={seconds} label={`${seconds} seconds`} selected={alarm?.seconds === seconds} onPress={() => alarm && pickAlarm({ ...alarm, seconds })} />
+            ))}
+          </ChipRow>
+        </View>
+        <ListRow
+          icon="play"
+          title="Test alarm"
+          subtitle="Hear it now. Press Stop to end it."
+          onPress={() => alarm && testAlarm(alarm).catch(() => Toast.fail('Allow notifications to hear the alarm.', 2))}
+          last
+        />
+      </ListGroup>
+
       <SectionHeader title="Streak" />
       <ListGroup>
         <View style={styles.modeBlock}>
@@ -274,8 +328,8 @@ export function SettingsScreen() {
           onPress={async () => {
             await resetOnboarding().unwrap().catch(() => undefined);
           }}
-          last
         />
+        <ListRow icon="sparkles" title="Watch the story" subtitle="What Memo does, in one short story" onPress={() => dispatch(storyOpened())} last />
       </ListGroup>
 
       <View style={styles.version}>
@@ -379,6 +433,12 @@ const styles = StyleSheet.create({
   },
   mtXs: {
     marginTop: 4,
+  },
+  mtMd: {
+    marginTop: spacing.md,
+  },
+  alarmChips: {
+    paddingTop: spacing.sm,
   },
   accentRow: {
     paddingVertical: spacing.lg,

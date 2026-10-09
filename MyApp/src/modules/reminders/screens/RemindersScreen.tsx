@@ -84,7 +84,7 @@ export function RemindersScreen() {
       const updated = await setCompleted({ id: r.id, completed: !r.completed_at }).unwrap();
       if (updated.completed_at) cancelReminderNotification(r.id).catch(() => undefined);
       else if (new Date(updated.remind_at).getTime() > Date.now()) {
-        scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at)).catch(() => undefined);
+        scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at), r.alarm_enabled).catch(() => undefined);
       }
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
@@ -95,7 +95,7 @@ export function RemindersScreen() {
     setMenuFor(null);
     try {
       const updated = await snooze({ id: r.id, minutes }).unwrap();
-      await scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at));
+      await scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at), r.alarm_enabled);
       Toast.success(`Moved to ${formatClock(updated.remind_at)}.`, 1.4);
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);

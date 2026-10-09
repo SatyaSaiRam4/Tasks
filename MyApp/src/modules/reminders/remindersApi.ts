@@ -13,6 +13,7 @@ export interface Reminder {
   status: ReminderStatus;
   whatsapp_number: string | null;
   whatsapp_status: WhatsAppStatus;
+  alarm_enabled: boolean;
   priority: ReminderPriority;
   track_id: string | null;
   completed_at: string | null;
@@ -27,6 +28,7 @@ export interface ReminderInput {
   note?: string | null;
   remind_at: string;
   whatsapp_number?: string | null;
+  alarm_enabled?: boolean;
   priority?: ReminderPriority;
   track_id?: string | null;
 }

@@ -17,7 +17,7 @@ import { store } from './src/app/store';
 import { useAppDispatch, useAppSelector } from './src/app/hooks';
 import { restoreSession, selectIsAuthenticated, selectIsBootstrapped } from './src/modules/auth/authSlice';
 import { RootNavigator } from './src/navigation/RootNavigator';
-import { initNotifications } from './src/notifications';
+import { initNotifications, loadAlarmPreferences, subscribeToNotificationEvents } from './src/notifications';
 import { colors, radius } from './src/theme';
 import { CelebrationProvider } from './src/components/Celebration';
 import { CompletionProvider } from './src/modules/routines/CompletionProvider';
@@ -67,6 +67,9 @@ function AppContent() {
     initNotifications().catch(() => {
       // Permission denied: everything still saves, notifications just won't show.
     });
+    loadAlarmPreferences();
+    // Stops a ringing alarm when its Stop button is pressed with the app open.
+    return subscribeToNotificationEvents();
   }, [dispatch]);
 
   if (!isBootstrapped) {

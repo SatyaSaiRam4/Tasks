@@ -48,6 +48,7 @@ def create_reminder(db: Session, user_id: UUID, data: dict) -> Reminder:
         remind_at=data["remind_at"],
         whatsapp_number=data.get("whatsapp_number"),
         whatsapp_status=_whatsapp_status_for(data.get("whatsapp_number")),
+        alarm_enabled=bool(data.get("alarm_enabled")),
         priority=data.get("priority") or "NORMAL",
         track_id=data.get("track_id"),
     )
@@ -67,6 +68,8 @@ def update_reminder(db: Session, user_id: UUID, reminder_id: UUID, fields: dict)
     clear_whatsapp = fields.pop("clear_whatsapp_number", False)
     clear_track = fields.pop("clear_track", False)
     whatsapp_touched = clear_whatsapp or "whatsapp_number" in fields or "remind_at" in fields
+    if fields.get("alarm_enabled") is None:
+        fields.pop("alarm_enabled", None)
     if fields.get("track_id") is not None:
         _validate_track(db, user_id, fields["track_id"])
 
