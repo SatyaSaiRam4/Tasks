@@ -1,36 +1,82 @@
 import React, { useId } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Mask, Path, Rect, Stop } from 'react-native-svg';
-import { colors, font } from '../theme';
+import { Image, Platform, StyleSheet, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
+import { brand, colors, shadow } from '../theme';
 
-/** Memo's mark: a champagne crescent moon with a small four-point star. */
-export function MoonMark({ size = 32 }: { size?: number }) {
+// Transparent PNGs cut from the Memo logo.
+const LOGO = require('../../assets/images/memo-logo.png');
+const MARK = require('../../assets/images/memo-mark.png');
+const LOGO_RATIO = 439 / 352;
+const MARK_RATIO = 439 / 276;
+
+/**
+ * The neon logo is made for a dark ground. In the light theme (or when
+ * `tile` is set) it sits on a small midnight tile, like an app icon, so it
+ * keeps its glow instead of washing out on cream.
+ */
+function onTile(tile?: boolean) {
+  return tile ?? !colors.isDark;
+}
+
+/** Memo's "M" mark (without the word), `size` tall. */
+export function BrandMark({ size = 32, tile }: { size?: number; tile?: boolean }) {
+  const image = <Image source={MARK} style={{ height: size, width: size * MARK_RATIO }} resizeMode="contain" accessibilityIgnoresInvertColors />;
+  if (!onTile(tile)) return image;
+  const pad = Math.round(size * 0.18);
+  return <View style={[styles.tile, shadow.card, { padding: pad, borderRadius: size * 0.34 }]}>{image}</View>;
+}
+
+/**
+ * "Memo" in the brand's own lettering: a serif italic filled with the logo's
+ * gold-to-ember gradient (deeper in the light theme, for contrast). Drawn as
+ * SVG so the gradient sits in the letters themselves.
+ */
+export function BrandName({ size = 24, light = false }: { size?: number; light?: boolean }) {
   const id = useId().replace(/:/g, '');
+  const bright = light || colors.isDark;
+  const from = bright ? '#FFE27A' : '#C27A0E';
+  const to = bright ? '#FF8A2A' : '#9A3D0A';
+  const width = Math.round(size * 2.55);
+  const height = Math.round(size * 1.3);
   return (
-    <Svg width={size} height={size} viewBox="0 0 32 32">
+    <Svg width={width} height={height} accessibilityLabel="Memo">
       <Defs>
-        <LinearGradient id={`mg${id}`} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={colors.goldBright} />
-          <Stop offset="1" stopColor={colors.goldDeep} />
+        <LinearGradient id={`bn${id}`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={from} />
+          <Stop offset="1" stopColor={to} />
         </LinearGradient>
-        <Mask id={`mm${id}`}>
-          <Rect width="32" height="32" fill="#fff" />
-          <Circle cx="19.5" cy="12" r="10" fill="#000" />
-        </Mask>
       </Defs>
-      <Circle cx="14" cy="17" r="12" fill={`url(#mg${id})`} mask={`url(#mm${id})`} />
-      <Path d="M25 3.5 L26 6.5 L29 7.5 L26 8.5 L25 11.5 L24 8.5 L21 7.5 L24 6.5 Z" fill={colors.goldBright} />
+      <SvgText
+        x={2}
+        y={size * 1.02}
+        fontSize={size * 1.12}
+        fontFamily={Platform.OS === 'ios' ? 'Georgia' : 'CormorantGaramond-SemiBoldItalic'}
+        fontStyle="italic"
+        fontWeight={Platform.OS === 'ios' ? '700' : 'normal'}
+        letterSpacing={0.6}
+        fill={`url(#bn${id})`}
+      >
+        Memo
+      </SvgText>
     </Svg>
   );
 }
 
-/** Mark + "Memo" wordmark, used in the top bar and on the signed-out screens. */
-export function Wordmark({ size = 'md' }: { size?: 'md' | 'lg' }) {
-  const lg = size === 'lg';
+/**
+ * The Memo logo. Large: the full logo (mark and word), for the splash and
+ * signed-out screens. Small and medium: the mark beside the name, for headers.
+ */
+export function Wordmark({ size = 'md', light = false }: { size?: 'sm' | 'md' | 'lg'; light?: boolean }) {
+  if (size === 'lg') {
+    const image = (
+      <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityRole="header" accessibilityLabel="Memo" accessibilityIgnoresInvertColors />
+    );
+    return onTile(light ? false : undefined) ? <View style={[styles.tile, styles.logoTile, shadow.float]}>{image}</View> : image;
+  }
   return (
     <View style={styles.row} accessibilityRole="header" accessibilityLabel="Memo">
-      <MoonMark size={lg ? 40 : 28} />
-      <Text style={[styles.word, lg && styles.wordLg]}>Memo</Text>
+      <BrandMark size={size === 'sm' ? 26 : 32} tile={light ? false : undefined} />
+      <BrandName size={size === 'sm' ? 25 : 28} light={light} />
     </View>
   );
 }
@@ -41,13 +87,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  word: {
-    ...font.serif,
-    fontSize: 21,
-    letterSpacing: 0.6,
-    color: colors.text,
+  tile: {
+    backgroundColor: brand.midnight,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(212, 175, 106, 0.35)',
   },
-  wordLg: {
-    fontSize: 30,
+  logoTile: {
+    padding: 18,
+    borderRadius: 32,
+  },
+  logo: {
+    height: 120,
+    width: 120 * LOGO_RATIO,
   },
 });

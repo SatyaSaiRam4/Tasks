@@ -4,10 +4,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { colors, font, radius, spacing, type as t } from '../../../theme';
+import { colors, font, radius, spacing, type as t, withAlpha } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
+import { RealIcon } from '../../../components/RealIcon';
 import { Fab, IconButton } from '../../../components/Controls';
 import { EmptyState, ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
 import { ConfirmSheet } from '../../../components/Sheet';
@@ -31,7 +32,7 @@ export function VaultScreen() {
 
   if (!unlocked) {
     return (
-      <Screen glowColor={colors.primary}>
+      <Screen glowColor={colors.violet}>
         <LargeTitle title="Vault" />
         {status.isLoading ? (
           <SkeletonList count={1} height={300} />
@@ -63,13 +64,12 @@ function UnlockedVault() {
   return (
     <View style={styles.flex} onTouchStart={touchVault}>
       <Screen
-        glowColor={colors.primary}
+        glowColor={colors.violet}
         onRefresh={entries.refetch}
         refreshing={entries.isFetching && !entries.isLoading}
         footer={showDeleted ? null : <Fab accessibilityLabel="New note" onPress={() => navigation.navigate('VaultEntry')} />}
       >
         <LargeTitle
-          eyebrow="Private"
           title={showDeleted ? 'Deleted notes' : 'Vault'}
           right={<IconButton icon="lock" accessibilityLabel="Lock Vault" onPress={lock} />}
         />
@@ -78,16 +78,11 @@ function UnlockedVault() {
             <Icon name="chevron-left" size={16} color={colors.primary} />
             <Text style={styles.link}>Back to notes</Text>
           </Pressable>
-        ) : (
-          <View style={styles.note}>
-            <Icon name="lock" size={14} color={colors.textTertiary} />
-            <Text style={t.caption}>Private notes are encrypted. Search, edit, or delete them here; the Vault locks when you leave Memo.</Text>
-          </View>
-        )}
+        ) : null}
 
         {!showDeleted ? (
           <View style={styles.search}>
-            <Icon name="search" size={18} color={colors.gold} strokeWidth={1.7} />
+            <Icon name="search" size={18} color={colors.violet} strokeWidth={1.7} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -108,7 +103,7 @@ function UnlockedVault() {
           <EmptyState
             icon={showDeleted ? 'trash' : 'lock'}
             title={showDeleted ? 'Nothing deleted' : query ? 'No notes found' : 'No notes yet'}
-            message={showDeleted || query ? undefined : 'Save passwords, recovery codes, or personal notes. Only you can open them with your Vault PIN.'}
+            message={showDeleted || query ? undefined : 'Only you can open them, with your PIN.'}
             actionLabel={showDeleted || query ? undefined : 'New note'}
             onAction={() => navigation.navigate('VaultEntry')}
           />
@@ -117,9 +112,7 @@ function UnlockedVault() {
             <FadeIn key={e.id} index={i}>
               <Card onPress={() => navigation.navigate('VaultEntry', { entryId: e.id })} style={styles.entry} accessibilityLabel={e.title ?? 'Untitled note'}>
                 <View style={styles.entryRow}>
-                  <View style={styles.entryIcon}>
-                    <Icon name="key" size={16} color={colors.gold} strokeWidth={1.7} />
-                  </View>
+                  <RealIcon name="lock" size={30} />
                   <View style={styles.flex}>
                     <Text style={styles.entryTitle} numberOfLines={1}>
                       {e.title || 'Untitled'}
@@ -130,6 +123,7 @@ function UnlockedVault() {
                       </Text>
                     ) : null}
                   </View>
+                  <Icon name="chevron-right" size={17} color={colors.textTertiary} />
                 </View>
               </Card>
             </FadeIn>
@@ -176,12 +170,6 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
   back: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -196,13 +184,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    height: 52,
+    height: 54,
     paddingHorizontal: spacing.lg + 2,
     marginBottom: spacing.xl,
     borderRadius: radius.pill,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: withAlpha(colors.violet, 0.35),
   },
   searchInput: {
     ...font.medium,
@@ -216,23 +204,12 @@ const styles = StyleSheet.create({
   entryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  entryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(156,139,218,0.12)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(156,139,218,0.35)',
+    gap: spacing.md + 2,
   },
   entryTitle: {
-    ...font.serif,
-    fontSize: 18,
-    lineHeight: 21,
-    color: colors.text,
+    ...t.heading,
+    fontSize: 20,
+    lineHeight: 24,
   },
   preview: {
     marginTop: 2,

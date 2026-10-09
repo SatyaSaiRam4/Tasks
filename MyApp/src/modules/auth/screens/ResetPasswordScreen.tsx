@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Toast from '@ant-design/react-native/lib/toast';
+import { spacing } from '../../../theme';
 import { TextField } from '../../../components/TextField';
 import { Button } from '../../../components/Button';
 import { getErrorMessage } from '../../../utils/apiError';
-import { useResetPasswordMutation } from '../authApi';
+import { useForgotPasswordMutation, useResetPasswordMutation } from '../authApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { AuthLayout } from './AuthLayout';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+/** Seconds before another code can be requested. */
+const RESEND_WAIT = 60;
 
 export function ResetPasswordScreen() {
   const navigation = useNavigation<Nav>();
@@ -19,6 +24,28 @@ export function ResetPasswordScreen() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [resend, { isLoading: resending }] = useForgotPasswordMutation();
+  // Starts counting down at once: a code was just sent from the previous screen.
+  const [wait, setWait] = useState(route.params?.email ? RESEND_WAIT : 0);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setWait(w => w - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  const sendAgain = async () => {
+    if (!email.includes('@') || wait > 0) return;
+    setError(null);
+    try {
+      await resend({ email: email.trim().toLowerCase() }).unwrap();
+      setCode('');
+      setWait(RESEND_WAIT);
+      Toast.success('A new code is on its way.', 1.6);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not send a new code.'));
+    }
+  };
 
   const canSubmit = email.includes('@') && /^\d{6}$/.test(code) && password.length >= 8 && !isLoading;
 
@@ -61,6 +88,20 @@ export function ResetPasswordScreen() {
         error={error}
       />
       <Button label="Update password" onPress={submit} disabled={!canSubmit} loading={isLoading} size="lg" />
+      <Button
+        label={wait > 0 ? `Resend code in ${wait}s` : 'Resend code'}
+        variant="ghost"
+        onPress={sendAgain}
+        disabled={wait > 0 || !email.includes('@')}
+        loading={resending}
+        style={styles.resend}
+      />
     </AuthLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  resend: {
+    marginTop: spacing.sm,
+  },
+});

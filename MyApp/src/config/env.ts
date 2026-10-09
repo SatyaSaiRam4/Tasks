@@ -10,7 +10,7 @@
  *    e.g. "http://192.168.1.23:8000/api/v1" — the device and machine must be
  *    on the same network, and the backend must be started with --host 0.0.0.0.
  */
-export const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+export const API_BASE_URL = 'http://127.0.0.1:8003/api/v1';
 
 /** Network request timeout, in milliseconds. */
 export const API_TIMEOUT_MS = 15000;

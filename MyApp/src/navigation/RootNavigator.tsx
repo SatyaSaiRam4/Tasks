@@ -7,31 +7,35 @@
  *
  *   Signed out → Login / Register / ForgotPassword / ResetPassword
  *   Signed in → Main tabs (Home · Categories · Reminders · Vault · Profile)
- *               + stack screens pushed on top of the tabs.
+ *               + stack screens pushed on top of the tabs. The tab bar (or
+ *               the desktop rail) is drawn over every signed-in screen, so
+ *               the five destinations are always one tap away.
  *   First time (or "Replay tour") → Satya's tour, drawn over the real app.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
   NavigationContainer,
+  StackActions,
   type NavigatorScreenParams,
   type Theme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, font, radius, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
-import { Icon, type IconName } from '../components/Icon';
-import { Gradient } from '../components/Gradient';
+import { brand, colors, font, gradients, radius, RAIL_WIDTH, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
+import { RealIcon, type RealIconName } from '../components/RealIcon';
+import { Glow, Gradient, Sheen } from '../components/Gradient';
+import { Wordmark } from '../components/Brand';
+import { Avatar } from '../components/Controls';
 import { useMotion } from '../hooks/useMotion';
-import { useLayout } from '../hooks/useLayout';
-import { easeOut } from '../animations';
+import { RailContext, useLayout } from '../hooks/useLayout';
 
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
@@ -54,6 +58,7 @@ import { SettingsScreen } from '../modules/settings/screens/SettingsScreen';
 import { ChangePasswordScreen } from '../modules/settings/screens/ChangePasswordScreen';
 import { AdminDashboardScreen } from '../modules/admin/screens/AdminDashboardScreen';
 import { AdminUsersScreen } from '../modules/admin/screens/AdminUsersScreen';
+import { WalletScreen } from '../modules/wallet/screens/WalletScreen';
 
 // --- Param lists ----------------------------------------------------------------
 
@@ -82,11 +87,12 @@ export type RootStackParamList = {
   ChangePassword: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
+  Wallet: undefined;
 };
 
 // --- Tab bar ----------------------------------------------------------------------
 
-const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = {
+const TABS: Record<keyof MainTabParamList, { label: string; icon: RealIconName }> = {
   HomeTab: { label: 'Home', icon: 'home' },
   RoutinesTab: { label: 'Categories', icon: 'target' },
   RemindersTab: { label: 'Reminders', icon: 'bell' },
@@ -94,20 +100,30 @@ const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = 
   ProfileTab: { label: 'Profile', icon: 'user' },
 };
 
+type TabKey = keyof MainTabParamList;
+const TAB_ORDER = Object.keys(TABS) as TabKey[];
+
+interface ChromeProps {
+  active: TabKey;
+  onPress: (tab: TabKey) => void;
+}
+
 /**
- * A floating glass tab bar. A champagne pill glides to the active tab;
- * the active icon turns gold. On tablets the bar is centered at a fixed width.
+ * A floating obsidian glass bar. A satin champagne pill glides to the
+ * active tab and its icon lifts slightly; on tablets the bar is centered at
+ * a fixed width. It stays midnight in both themes, like a jewellery case.
  */
-function TabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ active, onPress }: ChromeProps) {
+  const index = TAB_ORDER.indexOf(active);
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
   const { isTablet } = useLayout();
   const [barWidth, setBarWidth] = useState(0);
-  const x = useRef(new Animated.Value(state.index)).current;
+  const x = useRef(new Animated.Value(index)).current;
   useEffect(() => {
-    Animated.timing(x, { toValue: state.index, duration: reduced ? 0 : 420, easing: easeOut, useNativeDriver: true }).start();
-  }, [state.index, reduced, x]);
-  const slot = barWidth ? (barWidth - spacing.sm * 2) / state.routes.length : 0;
+    Animated.spring(x, { toValue: index, useNativeDriver: true, speed: reduced ? 1000 : 14, bounciness: reduced ? 0 : 5 }).start();
+  }, [index, reduced, x]);
+  const slot = barWidth ? (barWidth - spacing.sm * 2) / TAB_ORDER.length : 0;
 
   return (
     <View style={[styles.tabWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]} pointerEvents="box-none">
@@ -116,38 +132,96 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         accessibilityRole="tablist"
         onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
       >
-        <Gradient colors={['#151C34', '#090C17']} direction="vertical" borderRadius={radius.xl + 4} style={StyleSheet.absoluteFill} />
-        <View style={styles.tabSheen} pointerEvents="none" />
+        <Gradient colors={gradients.hero} direction="vertical" borderRadius={radius.xl} style={StyleSheet.absoluteFill} />
+        <Sheen color={gradients.heroSheen} inset="12%" />
         {slot ? (
           <Animated.View
             pointerEvents="none"
             style={[styles.tabIndicator, { width: slot, transform: [{ translateX: Animated.multiply(x, slot) }] }]}
           >
-            <View style={styles.tabIndicatorPill} />
+            <View style={styles.tabIndicatorPill}>
+              <Glow color={brand.champagne} size={84} intensity={0.28} style={styles.tabIndicatorGlow} />
+            </View>
             <View style={styles.tabIndicatorLine} />
           </Animated.View>
         ) : null}
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const tab = TABS[route.name as keyof MainTabParamList];
+        {TAB_ORDER.map(name => {
+          const focused = name === active;
+          const tab = TABS[name];
           return (
             <Pressable
-              key={route.key}
+              key={name}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={tab.label}
-              onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-              }}
+              onPress={() => onPress(name)}
               style={styles.tabItem}
             >
-              <Icon name={tab.icon} size={21} color={focused ? colors.gold : colors.textTertiary} strokeWidth={focused ? 2 : 1.7} />
-              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
+              <View style={!focused && styles.tabIconIdle}>
+                <RealIcon name={tab.icon} size={focused ? 26 : 23} />
+              </View>
+              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} numberOfLines={1}>
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
+    </View>
+  );
+}
+
+/** The desktop navigation rail: brand, the five destinations, and the signed-in member. */
+function NavRail({ active, onPress }: ChromeProps) {
+  const user = useAppSelector(selectCurrentUser);
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.rail, { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xl }]} accessibilityRole="tablist">
+      <Gradient colors={gradients.hero} direction="vertical" style={StyleSheet.absoluteFill} />
+      <View style={styles.railEdge} />
+      <View style={styles.railBrand}>
+        <Wordmark light />
+      </View>
+      <Text style={styles.railSection}>Navigate</Text>
+      {TAB_ORDER.map(name => {
+        const focused = name === active;
+        const tab = TABS[name];
+        return (
+          <Pressable
+            key={name}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={tab.label}
+            onPress={() => onPress(name)}
+            style={({ pressed }) => [styles.railItem, focused && styles.railItemActive, pressed && !focused && styles.railItemPressed]}
+          >
+            {focused ? <View style={styles.railMarker} /> : null}
+            <View style={!focused && styles.tabIconIdle}>
+              <RealIcon name={tab.icon} size={22} />
+            </View>
+            <Text style={[styles.railLabel, focused && styles.railLabelActive]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+      <View style={styles.flex} />
+      {user ? (
+        <Pressable
+          onPress={() => onPress('ProfileTab')}
+          accessibilityRole="button"
+          accessibilityLabel="Profile"
+          style={styles.railMember}
+        >
+          <Avatar name={user.display_name} emoji={user.avatar} size={40} />
+          <View style={styles.flex}>
+            <Text style={styles.railName} numberOfLines={1}>
+              {user.display_name}
+            </Text>
+            <Text style={styles.railMeta} numberOfLines={1}>
+              {user.public_id}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -157,11 +231,37 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
+const hideTabBar = () => null;
+
+/**
+ * Tabs slide in from the side they sit on: moving to a tab on the right
+ * brings it in from the right, and the old one leaves to the left.
+ */
+type SceneInterpolator = NonNullable<BottomTabNavigationOptions['sceneStyleInterpolator']>;
+
+function slideScenes(width: number): SceneInterpolator {
+  return ({ current }) => ({
+    sceneStyle: {
+      opacity: current.progress.interpolate({ inputRange: [-1, -0.6, 0, 0.6, 1], outputRange: [0, 0, 1, 0, 0] }),
+      transform: [{ translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-width * 0.3, 0, width * 0.3] }) }],
+    },
+  });
+}
 
 function MainTabs() {
+  const { width } = useWindowDimensions();
+  const { reduced } = useMotion();
   return (
-    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: colors.background } }}>
+    <Tab.Navigator
+      tabBar={hideTabBar}
+      screenOptions={{
+        headerShown: false,
+        animation: reduced ? 'none' : 'shift',
+        sceneStyleInterpolator: reduced ? undefined : slideScenes(width),
+        transitionSpec: { animation: 'timing', config: { duration: 280 } },
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+    >
       <Tab.Screen name="HomeTab" component={DashboardScreen} />
       <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
       <Tab.Screen name="RemindersTab" component={RemindersScreen} />
@@ -169,6 +269,28 @@ function MainTabs() {
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
   );
+}
+
+/** The tab under the current screen: the open tab, or the one a pushed screen sits on. */
+function activeTab(): TabKey {
+  const root = navigationRef.isReady() ? navigationRef.getRootState() : undefined;
+  const main = root?.routes.find(r => r.name === 'Main');
+  const tabs = main?.state;
+  const name = tabs?.routes[tabs.index ?? 0]?.name;
+  return name && name in TABS ? (name as TabKey) : 'HomeTab';
+}
+
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return open;
 }
 
 const navTheme: Theme = {
@@ -190,46 +312,76 @@ export function RootNavigator() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectCurrentUser);
   const showTour = isAuthenticated && user && !user.onboarding_completed;
+  const { isDesktop } = useLayout();
+  const keyboardOpen = useKeyboardOpen();
+  const [active, setActive] = useState<TabKey>('HomeTab');
+  const hasRail = Boolean(isAuthenticated && isDesktop);
 
-  const goToTab = useCallback((tab: keyof MainTabParamList) => {
-    if (navigationRef.isReady()) navigationRef.navigate('Main', { screen: tab });
+  // Back to the tabs (popping any pushed screens), then to the chosen tab.
+  const goToTab = useCallback((tab: TabKey) => {
+    if (navigationRef.isReady()) navigationRef.dispatch(StackActions.popTo('Main', { screen: tab }));
   }, []);
 
+  const navigator = (
+    <RootStack.Navigator
+      screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.background } }}
+    >
+      {!isAuthenticated ? (
+        <RootStack.Group screenOptions={{ animation: 'fade' }}>
+          <RootStack.Screen name="Login" component={LoginScreen} />
+          <RootStack.Screen name="Register" component={RegisterScreen} />
+          <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </RootStack.Group>
+      ) : (
+        <RootStack.Group>
+          <RootStack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
+          <RootStack.Screen name="TrackDetail" component={TrackDetailScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="TrackEditor" component={TrackEditorScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="Consistency" component={ConsistencyScreen} options={{ animation: 'slide_from_left' }} />
+          <RootStack.Screen name="Achievements" component={AchievementsScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="VaultEntry" component={VaultEntryScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="Discover" component={DiscoverScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="Wallet" component={WalletScreen} options={{ animation: 'slide_from_right' }} />
+        </RootStack.Group>
+      )}
+    </RootStack.Navigator>
+  );
+
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
-      <RootStack.Navigator
-        screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.background } }}
-      >
-        {!isAuthenticated ? (
-          <RootStack.Group screenOptions={{ animation: 'fade' }}>
-            <RootStack.Screen name="Login" component={LoginScreen} />
-            <RootStack.Screen name="Register" component={RegisterScreen} />
-            <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          </RootStack.Group>
+    <NavigationContainer ref={navigationRef} theme={navTheme} onReady={() => setActive(activeTab())} onStateChange={() => setActive(activeTab())}>
+      <RailContext.Provider value={hasRail}>
+        {hasRail ? (
+          <View style={styles.railLayout}>
+            <NavRail active={active} onPress={goToTab} />
+            <View style={styles.flex}>{navigator}</View>
+          </View>
         ) : (
-          <RootStack.Group>
-            <RootStack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
-            <RootStack.Screen name="TrackDetail" component={TrackDetailScreen} />
-            <RootStack.Screen name="TrackEditor" component={TrackEditorScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="Consistency" component={ConsistencyScreen} />
-            <RootStack.Screen name="Achievements" component={AchievementsScreen} />
-            <RootStack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="VaultEntry" component={VaultEntryScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="Discover" component={DiscoverScreen} />
-            <RootStack.Screen name="Settings" component={SettingsScreen} />
-            <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-            <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} />
-          </RootStack.Group>
+          <>
+            {navigator}
+            {isAuthenticated && !keyboardOpen ? <FloatingTabBar active={active} onPress={goToTab} /> : null}
+          </>
         )}
-      </RootStack.Navigator>
+      </RailContext.Provider>
       {showTour ? <SatyaTour goToTab={goToTab} /> : null}
     </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  railLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+  },
   tabWrap: {
     position: 'absolute',
     left: 0,
@@ -242,23 +394,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignSelf: 'stretch',
     height: TAB_BAR_HEIGHT,
-    borderRadius: radius.xl + 4,
-    backgroundColor: colors.glassStrong,
+    borderRadius: radius.xl,
+    backgroundColor: brand.midnight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
     paddingHorizontal: spacing.sm,
   },
   tabBarTablet: {
     alignSelf: 'center',
-    width: 560,
-  },
-  tabSheen: {
-    position: 'absolute',
-    top: 0,
-    left: '15%',
-    right: '15%',
-    height: 1,
-    backgroundColor: 'rgba(241,221,175,0.35)',
+    width: 580,
   },
   tabIndicator: {
     position: 'absolute',
@@ -269,35 +413,130 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabIndicatorPill: {
-    width: '84%',
-    height: 52,
+    width: '86%',
+    height: 54,
     borderRadius: radius.lg,
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.heroGoldSoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(217,188,130,0.25)',
+    borderColor: colors.heroGoldLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  tabIndicatorGlow: {
+    position: 'absolute',
+    top: -30,
   },
   tabIndicatorLine: {
     position: 'absolute',
     top: 0,
-    width: 22,
+    width: 24,
     height: 2,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
-    backgroundColor: colors.gold,
+    backgroundColor: brand.champagne,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
+  },
+  tabIconIdle: {
+    opacity: 0.6,
   },
   tabLabel: {
     ...font.semibold,
     fontSize: 10,
-    letterSpacing: 0.4,
-    color: colors.textTertiary,
+    letterSpacing: 0.6,
+    color: colors.heroTextTertiary,
   },
   tabLabelActive: {
-    color: colors.text,
+    ...font.bold,
+    color: colors.heroText,
+  },
+  rail: {
+    width: RAIL_WIDTH,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: brand.midnight,
+  },
+  railEdge: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.heroLine,
+  },
+  railBrand: {
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xxxl,
+  },
+  railSection: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.heroTextTertiary,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  railItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    height: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+  },
+  railItemActive: {
+    backgroundColor: colors.heroGoldSoft,
+    borderColor: colors.heroGoldLine,
+  },
+  railItemPressed: {
+    backgroundColor: colors.heroGlass,
+  },
+  railMarker: {
+    position: 'absolute',
+    left: -spacing.lg,
+    top: 12,
+    bottom: 12,
+    width: 2,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+    backgroundColor: brand.champagne,
+  },
+  railLabel: {
+    ...font.semibold,
+    fontSize: 14,
+    color: colors.heroTextSecondary,
+  },
+  railLabelActive: {
+    color: colors.heroText,
+  },
+  railMember: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.heroGlass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.heroLine,
+  },
+  railName: {
+    ...font.semibold,
+    fontSize: 14,
+    color: colors.heroText,
+  },
+  railMeta: {
+    ...font.bold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: brand.champagne,
+    marginTop: 2,
   },
 });

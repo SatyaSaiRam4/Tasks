@@ -23,7 +23,8 @@ import { CelebrationProvider } from './src/components/Celebration';
 import { CompletionProvider } from './src/modules/routines/CompletionProvider';
 import { BackgroundSync } from './src/modules/home/BackgroundSync';
 import { VaultAutoLock } from './src/modules/vault/VaultAutoLock';
-import { MoonMark } from './src/components/Brand';
+import { Wordmark } from './src/components/Brand';
+import { Glow } from './src/components/Gradient';
 import { Backdrop } from './src/layouts/Backdrop';
 
 // Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the selected theme.
@@ -43,10 +44,15 @@ const antTheme = {
   fill_tap: colors.surfaceAlt,
   fill_grey: colors.surface,
   border_color_base: colors.border,
+  border_color_thin: colors.goldLine,
+  fill_mask: colors.overlay,
+  color_text_base_inverse: '#F3EEE3',
+  picker_item_height: 42,
+  picker_header_height: 52,
   radius_sm: radius.sm,
   radius_md: radius.md,
   radius_lg: radius.lg,
-  toast_fill: colors.isDark ? 'rgba(25, 29, 38, 0.97)' : 'rgba(29, 41, 47, 0.94)',
+  toast_fill: 'rgba(11, 17, 34, 0.96)',
   primary_button_fill: colors.primary,
   primary_button_fill_tap: colors.primarySecondary,
 };
@@ -68,7 +74,8 @@ function AppContent() {
       <View style={styles.splash} accessibilityLabel="Loading Memo">
         <Backdrop />
         <View style={styles.splashMark}>
-          <MoonMark size={88} />
+          <Glow color={colors.gold} size={320} intensity={0.22} style={styles.splashGlow} />
+          <Wordmark size="lg" />
         </View>
       </View>
     );
@@ -119,6 +126,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splashGlow: {
+    position: 'absolute',
   },
 });
 

@@ -9,12 +9,12 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, font, fontSize, gradients, radius, spacing, TOUCH_TARGET } from '../theme';
+import { colors, gradients, radius, shadow, spacing, TOUCH_TARGET, type as t } from '../theme';
 import { usePressScale } from '../animations';
-import { Gradient } from './Gradient';
+import { Gradient, Sheen } from './Gradient';
 import { Icon, type IconName } from './Icon';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerGhost' | 'success';
 type Size = 'lg' | 'md' | 'sm';
 
 interface ButtonProps {
@@ -32,14 +32,15 @@ interface ButtonProps {
   accessibilityHint?: string;
 }
 
-const HEIGHT: Record<Size, number> = { lg: 58, md: 50, sm: 38 };
-const LABEL: Record<Size, number> = { lg: fontSize.body, md: 14.5, sm: fontSize.caption };
+const HEIGHT: Record<Size, number> = { lg: 56, md: 50, sm: 38 };
+const LABEL: Record<Size, number> = { lg: 15, md: 14.5, sm: 13 };
 
 /**
- * The one button used everywhere, pill-shaped. `primary` is a champagne
- * gradient call to action with dark ink, `secondary` a glass button with a
- * hairline edge, `ghost` text-only, `danger` for destructive actions only,
- * `success` for completion confirmations.
+ * The one button used everywhere, pill-shaped. `primary` is a satin
+ * champagne (accent) gradient with dark ink and a soft glow, `secondary` a
+ * glass button with a fine gold edge, `ghost` text-only, `danger` (and the
+ * text-only `dangerGhost`) for destructive actions only, `success` for
+ * completion confirmations.
  */
 export function Button({
   label,
@@ -57,27 +58,32 @@ export function Button({
 }: ButtonProps) {
   const press = usePressScale(0.97);
   const isDisabled = disabled || loading;
-  const filled = variant === 'primary' || variant === 'success';
+  // A disabled call to action rests as a quiet outline instead of a dimmed gold.
+  const muted = disabled && !loading && (variant === 'primary' || variant === 'success');
+  const filled = !muted && (variant === 'primary' || variant === 'success');
 
-  const textColor = filled
+  const textColor = muted
+    ? colors.textTertiary
+    : filled
     ? colors.onPrimary
-    : variant === 'danger'
+    : variant === 'danger' || variant === 'dangerGhost'
       ? colors.danger
       : variant === 'ghost'
         ? colors.primary
         : colors.text;
 
+  const iconSize = size === 'sm' ? 15 : 17;
   const content = (
     <View style={styles.row}>
       {loading ? (
         <ActivityIndicator size="small" color={textColor} />
       ) : (
         <>
-          {icon ? <Icon name={icon} size={size === 'sm' ? 15 : 17} color={textColor} strokeWidth={2} /> : null}
+          {icon ? <Icon name={icon} size={iconSize} color={textColor} strokeWidth={2} /> : null}
           <Text style={[styles.label, { color: textColor, fontSize: LABEL[size] }]} numberOfLines={1}>
             {label}
           </Text>
-          {iconRight ? <Icon name={iconRight} size={size === 'sm' ? 15 : 17} color={textColor} strokeWidth={2} /> : null}
+          {iconRight ? <Icon name={iconRight} size={iconSize} color={textColor} strokeWidth={2} /> : null}
         </>
       )}
     </View>
@@ -89,12 +95,12 @@ export function Button({
     body = (
       <Gradient
         colors={variant === 'success' ? gradients.success : gradients.primary}
-        direction="horizontal"
+        direction="diagonal"
         borderRadius={radius.pill}
         style={[styles.base, styles.filled, height, size === 'sm' && styles.small]}
       >
         {/* A soft highlight along the top edge, like light on satin. */}
-        <View style={styles.sheen} pointerEvents="none" />
+        <Sheen color={gradients.satinSheen} inset="14%" />
         {content}
       </Gradient>
     );
@@ -105,9 +111,10 @@ export function Button({
           styles.base,
           height,
           size === 'sm' && styles.small,
-          variant === 'secondary' && styles.secondary,
+          (variant === 'secondary' || muted) && styles.secondary,
+          muted && styles.muted,
           variant === 'danger' && styles.danger,
-          variant === 'ghost' && styles.ghost,
+          (variant === 'ghost' || variant === 'dangerGhost') && styles.ghost,
         ]}
       >
         {content}
@@ -119,8 +126,10 @@ export function Button({
     <Animated.View
       style={[
         fullWidth ? styles.full : styles.inline,
+        filled && !isDisabled && variant === 'primary' && size !== 'sm' && shadow.glow,
+        styles.round,
         { transform: [{ scale: press.scale }] },
-        isDisabled && styles.disabled,
+        isDisabled && !muted && styles.disabled,
         style,
       ]}
     >
@@ -133,6 +142,7 @@ export function Button({
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={accessibilityHint}
         accessibilityState={{ disabled: isDisabled, busy: loading }}
+        style={({ pressed }) => pressed && !filled && styles.pressed}
       >
         {body}
       </Pressable>
@@ -147,6 +157,9 @@ const styles = StyleSheet.create({
   inline: {
     alignSelf: 'flex-start',
   },
+  round: {
+    borderRadius: radius.pill,
+  },
   base: {
     borderRadius: radius.pill,
     paddingHorizontal: spacing.xxl,
@@ -158,15 +171,7 @@ const styles = StyleSheet.create({
   },
   filled: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  sheen: {
-    position: 'absolute',
-    top: 0,
-    left: '12%',
-    right: '12%',
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderColor: 'rgba(255,255,255,0.45)',
   },
   row: {
     flexDirection: 'row',
@@ -175,23 +180,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   label: {
-    ...font.bold,
-    letterSpacing: 0.5,
+    ...t.label,
   },
   secondary: {
-    backgroundColor: colors.glass,
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: colors.glassStrong,
+    borderWidth: 1,
     borderColor: colors.goldLine,
+  },
+  muted: {
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.glass,
   },
   danger: {
     backgroundColor: colors.dangerSoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(236,135,150,0.3)',
+    borderWidth: 1,
+    borderColor: colors.dangerSoft,
   },
   ghost: {
     backgroundColor: colors.transparent,
   },
+  pressed: {
+    opacity: 0.7,
+  },
   disabled: {
-    opacity: 0.4,
+    opacity: 0.38,
   },
 });

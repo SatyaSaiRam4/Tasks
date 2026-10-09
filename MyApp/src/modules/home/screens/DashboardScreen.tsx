@@ -5,21 +5,23 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import { colors, gradients, radius, spacing } from '../../../theme';
+import { brand, colors, font, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { Card } from '../../../components/Card';
-import { IconButton } from '../../../components/Controls';
+import { ListGroup, ListRow } from '../../../components/ListRow';
+import { RealIcon } from '../../../components/RealIcon';
 import { ErrorState, FadeIn, Skeleton } from '../../../components/Feedback';
 import { Glow } from '../../../components/Gradient';
 import { Icon } from '../../../components/Icon';
-import { Eyebrow, TopBar } from '../../../components/ScreenHeader';
-import { useLayout } from '../../../hooks/useLayout';
+import { AnimatedNumber } from '../../../components/Progress';
+import { TopBar } from '../../../components/ScreenHeader';
 import { useLoop } from '../../../animations';
 import { useCelebration } from '../../../components/Celebration';
 import { getErrorMessage } from '../../../utils/apiError';
-import { formatDayShort } from '../../../utils/date';
-import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks/streaksApi';
-import { useListTracksQuery } from '../../routines/routinesApi';
+import { formatDateTime, fromDateKey, WEEKDAY_LONG, MONTH_LONG } from '../../../utils/date';
+import { useGetDashboardQuery, useGetTrackCompletionsQuery, type Dashboard } from '../../streaks/streaksApi';
+import { greeting } from '../../satya/messages';
+import { TierRow } from '../../streaks/Tiers';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -28,15 +30,17 @@ type Nav = CompositeNavigationProp<
 >;
 const SEEN_COMPLETIONS_KEY = '@rememberly/seen_track_completions';
 
-/** Home: one streak feature and two direct paths into the daily workflow. */
+/**
+ * Home, kept simple: the streak count beside a flame, the streak badges
+ * (tap one for its steps), then plain rows into today's categories and the
+ * next reminder.
+ */
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { data, isLoading, isError, error, refetch, isFetching } = useGetDashboardQuery();
-  const tracks = useListTracksQuery();
   const completions = useGetTrackCompletionsQuery();
   const { celebrate } = useCelebration();
   const celebrated = useRef(false);
-  const { isTablet } = useLayout();
 
   // Celebrate finished categories the user hasn't seen yet.
   useEffect(() => {
@@ -63,197 +67,178 @@ export function DashboardScreen() {
       .catch(() => undefined);
   }, [completions.data, celebrate]);
 
-  const header = (
-    <View style={styles.header}>
-      <View style={styles.headerTitle}>
-        <Text style={styles.pageTitle}>Today</Text>
-        {data ? <Text style={styles.date}>{formatDayShort(data.streak.today.date)}</Text> : null}
-      </View>
-      <IconButton
-        icon="user"
-        accessibilityLabel="Open profile"
-        onPress={() => navigation.navigate('ProfileTab')}
-      />
-    </View>
-  );
-
   if (isLoading) {
     return (
-      <Screen contentStyle={styles.dashboard}>
-        {header}
-        <Skeleton height={236} rounded={radius.lg} />
-        <View style={styles.destinationRow}>
-          <Skeleton height={132} rounded={radius.md} style={styles.destinationSkeleton} />
-          <Skeleton height={132} rounded={radius.md} style={styles.destinationSkeleton} />
-        </View>
+      <Screen>
+        <TopBar />
+        <Skeleton width="45%" height={14} style={styles.skelEyebrow} />
+        <Skeleton width="80%" height={40} style={styles.skelTitle} />
+        <Skeleton height={280} rounded={radius.xl} />
       </Screen>
     );
   }
 
   if (isError || !data) {
     return (
-      <Screen contentStyle={styles.dashboard}>
-        {header}
+      <Screen>
+        <TopBar />
         <ErrorState message={getErrorMessage(error, 'Could not load your home screen.')} onRetry={refetch} />
       </Screen>
     );
   }
 
   const { streak } = data;
+  const groups = data.agenda.groups;
+  const nextReminder = data.upcoming_reminders[0];
 
   return (
-    <Screen
-      contentStyle={styles.dashboard}
-      onRefresh={() => {
-        refetch();
-        tracks.refetch();
-      }}
-      refreshing={isFetching && !isLoading}
-    >
-      {header}
-      <FadeIn style={styles.streakWrap}>
-        <Card
-          gradient={gradients.dashboard}
-          onPress={() => navigation.navigate('Consistency')}
-          contentStyle={styles.streakContent}
-          accessibilityLabel={`${streak.current_streak} day streak`}
-        >
-          <View style={styles.streakCopy}>
-            <Text style={styles.streakEyebrow}>CURRENT STREAK</Text>
-            <View style={styles.streakNumberRow}>
-              <Text style={styles.streakNum}>{streak.current_streak}</Text>
-              <Text style={styles.streakUnit}>days</Text>
-            </View>
-          </View>
-          <View style={styles.flameBadge}>
-            <FlameMark lit={streak.today.secured} />
-          </View>
-        </Card>
+    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
+      <TopBar />
+      <FadeIn style={styles.greeting}>
+        <Text style={styles.date}>{longDate(streak.today.date)}</Text>
+        <Text style={styles.hello} accessibilityRole="header">
+          {greeting(data)}
+        </Text>
       </FadeIn>
 
-      <View style={styles.destinationRow}>
-        <Card
-          onPress={() => navigation.navigate('RoutinesTab')}
-          style={styles.destinationCard}
-          contentStyle={styles.destinationContent}
-          accessibilityLabel={tracks.data ? `${tracks.data.length} categories` : 'Open categories'}
-        >
-          <View style={styles.destinationIcon}>
-            <Icon name="target" size={22} color={colors.primary} />
-          </View>
-          <Text style={styles.destinationCount}>{tracks.data ? tracks.data.length : '...'}</Text>
-          <View style={styles.destinationFooter}>
-            <Text style={styles.destinationTitle}>Categories</Text>
-            <Icon name="arrow-right" size={17} color={colors.textTertiary} />
-          </View>
-        </Card>
-        <Card
-          onPress={() => navigation.navigate('RemindersTab')}
-          style={styles.destinationCard}
-          contentStyle={styles.destinationContent}
-          accessibilityLabel={`${data.reminder_count} reminders`}
-        >
-          <View style={styles.destinationIcon}>
-            <Icon name="bell" size={22} color={colors.primary} />
-          </View>
-          <Text style={styles.destinationCount}>{data.reminder_count}</Text>
-          <View style={styles.destinationFooter}>
-            <Text style={styles.destinationTitle}>Reminders</Text>
-            <Icon name="arrow-right" size={17} color={colors.textTertiary} />
-          </View>
-        </Card>
-      </View>
+      <FadeIn index={1}>
+        <StreakCard data={data} onPress={() => navigation.navigate('Consistency')} />
+      </FadeIn>
+
+      <FadeIn index={2}>
+        <Text style={styles.section}>Badges</Text>
+        <TierRow best={streak.best_streak} />
+      </FadeIn>
+
+      <FadeIn index={3}>
+        <Text style={styles.section}>Today’s categories</Text>
+        <ListGroup>
+          {groups.length ? (
+            groups.map((g, i) => (
+              <ListRow
+                key={g.track.id}
+                leading={<RealIcon name="target" size={34} />}
+                title={g.track.name}
+                subtitle={g.required ? `${Math.min(g.completed, g.required)} of ${g.required} done` : 'Nothing due today'}
+                onPress={() => navigation.navigate('TrackDetail', { trackId: g.track.id })}
+                last={i === groups.length - 1}
+              />
+            ))
+          ) : (
+            <ListRow
+              leading={<RealIcon name="target" size={34} />}
+              title={data.total_tracks ? 'Nothing due today' : 'Create your first category'}
+              onPress={() => (data.total_tracks ? navigation.navigate('RoutinesTab') : navigation.navigate('TrackEditor'))}
+              last
+            />
+          )}
+        </ListGroup>
+
+        <Text style={styles.section}>Next reminder</Text>
+        <ListGroup>
+          <ListRow
+            leading={<RealIcon name="bell" size={34} />}
+            title={nextReminder ? nextReminder.title : 'No reminders coming up'}
+            subtitle={nextReminder ? formatDateTime(nextReminder.remind_at) : 'Tap to add one'}
+            onPress={() =>
+              nextReminder ? navigation.navigate('ReminderEditor', { reminderId: nextReminder.id }) : navigation.navigate('RemindersTab')
+            }
+            last
+          />
+        </ListGroup>
+      </FadeIn>
     </Screen>
   );
 }
 
-/** The streak flame with a slow breathing halo; brighter once today is secured. */
+function longDate(key: string) {
+  const d = fromDateKey(key);
+  return `${WEEKDAY_LONG[d.getDay()]}, ${MONTH_LONG[d.getMonth()]} ${d.getDate()}`;
+}
+
+/** One short line under the streak: what today still needs. */
+function statusLine(d: Dashboard) {
+  const { today } = d.streak;
+  const tasks = (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'}`;
+  if (d.total_tracks === 0) return { text: 'Add a category to start', color: colors.heroTextSecondary };
+  if (today.secured) return { text: 'Today is done ✓', color: brand.jade };
+  if (today.required === 0) return { text: 'Nothing due today', color: colors.heroTextSecondary };
+  if (d.streak.at_risk) return { text: `${tasks(today.remaining)} left to keep it`, color: brand.ember };
+  return { text: `${tasks(today.remaining)} left today`, color: brand.champagneLight };
+}
+
+/** The streak: a real flame beside the count, and one line about today. */
+function StreakCard({ data, onPress }: { data: Dashboard; onPress: () => void }) {
+  const { streak } = data;
+  const status = statusLine(data);
+  return (
+    <Card tone="hero" onPress={onPress} contentStyle={styles.streak} accessibilityLabel={`${streak.current_streak} day streak. ${status.text}. Open streak history.`}>
+      <Glow color={brand.ember} size={220} intensity={0.16} style={styles.streakGlow} />
+      <FlameMark lit={streak.today.secured} />
+      <View style={styles.flex}>
+        <View style={styles.countRow}>
+          <AnimatedNumber value={streak.current_streak} style={styles.count} />
+          <Text style={styles.unit}>{streak.current_streak === 1 ? 'day' : 'days'}</Text>
+        </View>
+        <Text style={styles.streakLabel}>Current streak</Text>
+        <Text style={[styles.status, { color: status.color }]}>{status.text}</Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={colors.heroTextTertiary} />
+    </Card>
+  );
+}
+
+/** The streak flame with a slow breathing glow; brighter once today is secured. */
 function FlameMark({ lit }: { lit: boolean }) {
   const breathe = useLoop(3200);
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] });
   return (
     <View style={styles.flame}>
       <Animated.View style={[styles.flameGlow, { transform: [{ scale }] }]}>
-        <Glow color={colors.streak} size={44} intensity={lit ? 0.7 : 0.45} />
+        <Glow color={brand.ember} size={110} intensity={lit ? 0.7 : 0.35} />
       </Animated.View>
-      <Icon name="flame" size={18} color={colors.streak} fill={lit ? colors.streak : 'none'} strokeWidth={1.8} />
+      <RealIcon name="flame" size={64} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  dashboard: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: spacing.md,
-    paddingBottom: 132,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+  flex: {
+    flex: 1,
   },
   skelEyebrow: {
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
+    marginTop: spacing.lg,
   },
-  columns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xl,
-  },
-  headerTitle: {
-    gap: 2,
-  },
-  pageTitle: {
-    color: colors.text,
-    fontFamily: 'serif',
-    fontSize: 30,
-    fontWeight: '700',
-  },
-  date: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  streakContent: {
-    minHeight: 196,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
-  },
-  streakWrap: {
+  skelTitle: {
+    marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
-  streakCopy: {
-    gap: spacing.xs,
+  greeting: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
-  streakEyebrow: {
-    color: 'rgba(255,255,255,0.68)',
-    fontSize: 11,
-    fontWeight: '700',
+  date: {
+    ...t.caption,
+    color: colors.textSecondary,
   },
-  streakNumberRow: {
+  hello: {
+    ...t.heading,
+    marginTop: 2,
+  },
+  streak: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-  },
-  flameBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.2)',
+    gap: spacing.lg,
+    padding: spacing.xl,
+  },
+  streakGlow: {
+    position: 'absolute',
+    left: -60,
+    top: -70,
   },
   flame: {
-    width: 52,
-    height: 52,
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -262,58 +247,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  streakNum: {
-    fontFamily: 'serif',
-    fontSize: 68,
-    lineHeight: 76,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  streakUnit: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  destinationRow: {
+  countRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'baseline',
+    gap: spacing.sm,
   },
-  destinationSkeleton: {
-    flex: 1,
+  count: {
+    ...font.heavy,
+    fontSize: 52,
+    lineHeight: 58,
+    color: brand.champagneLight,
   },
-  destinationCard: {
-    flex: 1,
-    minWidth: 0,
+  unit: {
+    ...font.semibold,
+    fontSize: 17,
+    color: colors.heroTextSecondary,
   },
-  destinationContent: {
-    minHeight: 142,
-    justifyContent: 'space-between',
-    padding: spacing.md,
+  streakLabel: {
+    ...font.semibold,
+    fontSize: 12,
+    letterSpacing: 0.4,
+    color: colors.heroTextSecondary,
   },
-  destinationIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primarySoft,
-  },
-  destinationCount: {
-    color: colors.text,
-    fontFamily: 'serif',
-    fontSize: 30,
-    fontWeight: '700',
-  },
-  destinationFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
-  },
-  destinationTitle: {
-    flexShrink: 1,
-    color: colors.textSecondary,
+  status: {
+    ...font.bold,
     fontSize: 13,
-    fontWeight: '600',
+    marginTop: spacing.sm,
+  },
+  section: {
+    ...t.micro,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    marginLeft: 2,
   },
 });

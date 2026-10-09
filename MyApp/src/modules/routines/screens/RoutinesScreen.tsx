@@ -30,9 +30,9 @@ export function RoutinesScreen() {
       refreshing={tracks.isFetching}
       footer={tracks.data?.length ? <Fab accessibilityLabel="New category" onPress={newCategory} /> : null}
     >
-      <LargeTitle eyebrow="Your goals" title="Categories" />
+      <LargeTitle title="Categories" />
       {tracks.isLoading ? (
-        <SkeletonList count={3} height={76} />
+        <SkeletonList count={3} height={170} />
       ) : tracks.isError ? (
         <ErrorState message={getErrorMessage(tracks.error, 'Could not load your categories.')} onRetry={tracks.refetch} />
       ) : !tracks.data?.length ? (

@@ -1,16 +1,17 @@
 import React from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '../app/hooks';
-import { selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, hitSlop, spacing, type as t } from '../theme';
-import { useEntrance } from '../animations';
+import { colors, spacing, type as t, withAlpha } from '../theme';
+import { riseStyle, useEntrance } from '../animations';
+import { useLayout } from '../hooks/useLayout';
 import { Wordmark } from './Brand';
-import { Avatar, IconButton } from './Controls';
+import { IconButton } from './Controls';
+import { RealIcon } from './RealIcon';
+import { Gradient } from './Gradient';
 
 /**
- * Header for pushed screens: back/close button, a centered serif title,
- * optional right actions. Tab roots use LargeTitle instead.
+ * Header for pushed screens: back/close button, a centered serif title and
+ * an optional right action. Tab roots use TopBar + LargeTitle instead.
  */
 export function ScreenHeader({
   title,
@@ -26,96 +27,85 @@ export function ScreenHeader({
   onBack?: () => void;
 }) {
   const navigation = useNavigation();
+  const drop = useEntrance(0, 420);
   return (
-    <View style={styles.row}>
+    <Animated.View style={[styles.row, riseStyle(drop, -14)]}>
       <IconButton
         icon={close ? 'x' : 'chevron-left'}
         accessibilityLabel={close ? 'Close' : 'Back'}
         onPress={onBack ?? (() => navigation.goBack())}
       />
       <View style={styles.titles}>
-        {title ? (
-          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
-            {title}
-          </Text>
-        ) : null}
         {subtitle ? (
           <Text style={styles.subtitle} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
+        {title ? (
+          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
+            {title}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.right}>{right}</View>
-    </View>
+    </Animated.View>
   );
 }
+
+type Navigate = { navigate: (...args: unknown[]) => void };
 
 /**
  * The brand bar at the top of every tab: the Memo mark on the left, then
- * any screen actions, Settings and the Profile avatar on the right.
+ * screen actions, Search (find a friend by User ID), Wallet and Settings
+ * on the right. Reminders and
+ * Profile live in the tab bar, which is on every screen. With the desktop
+ * rail the mark lives in the rail.
  */
-export function TopBar({
-  actions,
-  hideProfile = false,
-  hideSettings = false,
-}: {
-  actions?: React.ReactNode;
-  hideProfile?: boolean;
-  hideSettings?: boolean;
-}) {
+export function TopBar({ actions }: { actions?: React.ReactNode }) {
   // Loosely typed: this bar is rendered inside both tab and stack screens.
-  const navigation = useNavigation<{ navigate: (...args: unknown[]) => void }>();
-  const user = useAppSelector(selectCurrentUser);
+  const navigation = useNavigation<Navigate>();
+  const { hasRail } = useLayout();
+  const drop = useEntrance(0, 420);
   return (
-    <View style={styles.topBar}>
-      <Wordmark />
+    <Animated.View style={[styles.topBar, hasRail && styles.topBarRail, riseStyle(drop, -14)]}>
+      {hasRail ? <View /> : <Wordmark size="sm" />}
       <View style={styles.topActions}>
         {actions}
-        {hideSettings ? null : (
-          <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
-        )}
-        {hideProfile || !user ? null : (
-          <Pressable
-            onPress={() => navigation.navigate('Main', { screen: 'ProfileTab' })}
-            hitSlop={hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel="Profile"
-          >
-            <Avatar name={user.display_name} emoji={user.avatar} size={40} />
-          </Pressable>
-        )}
+        <IconButton icon="search" accessibilityLabel="Find a friend by User ID" onPress={() => navigation.navigate('Discover')} />
+        <IconButton glyph={<RealIcon name="wallet" size={24} />} accessibilityLabel="Wallet" onPress={() => navigation.navigate('Wallet')} />
+        <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
-/** The editorial title block at the top of each tab, under the brand bar. */
+/** The title block at the top of each tab, under the brand bar. */
 export function LargeTitle({
   eyebrow,
   title,
+  subtitle,
   right,
   topBar = true,
   topBarActions,
-  hideProfile,
 }: {
   eyebrow?: string;
   title: string;
+  subtitle?: string;
   right?: React.ReactNode;
   topBar?: boolean;
   topBarActions?: React.ReactNode;
-  hideProfile?: boolean;
 }) {
-  const enter = useEntrance(0, 700);
-  const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
+  const enter = useEntrance(60, 760);
   return (
     <View>
-      {topBar ? <TopBar actions={topBarActions} hideProfile={hideProfile} /> : null}
-      <Animated.View style={[styles.large, { opacity: enter, transform: [{ translateY }] }]}>
+      {topBar ? <TopBar actions={topBarActions} /> : null}
+      <Animated.View style={[styles.large, riseStyle(enter, 16)]}>
         <View style={styles.flex}>
           {eyebrow ? <Eyebrow label={eyebrow} /> : null}
-          <Text style={[t.display, styles.largeTitle]} accessibilityRole="header">
+          <Text style={styles.largeTitle} accessibilityRole="header">
             {title}
           </Text>
+          {subtitle ? <Text style={styles.largeSubtitle}>{subtitle}</Text> : null}
         </View>
         {right ? <View style={styles.largeRight}>{right}</View> : null}
       </Animated.View>
@@ -124,10 +114,14 @@ export function LargeTitle({
 }
 
 /** A small champagne eyebrow with a leading rule: "—— TODAY". */
-export function Eyebrow({ label, color }: { label: string; color?: string }) {
+export function Eyebrow({ label, color, style }: { label: string; color?: string; style?: object }) {
   return (
-    <View style={styles.eyebrow}>
-      <View style={[styles.eyebrowRule, color ? { backgroundColor: color } : null]} />
+    <View style={[styles.eyebrow, style]}>
+      <Gradient
+        colors={[withAlpha(color ?? colors.gold, 0), color ?? colors.gold]}
+        direction="horizontal"
+        style={styles.eyebrowRule}
+      />
       <Text style={[t.micro, color ? { color } : null]}>{label}</Text>
     </View>
   );
@@ -141,8 +135,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   titles: {
     flex: 1,
@@ -151,10 +145,13 @@ const styles = StyleSheet.create({
   title: {
     ...t.heading,
     fontSize: 20,
+    lineHeight: 26,
+    textAlign: 'center',
   },
   subtitle: {
-    ...t.caption,
-    marginTop: 1,
+    ...t.micro,
+    fontSize: 9.5,
+    marginBottom: 2,
   },
   right: {
     minWidth: 44,
@@ -166,8 +163,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  topBarRail: {
+    paddingTop: spacing.sm,
   },
   topActions: {
     flexDirection: 'row',
@@ -176,12 +176,16 @@ const styles = StyleSheet.create({
   },
   large: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+    alignItems: 'center',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
   largeTitle: {
-    marginTop: spacing.sm,
+    ...t.title,
+  },
+  largeSubtitle: {
+    ...t.aside,
+    marginTop: spacing.xs,
   },
   largeRight: {
     flexDirection: 'row',
@@ -194,8 +198,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   eyebrowRule: {
-    width: 18,
+    width: 22,
     height: 1,
-    backgroundColor: colors.goldLine,
   },
 });

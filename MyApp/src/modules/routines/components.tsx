@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, font, gradients, radius, spacing, type as t } from '../../theme';
+import { colors, font, gradients, radius, spacing, TRACK_COLORS, type as t, withAlpha } from '../../theme';
 import { Card } from '../../components/Card';
 import { Icon } from '../../components/Icon';
+import { RealIcon } from '../../components/RealIcon';
 import { ProgressBar } from '../../components/Progress';
 import { formatDayMonth, fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
 import type { GridCell, Track, TrackGrid } from './routinesApi';
@@ -16,40 +17,71 @@ export function periodLabel(track: Track): string {
   return range;
 }
 
-/**
- * One category in a list: a monogram medallion, its name and period, and
- * today's progress as a fine gauge underneath.
- */
+/** A stable jewel color for a category: its own color, or one picked from its name. */
+export function categoryColor(seed: string, explicit?: string | null): string {
+  if (explicit && /^#[0-9a-f]{6}$/i.test(explicit)) return explicit;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 9973;
+  return TRACK_COLORS[h % TRACK_COLORS.length];
+}
+
+/** A category's initial in a jewel-toned double ring. */
+export function Monogram({ name, color, size = 46, done = false }: { name: string; color: string; size?: number; done?: boolean }) {
+  const ring = done ? colors.success : color;
+  return (
+    <View
+      style={[
+        styles.monogram,
+        { width: size, height: size, borderRadius: size / 2, borderColor: ring, backgroundColor: withAlpha(ring, colors.isDark ? 0.08 : 0.1) },
+      ]}
+    >
+      <View style={[styles.monogramInner, { borderRadius: size / 2, borderColor: withAlpha(ring, 0.3) }]} />
+      {done ? (
+        <RealIcon name="check" size={size * 0.62} />
+      ) : (
+        <Text style={[styles.monogramText, { fontSize: size * 0.42, color: colors.isDark ? color : colors.text }]}>
+          {name.trim().charAt(0).toUpperCase() || '•'}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/** One line about a category today: progress, or why nothing is due. */
+function todayLine(track: Track): string {
+  if (track.status === 'UPCOMING') return 'Starts soon';
+  if (track.status === 'ENDED' || track.status === 'ARCHIVED') return 'Ended';
+  if (track.today_required === 0) return track.action_count ? 'Nothing due today' : 'No tasks yet';
+  return `${Math.min(track.today_completed, track.today_required)} of ${track.today_required} done today`;
+}
+
+/** One category as a compact row: its initial, name, today's progress and a fine gauge. */
 export function CategoryCard({ track, onPress, style }: { track: Track; onPress: () => void; style?: StyleProp<ViewStyle> }) {
   const allDone = track.today_required > 0 && track.today_completed >= track.today_required;
   const progress = track.today_required > 0 ? track.today_completed / track.today_required : 0;
+  const color = categoryColor(track.name, track.color);
   return (
-    <Card onPress={onPress} style={[styles.card, style]} accessibilityLabel={`${track.name}, ${track.today_completed} of ${track.today_required} done today`}>
+    <Card
+      onPress={onPress}
+      style={[styles.card, style]}
+      contentStyle={styles.cardContent}
+      accent={color}
+      accessibilityLabel={`${track.name}, ${todayLine(track)}`}
+    >
       <View style={styles.cardRow}>
-        <View style={[styles.monogram, allDone && styles.monogramDone]}>
-          <Text style={[styles.monogramText, allDone && { color: colors.success }]}>{track.name.trim().charAt(0).toUpperCase() || '•'}</Text>
-        </View>
+        <Monogram name={track.name} color={color} size={40} done={allDone} />
         <View style={styles.flex}>
           <Text style={styles.cardTitle} numberOfLines={1}>
             {track.name}
           </Text>
-          <Text style={[t.caption, styles.cardMeta]} numberOfLines={1}>
-            {periodLabel(track)}
+          <Text style={[t.caption, styles.cardMeta, allDone && { color: colors.success }]} numberOfLines={1}>
+            {todayLine(track)}
           </Text>
         </View>
-        {track.today_required > 0 ? (
-          <View style={styles.today}>
-            {allDone ? <Icon name="check" size={13} color={colors.success} strokeWidth={2.6} /> : null}
-            <Text style={[styles.todayText, allDone && { color: colors.success }]}>
-              {track.today_completed}
-              <Text style={styles.todayOf}>/{track.today_required}</Text>
-            </Text>
-          </View>
-        ) : null}
-        <Icon name="chevron-right" size={17} color={colors.textTertiary} />
+        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
       </View>
       {track.today_required > 0 ? (
-        <ProgressBar progress={progress} height={3} colorsPair={allDone ? gradients.success : gradients.gold} style={styles.gauge} />
+        <ProgressBar progress={progress} height={3} colorsPair={allDone ? gradients.success : [withAlpha(color, 0.7), color]} style={styles.cardBar} />
       ) : null}
     </Card>
   );
@@ -152,9 +184,7 @@ const MARK_LABEL: Record<GridCell, string> = {
 function Mark({ cell, label, onPress }: { cell: GridCell; label: string; onPress?: () => void }) {
   const box =
     cell === 'DONE' ? (
-      <View style={[styles.box, styles.boxDone]}>
-        <Icon name="check" size={15} color={colors.onPrimary} strokeWidth={2.8} />
-      </View>
+      <RealIcon name="check" size={26} />
     ) : cell === 'MISSED' ? (
       <Icon name="x" size={15} color={colors.danger} strokeWidth={2} />
     ) : cell === 'TODO' ? (
@@ -194,58 +224,44 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   card: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm + 2,
+  },
+  cardContent: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  cardBar: {
+    marginTop: spacing.md,
   },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.md + 2,
   },
   monogram: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#161D36',
     borderWidth: 1,
-    borderColor: colors.goldLine,
   },
-  monogramDone: {
-    backgroundColor: colors.successSoft,
-    borderColor: 'rgba(140,211,179,0.35)',
+  monogramInner: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    right: 3,
+    bottom: 3,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   monogramText: {
-    ...font.serif,
-    fontSize: 20,
-    lineHeight: 23,
-    color: colors.goldBright,
+    ...font.bold,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   cardTitle: {
-    ...font.serif,
-    fontSize: 19,
-    lineHeight: 22,
-    color: colors.text,
+    ...t.bodyStrong,
+    fontSize: 16,
   },
   cardMeta: {
     marginTop: 2,
-  },
-  today: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  todayText: {
-    ...font.serif,
-    fontSize: 20,
-    color: colors.goldBright,
-  },
-  todayOf: {
-    fontSize: 17,
-    color: colors.textTertiary,
-  },
-  gauge: {
-    marginTop: spacing.lg,
   },
 
   table: {
@@ -254,13 +270,13 @@ const styles = StyleSheet.create({
     borderColor: colors.goldLine,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: colors.glass,
+    backgroundColor: colors.surface,
   },
   nameCol: {
     width: NAME_W,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: colors.goldLine,
-    backgroundColor: 'rgba(21,27,47,0.9)',
+    backgroundColor: colors.surfaceAlt,
   },
   row: {
     flexDirection: 'row',
@@ -282,7 +298,7 @@ const styles = StyleSheet.create({
   },
   bottomLine: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
+    borderBottomColor: colors.border,
   },
   leftLine: {
     borderLeftWidth: StyleSheet.hairlineWidth,
@@ -293,19 +309,20 @@ const styles = StyleSheet.create({
   },
   taskName: {
     ...font.semibold,
+    fontSize: 13.5,
     color: colors.text,
   },
   weekday: {
     ...font.bold,
-    fontSize: 9.5,
-    letterSpacing: 1,
+    fontSize: 9,
+    letterSpacing: 1.2,
     color: colors.textTertiary,
     textTransform: 'uppercase',
   },
   dayNum: {
     ...font.serif,
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 20,
     color: colors.text,
   },
   todayText2: {
@@ -318,13 +335,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxDone: {
-    backgroundColor: colors.success,
-  },
   boxTodo: {
     borderWidth: 1.5,
     borderColor: colors.gold,
-    backgroundColor: 'rgba(5,6,11,0.6)',
+    backgroundColor: colors.goldSoft,
   },
   boxFuture: {
     borderWidth: 1,

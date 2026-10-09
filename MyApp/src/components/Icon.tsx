@@ -314,6 +314,13 @@ const ICONS = {
       <Line x1="3" y1="18" x2="3.01" y2="18" />
     </>
   ),
+  wallet: (
+    <>
+      <Path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3" />
+      <Path d="M3 5v14a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" />
+      <Path d="M21 11h-4a2 2 0 0 0 0 4h4a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5z" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof ICONS;

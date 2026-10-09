@@ -17,7 +17,8 @@ models call these **Track** and **Action**, respectively.
 ### Categories and tasks
 
 - Categories have a name and a start/end date. They group tasks around a goal.
-- The current mobile flow adds a task by name and uses daily recurrence.
+- A new category's tasks are added on the same screen it is created on; more
+  can be added later from the category. Tasks use daily recurrence.
   Backend task records and API schemas also support recurrence rules, optional
   times, priorities, descriptions, steps, and reminder settings.
 - A category detail shows a task-by-day completion grid. Completions are
@@ -37,6 +38,21 @@ models call these **Track** and **Action**, respectively.
   completion bonuses.
 - The app includes streak history, achievement badges, and an optional local
   evening streak warning.
+- Home shows the current streak beside a flame, the streak badges, and plain
+  rows into today's categories and the next reminder.
+- Streak badges are premium tiers earned by the best streak: Bronze (7
+  days), Silver (30), Gold (100), Platinum (250), Diamond (500) and Master
+  (1000). Tapping a badge shows its steps and progress. They are computed in
+  the app from `best_streak`; Home and Profile show them.
+
+### Wallet
+
+- Streak milestones earn money once each: a 500-day streak earns ₹10 and a
+  1000-day streak ₹20. Milestones use the best finalized streak, so they
+  count only once the day has closed.
+- The user redeems the whole balance by entering a mobile number. Each
+  redemption is stored as PENDING and deducted from the balance at once;
+  payouts are made by hand.
 
 ### Reminders and notifications
 
@@ -64,7 +80,13 @@ models call these **Track** and **Action**, respectively.
 ### Accounts, profiles, and settings
 
 - Authentication includes registration, login, refresh-token rotation, logout,
-  password changes, and password reset flows.
+  password changes, and password reset flows. Reset codes are emailed through
+  Resend or SMTP (Gmail needs an App Password; ports 587 and 465 both work).
+  With neither configured, codes are only printed to the server console. The
+  reset screen can resend a code after 60 seconds. `SMTP_SERVER` and
+  `SMTP_EMAIL` are accepted as aliases of `SMTP_HOST` and `SMTP_USER`. Check
+  delivery with `python -m app.integrations.email you@example.com` (from
+  `Backend/`), which prints the provider's real error.
 - Profiles show a public User ID, current and best streaks, successful days,
   and achievements. Friends can be searched by User ID only when the account
   has enabled profile discovery; individual streak and achievement visibility
@@ -83,7 +105,7 @@ models call these **Track** and **Action**, respectively.
   `/api/v1` by `Backend/app/api/router.py`.
 - SQLAlchemy models and feature logic live in `Backend/app/modules/`: `auth`,
   `users`, `tracks`, `actions`, `streaks`, `achievements`, `reminders`,
-  `vault`, `dashboard`, and `admin`.
+  `vault`, `wallet`, `dashboard`, and `admin`.
 - Database schema changes are managed by Alembic in `Backend/alembic/`. Apply
   migrations explicitly; application startup does not create tables.
 - Authentication uses Argon2 password hashing, JWT access tokens, and rotating
@@ -108,8 +130,27 @@ models call these **Track** and **Action**, respectively.
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
   `MyApp/src/config/env.ts`.
-- Design tokens, themes, and accents live in `MyApp/src/theme/`. Reusable UI
-  components are in `MyApp/src/components/`.
+- The "Midnight & Champagne" design system lives in `MyApp/src/theme/`:
+  `palette.ts` (brand colors, dark and light themes, accents),
+  `typography.ts` (Cormorant Garamond display and Manrope UI type),
+  `tokens.ts` (spacing, radius, motion, layout) and `index.ts` (the
+  semantic `colors`, `gradients`, `type` and `shadow` tokens applied at
+  startup). Reusable UI components are in `MyApp/src/components/`, the
+  ambient backdrop in `MyApp/src/layouts/`, and shared motion in
+  `MyApp/src/animations/`. Dark is the default theme.
+- The bundled fonts are in `MyApp/assets/fonts` (SIL Open Font License),
+  which Android packages as assets. iOS currently falls back to the system
+  serif and sans until the fonts are added to the Xcode project.
+- Phones use a floating tab bar, tablets a centered tab bar with two-column
+  layouts, and desktop-width windows a navigation rail on the left. The tab
+  bar or rail shows on every signed-in screen, including pushed screens; the
+  phone bar hides while the keyboard is open.
+- Every tab's top bar has the same actions: Search (find another user by
+  User ID and see their shared streak), Wallet and Settings.
+- The Memo logo lives in `MyApp/assets/images` as transparent PNGs cut from
+  `Memo.png` (`memo-logo.png` full, `memo-mark.png` the "M" only), so it sits
+  on either theme. Colourful "real" icons (`MyApp/src/components/RealIcon.tsx`)
+  are used for the tab bar, streak, badges, wallet, reminders and Vault.
 - Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
   reminder/task alarms and the streak warning while signed in.
 - Satya's model is rendered in a WebView from the mobile app's bundled assets.

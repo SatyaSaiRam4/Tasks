@@ -1,306 +1,176 @@
 /**
- * Memo design tokens — a light-first system with a dark alternative.
+ * Memo design system — "Midnight & Champagne".
  *
- * Warm, light-first surfaces with a configurable accent, semantic colors for
- * completion and streaks, and red only for destructive actions. Screens use
- * semantic tokens from here, never raw hex values.
+ * One source of truth for color, type, shape, depth and motion. Screens read
+ * semantic tokens from here and never use raw hex values.
  *
- * `primary` is the interactive accent and is user-configurable (Settings →
- * Accent). It is applied once at startup (see applyAccent / index.js), before
- * any StyleSheet is created, so every screen picks it up consistently. The
- * gold brand color (`colors.gold`) never changes.
+ * The theme (dark by default, or the ivory light theme) and the accent are
+ * chosen in Settings and applied once at startup by `applyTheme` and
+ * `applyAccent` (see index.js), before any screen creates its StyleSheet.
+ * Both functions update the exported objects in place, so every token below
+ * (colors, gradients, type, shadow) is already final when screens load.
  */
+import type { TextStyle } from 'react-native';
+import { ACCENTS, brand, DEFAULT_ACCENT, DEFAULT_THEME, PALETTES, withAlpha, type AccentName, type ThemeMode } from './palette';
+import { font, sansFace, serifFace } from './typography';
 
-import { Platform } from 'react-native';
+export * from './palette';
+export * from './typography';
+export * from './tokens';
 
-export const ACCENTS = {
-  violet: { primary: '#6D5BD0', secondary: '#5274C8' },
-  ocean: { primary: '#2678A8', secondary: '#168B83' },
-  emerald: { primary: '#168363', secondary: '#2678A8' },
-  rose: { primary: '#BD4C72', secondary: '#875AB8' },
-  amber: { primary: '#A85D20', secondary: '#C47732' },
-} as const;
-
-export type AccentName = keyof typeof ACCENTS;
-export type ThemeMode = 'light' | 'dark';
-export const DEFAULT_ACCENT: AccentName = 'amber';
-export const DEFAULT_THEME: ThemeMode = 'light';
-
-const PALETTES = {
-  light: {
-    background: '#F5F3EE',
-    backgroundRaised: '#FFFFFF',
-    surface: '#FFFFFF',
-    surfaceAlt: '#F0EEE8',
-    surfaceHigh: '#E8E5DE',
-    overlay: 'rgba(19, 25, 31, 0.48)',
-    border: 'rgba(34, 43, 51, 0.09)',
-    borderStrong: 'rgba(34, 43, 51, 0.16)',
-    divider: 'rgba(34, 43, 51, 0.08)',
-    text: '#1D292F',
-    textSecondary: '#59666B',
-    textTertiary: '#7B8588',
-    textInverse: '#FFFFFF',
-    success: '#168363',
-    successSoft: 'rgba(22, 131, 99, 0.12)',
-    streak: '#B86A2D',
-    streakGold: '#C18436',
-    streakSoft: 'rgba(184, 106, 45, 0.12)',
-    warning: '#A66A1D',
-    warningSoft: 'rgba(166, 106, 29, 0.12)',
-    danger: '#C44747',
-    dangerSoft: 'rgba(196, 71, 71, 0.10)',
-    info: '#28759A',
-    infoSoft: 'rgba(40, 117, 154, 0.11)',
-    isDark: false,
-  },
-  dark: {
-    background: '#101416',
-    backgroundRaised: '#171D1F',
-    surface: '#1B2224',
-    surfaceAlt: '#242D2F',
-    surfaceHigh: '#303B3D',
-    overlay: 'rgba(3, 7, 8, 0.76)',
-    border: 'rgba(255, 255, 255, 0.08)',
-    borderStrong: 'rgba(255, 255, 255, 0.15)',
-    divider: 'rgba(255, 255, 255, 0.07)',
-    text: '#F3F4EF',
-    textSecondary: '#AEB8B7',
-    textTertiary: '#7E8A89',
-    textInverse: '#101416',
-    success: '#48BE91',
-    successSoft: 'rgba(72, 190, 145, 0.14)',
-    streak: '#E79A53',
-    streakGold: '#E8BE72',
-    streakSoft: 'rgba(231, 154, 83, 0.14)',
-    warning: '#E8BE72',
-    warningSoft: 'rgba(232, 190, 114, 0.14)',
-    danger: '#E77777',
-    dangerSoft: 'rgba(231, 119, 119, 0.14)',
-    info: '#71B5D2',
-    infoSoft: 'rgba(113, 181, 210, 0.14)',
-    isDark: true,
-  },
-} as const;
-
-export function withAlpha(hex: string, alpha: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
-/** Type families: the platform's own serif and sans faces, no bundled font files. */
-export const fonts = {
-  display: Platform.select({ ios: 'Georgia', default: 'serif' }),
-  sans: Platform.select({ ios: 'System', default: 'sans-serif' }),
-};
+type Pair = [string, string];
 
 export const colors = {
-  ...PALETTES.light,
+  ...PALETTES[DEFAULT_THEME],
 
-  // Accent (mutated by applyAccent at startup).
+  // Interactive accent (set by applyAccent).
   primary: ACCENTS[DEFAULT_ACCENT].primary as string,
-  primarySecondary: ACCENTS[DEFAULT_ACCENT].secondary as string,
-  primarySoft: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.16),
-  primaryGlow: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.35),
+  primarySecondary: ACCENTS[DEFAULT_ACCENT].deep as string,
+  primarySoft: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.14),
+  primaryGlow: withAlpha(ACCENTS[DEFAULT_ACCENT].primary, 0.32),
+  /** Solid accent fill that always carries dark ink (chips, small round buttons). */
+  primaryFill: ACCENTS[DEFAULT_ACCENT].primary as string,
+  onPrimary: brand.ink as string,
 
-  gold: '#D9A74A',
-  goldBright: '#F5C977',
-  goldDeep: '#B77B2F',
-  goldSoft: 'rgba(217, 167, 74, 0.12)',
-  goldLine: 'rgba(201, 159, 82, 0.5)',
-  glass: 'rgba(255, 255, 255, 0.14)',
-  glassStrong: 'rgba(255, 255, 255, 0.22)',
-  moon: '#E1D2A0',
-  violet: '#7C6BC0',
-  onPrimary: '#FFFFFF',
+  // The cinematic "hero" surfaces stay midnight in both themes.
+  heroText: brand.ivory as string,
+  heroTextSecondary: 'rgba(239, 233, 220, 0.66)',
+  heroTextTertiary: 'rgba(239, 233, 220, 0.42)',
+  heroLine: 'rgba(212, 175, 106, 0.28)',
+  heroGlass: 'rgba(255, 255, 255, 0.05)',
+  heroGoldSoft: 'rgba(212, 175, 106, 0.1)',
+  heroGoldLine: 'rgba(212, 175, 106, 0.3)',
+  /** Full-screen scrims behind celebrations and the guided tour. */
+  scrim: 'rgba(2, 4, 9, 0.9)',
+  scrimSoft: 'rgba(2, 4, 9, 0.72)',
+
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
 };
 
-/** Selects the shared surface and semantic colors before screens are loaded. */
-export function applyTheme(mode: string | null | undefined): ThemeMode {
-  const key: ThemeMode = mode === 'dark' ? 'dark' : DEFAULT_THEME;
-  Object.assign(colors, PALETTES[key]);
-  gradients.surface = key === 'light' ? ['#FFFFFF', '#F0EEE8'] : ['#242D2F', '#171D1F'];
-  gradients.vault = key === 'light' ? ['#E9E5F1', '#F5F3EE'] : ['#292536', '#101416'];
-  gradients.dashboard = key === 'light' ? ['#304840', '#203932'] : ['#293B36', '#182925'];
-  gradients.streak = key === 'light' ? ['#C18436', '#A85D20'] : ['#E8BE72', '#D78642'];
-  gradients.success = key === 'light' ? ['#168363', '#267D69'] : ['#48BE91', '#2E9B8C'];
-  gradients.danger = key === 'light' ? ['#C44747', '#A93E57'] : ['#E77777', '#C85B65'];
-  gradients.gold = key === 'light' ? ['#F5C977', '#B77B2F'] : ['#E8BE72', '#D29A4E'];
-  gradients.moonlight = key === 'light' ? ['#F8F2E2', '#E7D6AE'] : ['#2E2C31', '#1F2127'];
-  Object.assign(shadow.card, {
-    shadowOpacity: key === 'light' ? 0.09 : 0.35,
-    shadowRadius: key === 'light' ? 14 : 20,
-    elevation: key === 'light' ? 2 : 6,
-  });
-  Object.assign(shadow.float, {
-    shadowOpacity: key === 'light' ? 0.14 : 0.45,
-    shadowRadius: key === 'light' ? 20 : 28,
-    elevation: key === 'light' ? 5 : 12,
-  });
-  return key;
+export const gradients = {
+  primary: [ACCENTS[DEFAULT_ACCENT].bright, ACCENTS[DEFAULT_ACCENT].primary] as Pair,
+  gold: [brand.champagneLight, brand.champagneDeep] as Pair,
+  /** The midnight hero panel used for feature cards, sheets and the tab bar. */
+  hero: [brand.panelHigh, brand.midnight] as Pair,
+  surface: ['#121A2E', '#0B1122'] as Pair,
+  streak: ['#F0C27F', '#C9772F'] as Pair,
+  success: ['#9FDCBF', '#5BA886'] as Pair,
+  danger: ['#F0A2A6', '#C9606A'] as Pair,
+  /** Backdrop wash, top → bottom. */
+  backdrop: [brand.navy, brand.obsidian] as Pair,
+  /** Faint gold sheen across the top edge of raised surfaces. */
+  sheen: ['rgba(243, 220, 166, 0)', 'rgba(243, 220, 166, 0.38)'] as Pair,
+  /** The brighter sheen used on midnight hero surfaces (same in both themes). */
+  heroSheen: ['rgba(243, 220, 166, 0)', 'rgba(243, 220, 166, 0.55)'] as Pair,
+  /** Light on satin: the highlight along filled buttons. */
+  satinSheen: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.75)'] as Pair,
+};
+
+const serifStyle = (size: number, lineHeight: number, weight: '500' | '600' | '700' = '600'): TextStyle => ({
+  ...serifFace(weight),
+  fontSize: size,
+  lineHeight,
+  color: colors.text,
+});
+
+function buildType() {
+  return {
+    hero: { ...serifStyle(64, 66), letterSpacing: -1 },
+    display: { ...serifStyle(40, 44), letterSpacing: -0.4 },
+    title: { ...serifStyle(30, 34), letterSpacing: -0.2 },
+    heading: serifStyle(23, 27),
+    subtitle: { ...sansFace('600'), fontSize: 16, lineHeight: 22, color: colors.text },
+    body: { ...sansFace('400'), fontSize: 15, lineHeight: 23, color: colors.text },
+    bodyStrong: { ...sansFace('600'), fontSize: 15, lineHeight: 21, color: colors.text },
+    caption: { ...sansFace('500'), fontSize: 13, lineHeight: 18, color: colors.textSecondary },
+    /** Spaced small caps used for eyebrows and labels. */
+    micro: {
+      ...sansFace('700'),
+      fontSize: 10.5,
+      lineHeight: 14,
+      letterSpacing: 2.2,
+      textTransform: 'uppercase' as const,
+      color: colors.gold,
+    },
+    /** A serif italic aside, e.g. greetings and quiet notes. */
+    aside: { ...serifFace('500', true), fontSize: 18, lineHeight: 24, color: colors.textSecondary },
+    /** Big serif numerals (streaks, counts). */
+    numeral: { ...serifStyle(44, 48), letterSpacing: -0.5 },
+    /** Button and tab labels. */
+    label: { ...sansFace('700'), fontSize: 14.5, letterSpacing: 0.6, color: colors.text },
+  };
 }
 
-export const gradients = {
-  primary: [colors.primary, colors.primarySecondary] as [string, string],
-  streak: ['#C18436', '#A85D20'] as [string, string],
-  success: ['#168363', '#267D69'] as [string, string],
-  surface: ['#FFFFFF', '#F0EEE8'] as [string, string],
-  vault: ['#E9E5F1', '#F5F3EE'] as [string, string],
-  dashboard: ['#304840', '#203932'] as [string, string],
-  danger: ['#C44747', '#A93E57'] as [string, string],
-  gold: ['#F5C977', '#B77B2F'] as [string, string],
-  moonlight: ['#F8F2E2', '#E7D6AE'] as [string, string],
+export const type = buildType();
+
+export const shadow = {
+  card: {
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.32,
+    shadowRadius: 22,
+    elevation: 4,
+  },
+  float: {
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.45,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  /** A warm halo under primary calls to action. */
+  glow: {
+    shadowColor: ACCENTS[DEFAULT_ACCENT].primary as string,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 6,
+  },
 };
+
+/** Selects the theme palette before screens are loaded. */
+export function applyTheme(mode: string | null | undefined): ThemeMode {
+  const key: ThemeMode = mode === 'light' || mode === 'dark' ? mode : DEFAULT_THEME;
+  Object.assign(colors, PALETTES[key]);
+  const dark = key === 'dark';
+  gradients.surface = dark ? ['#111A2E', '#0B1122'] : ['#FFFDF8', '#F7F1E5'];
+  gradients.backdrop = dark ? [brand.navy, brand.obsidian] : ['#FBF7EF', '#F1E9DA'];
+  gradients.streak = dark ? ['#F0C27F', '#C9772F'] : ['#E2A35A', '#B8692A'];
+  gradients.success = dark ? ['#9FDCBF', '#5BA886'] : ['#5DB38B', '#2F8A63'];
+  gradients.danger = dark ? ['#F0A2A6', '#C9606A'] : ['#D86A72', '#B8434B'];
+  gradients.sheen = dark ? ['rgba(243, 220, 166, 0)', 'rgba(243, 220, 166, 0.38)'] : ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.95)'];
+  Object.assign(shadow.card, {
+    shadowColor: dark ? colors.black : '#3B2A10',
+    shadowOpacity: dark ? 0.32 : 0.08,
+    shadowRadius: dark ? 22 : 18,
+    elevation: dark ? 4 : 2,
+  });
+  Object.assign(shadow.float, {
+    shadowColor: dark ? colors.black : '#1A1408',
+    shadowOpacity: dark ? 0.45 : 0.16,
+    shadowRadius: dark ? 30 : 26,
+    elevation: dark ? 12 : 8,
+  });
+  Object.assign(type, buildType());
+  return key;
+}
 
 /** Applies a named accent before any styles are created. */
 export function applyAccent(name: string | null | undefined): AccentName {
   const key = (name && name in ACCENTS ? name : DEFAULT_ACCENT) as AccentName;
   const accent = ACCENTS[key];
-  colors.primary = accent.primary;
-  colors.primarySecondary = accent.secondary;
-  colors.primarySoft = withAlpha(accent.primary, 0.14);
+  // Light theme: interactive text uses the deep tone so it reads on ivory.
+  colors.primary = colors.isDark ? accent.primary : accent.deep;
+  colors.primarySecondary = colors.isDark ? accent.deep : accent.primary;
+  colors.primarySoft = withAlpha(accent.primary, colors.isDark ? 0.14 : 0.16);
   colors.primaryGlow = withAlpha(accent.primary, 0.32);
-  gradients.primary = [accent.primary, accent.secondary];
+  colors.primaryFill = accent.primary;
+  colors.onPrimary = brand.ink;
+  gradients.primary = [accent.bright, accent.primary];
+  shadow.glow.shadowColor = accent.primary;
   return key;
 }
 
-/** Per-Track colors users can pick from. */
-export const TRACK_COLORS = ['#D9BC82', '#A3BEEB', '#93D2B6', '#E8AD66', '#E5AFBE', '#B1A3EC', '#8FC6E0', '#E6957F'];
-
-export const spacing = {
-  xxs: 2,
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 28,
-  xxxl: 40,
-  huge: 56,
-} as const;
-
-/** Horizontal page gutter used by every screen (phones). */
-export const GUTTER = 20;
-
-/** Height of the floating tab bar, excluding the bottom safe-area padding. */
-export const TAB_BAR_HEIGHT = 68;
-
-/** Layout breakpoints (dp) and the readable content width on large screens. */
-export const breakpoints = {
-  tablet: 700,
-  desktop: 1024,
-} as const;
-export const CONTENT_MAX_WIDTH = 760;
-export const WIDE_CONTENT_MAX_WIDTH = 1080;
-
-export const radius = {
-  xs: 4,
-  sm: 8,
-  md: 10,
-  lg: 12,
-  xl: 16,
-  xxl: 24,
-  pill: 999,
-} as const;
-
-export const fontSize = {
-  micro: 10.5,
-  caption: 13,
-  body: 15,
-  subtitle: 16,
-  heading: 20,
-  title: 26,
-  display: 32,
-  hero: 52,
-} as const;
-
-/** Some serif faces default to old-style figures; numbers must read as numbers. */
-const LINING: ('lining-nums')[] = ['lining-nums'];
-
-const serif = (size: number, weight: '500' | '600' | '700' = '600') => ({
-  fontFamily: fonts.display,
-  fontVariant: LINING,
-  fontSize: size,
-  fontWeight: weight,
-  color: colors.text,
-});
-const sans = (size: number, weight: '400' | '500' | '600' | '700' | '800' = '400') => ({
-  fontFamily: fonts.sans,
-  fontSize: size,
-  fontWeight: weight,
-  color: colors.text,
-});
-
-/** Font family + weight for one-off styles, so nothing falls back to the system face. */
-export const font = {
-  regular: { fontFamily: fonts.sans, fontWeight: '400' as const },
-  medium: { fontFamily: fonts.sans, fontWeight: '500' as const },
-  semibold: { fontFamily: fonts.sans, fontWeight: '600' as const },
-  bold: { fontFamily: fonts.sans, fontWeight: '700' as const },
-  heavy: { fontFamily: fonts.sans, fontWeight: '800' as const },
-  serif: { fontFamily: fonts.display, fontWeight: '600' as const, fontVariant: LINING },
-  serifBold: { fontFamily: fonts.display, fontWeight: '700' as const, fontVariant: LINING },
-  serifItalic: { fontFamily: fonts.display, fontWeight: '500' as const, fontStyle: 'italic' as const, fontVariant: LINING },
-};
-
-export const type = {
-  hero: { fontFamily: 'serif', fontSize: fontSize.hero, fontWeight: '800' as const, color: colors.text },
-  display: { fontFamily: 'serif', fontSize: fontSize.display, fontWeight: '800' as const, color: colors.text },
-  title: { fontFamily: 'serif', fontSize: fontSize.title, fontWeight: '700' as const, color: colors.text },
-  heading: { fontFamily: 'serif', fontSize: fontSize.heading, fontWeight: '700' as const, color: colors.text },
-  subtitle: { fontSize: fontSize.subtitle, fontWeight: '600' as const, color: colors.text },
-  body: { fontSize: fontSize.body, fontWeight: '400' as const, lineHeight: 22, color: colors.text },
-  bodyStrong: { fontSize: fontSize.body, fontWeight: '600' as const, color: colors.text },
-  caption: { fontSize: fontSize.caption, fontWeight: '500' as const, color: colors.textSecondary },
-  micro: {
-    fontSize: fontSize.micro,
-    fontWeight: '700' as const,
-    letterSpacing: 0,
-    textTransform: 'uppercase' as const,
-    color: withAlpha(colors.gold, 0.78),
-  },
-  /** A serif italic aside, e.g. greetings and quiet notes. */
-  aside: { ...font.serifItalic, fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
-  /** Big serif numerals (streaks, counts). */
-  numeral: { ...serif(36, '600'), letterSpacing: -0.5 },
-};
-
-export const shadow = {
-  card: {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.09,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  float: {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.14,
-    shadowRadius: 20,
-    elevation: 5,
-  },
-};
-
-export const motion = {
-  fast: 160,
-  normal: 280,
-  slow: 520,
-  stagger: 70,
-  ambient: 5200,
-};
-
-export const iconSize = {
-  sm: 16,
-  md: 20,
-  lg: 24,
-  xl: 32,
-};
-
-export const hitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
-
-/** Minimum comfortable touch target. */
-export const TOUCH_TARGET = 44;
+export { font };

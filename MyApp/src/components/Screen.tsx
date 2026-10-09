@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewStyle } from 'react-native';
+import { Animated, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { colors, CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH } from '../theme';
+import { colors, CONTENT_MAX_WIDTH, spacing, WIDE_CONTENT_MAX_WIDTH } from '../theme';
 import { useLayout } from '../hooks/useLayout';
 import { Backdrop } from '../layouts/Backdrop';
 import { OfflineBanner } from './OfflineBanner';
+import { riseStyle, useFocusEntrance } from '../animations';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ interface ScreenProps {
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: Edge[];
-  /** Tints the moonlit glow of the night-sky backdrop, e.g. the Vault uses violet. */
+  /** Tints the main pool of ambient light, e.g. the Vault uses the accent. */
   glowColor?: string;
   /** Dashboard-style screens get a wider column on tablets and desktops. */
   wide?: boolean;
@@ -23,9 +24,10 @@ interface ScreenProps {
 }
 
 /**
- * Shared screen chrome: the selected background with a faint ambient glow,
- * safe areas, an offline banner, and an optional scroll
- * container with pull-to-refresh.
+ * Shared screen chrome: the cinematic backdrop, safe areas, an offline
+ * banner, an entrance as the screen comes into view, and an optional scroll
+ * container with pull-to-refresh. Content is
+ * centered in a capped column on large screens.
  */
 export function Screen({
   children,
@@ -35,18 +37,21 @@ export function Screen({
   refreshing = false,
   onRefresh,
   edges = ['top'],
-  glowColor = colors.moon,
+  glowColor,
   wide = false,
   keyboardShouldPersistTaps = 'handled',
   footer,
 }: ScreenProps) {
-  const { gutter } = useLayout();
+  const { gutter, hasRail } = useLayout();
+  // Content rises in from below whenever the screen comes into view.
+  const enter = useFocusEntrance();
+  const body = <Animated.View style={[styles.fill, riseStyle(enter, 28)]}>{children}</Animated.View>;
   const frame: ViewStyle = {
     width: '100%',
     maxWidth: (wide ? WIDE_CONTENT_MAX_WIDTH : CONTENT_MAX_WIDTH) + gutter * 2,
     alignSelf: 'center',
   };
-  const inner = [frame, padded && { paddingHorizontal: gutter }, contentStyle];
+  const inner = [frame, padded && { paddingHorizontal: gutter }, hasRail && styles.railContent, contentStyle];
 
   // Only show the spinner for a refresh the user pulled for. `refreshing` is
   // usually a query's isFetching, which also flips on background refetches,
@@ -70,6 +75,7 @@ export function Screen({
       <OfflineBanner />
       {scroll ? (
         <ScrollView
+          style={styles.fill}
           contentContainerStyle={[styles.scrollContent, ...inner]}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}
           showsVerticalScrollIndicator={false}
@@ -85,10 +91,10 @@ export function Screen({
             ) : undefined
           }
         >
-          {children}
+          {body}
         </ScrollView>
       ) : (
-        <View style={[styles.fill, ...inner]}>{children}</View>
+        <View style={[styles.fill, ...inner]}>{body}</View>
       )}
       {footer}
     </SafeAreaView>
@@ -105,6 +111,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 140,
+    paddingBottom: 150,
+  },
+  railContent: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.huge * 2,
   },
 });

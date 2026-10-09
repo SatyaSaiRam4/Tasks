@@ -6,12 +6,13 @@ import { colors, font, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
-import { SectionHeader } from '../../../components/Controls';
+import { Medallion, SectionHeader } from '../../../components/Controls';
 import { Button } from '../../../components/Button';
 import { AnimatedNumber } from '../../../components/Progress';
 import { ErrorState, SkeletonList } from '../../../components/Feedback';
-import { Icon, type IconName } from '../../../components/Icon';
+import { type IconName } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
+import { useLayout } from '../../../hooks/useLayout';
 import { useGetAdminDashboardQuery } from '../adminApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
@@ -24,6 +25,7 @@ export function AdminDashboardScreen() {
   return (
     <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
       <ScreenHeader title="Admin" subtitle="System overview" />
+      <Text style={styles.intro}>Live totals across every account. Private Vault content is never visible here.</Text>
       {isLoading ? (
         <SkeletonList count={6} height={80} />
       ) : isError || !data ? (
@@ -55,9 +57,9 @@ export function AdminDashboardScreen() {
             <Tile icon="clock" label="WhatsApp queued" value={data.whatsapp_pending} color={colors.info} />
           </View>
 
-          <Card style={styles.vault}>
+          <Card tone="glass" style={styles.vault}>
             <View style={styles.row}>
-              <Icon name="lock" size={18} color={colors.textSecondary} />
+              <Medallion icon="lock" size={38} color={colors.violet} />
               <Text style={[t.caption, styles.flex]}>
                 {data.vault_entries} Vault entries exist. Admins can see this count only. Vault content is encrypted and never
                 available here.
@@ -73,9 +75,10 @@ export function AdminDashboardScreen() {
 }
 
 function Tile({ icon, label, value, color }: { icon: IconName; label: string; value: number; color: string }) {
+  const { isPhone } = useLayout();
   return (
-    <Card style={styles.tile} contentStyle={styles.tileContent}>
-      <Icon name={icon} size={16} color={color} />
+    <Card style={[styles.tile, isPhone && styles.tilePhone]} contentStyle={styles.tileContent}>
+      <Medallion icon={icon} size={34} color={color} />
       <AnimatedNumber value={value} style={styles.value} />
       <Text style={t.caption}>{label}</Text>
     </Card>
@@ -89,9 +92,14 @@ const styles = StyleSheet.create({
   first: {
     marginTop: spacing.sm,
   },
+  intro: {
+    ...t.aside,
+    marginBottom: spacing.sm,
+  },
   row: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.md,
   },
   grid: {
     flexDirection: 'row',
@@ -99,17 +107,20 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   tile: {
-    width: '30.5%',
+    width: '31%',
     flexGrow: 1,
   },
+  tilePhone: {
+    width: '47%',
+  },
   tileContent: {
-    padding: spacing.md,
-    gap: 4,
+    padding: spacing.lg,
+    gap: 6,
   },
   value: {
     ...font.serif,
-    fontSize: 26,
-    lineHeight: 30,
+    fontSize: 30,
+    lineHeight: 34,
     color: colors.goldBright,
   },
   vault: {

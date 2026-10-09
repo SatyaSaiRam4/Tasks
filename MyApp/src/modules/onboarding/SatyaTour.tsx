@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, font, radius, spacing, type as t } from '../../theme';
+import { brand, colors, font, gradients, radius, spacing, type as t } from '../../theme';
+import { Gradient, Sheen } from '../../components/Gradient';
 import { useMotion } from '../../hooks/useMotion';
 import { Button } from '../../components/Button';
 import { useAppSelector } from '../../app/hooks';
@@ -60,7 +61,9 @@ export function SatyaTour({ goToTab }: { goToTab: (tab: keyof MainTabParamList) 
     <View style={styles.overlay} onStartShouldSetResponder={() => true} accessibilityViewIsModal>
       <Animated.View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg, opacity: fade }]}>
         <View style={styles.bubble}>
-          <Text style={styles.name}>SATYA</Text>
+          <Gradient colors={gradients.hero} direction="diagonal" style={StyleSheet.absoluteFill} />
+          <Sheen color={gradients.heroSheen} inset="18%" />
+          <Text style={styles.name}>Satya · your guide</Text>
           <Text style={[t.body, styles.text]} accessibilityLiveRegion="polite">
             {step.text(name)}
           </Text>
@@ -97,7 +100,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(2, 3, 8, 0.7)',
+    backgroundColor: colors.scrimSoft,
     justifyContent: 'flex-end',
   },
   bottom: {
@@ -112,22 +115,24 @@ const styles = StyleSheet.create({
   },
   bubble: {
     flex: 1,
-    padding: spacing.lg,
+    padding: spacing.lg + 2,
     borderRadius: radius.xl,
     borderBottomRightRadius: radius.sm,
-    backgroundColor: colors.glassStrong,
+    backgroundColor: brand.midnight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldLine,
+    borderColor: colors.heroLine,
     marginBottom: spacing.xl,
+    overflow: 'hidden',
   },
   name: {
     ...t.micro,
+    color: brand.champagne,
   },
   text: {
     ...t.aside,
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 20,
+    color: colors.heroText,
+    fontSize: 19,
+    lineHeight: 25,
     marginTop: spacing.sm,
   },
   footer: {
@@ -146,14 +151,14 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceHigh,
+    backgroundColor: 'rgba(239,233,220,0.18)',
   },
   dotOn: {
     width: 18,
-    backgroundColor: colors.gold,
+    backgroundColor: brand.champagne,
   },
   skip: {
     ...font.semibold,
-    color: colors.textSecondary,
+    color: colors.heroTextSecondary,
   },
 });

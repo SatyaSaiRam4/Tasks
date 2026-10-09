@@ -6,6 +6,7 @@ import { colors, spacing, type as t } from '../../theme';
 import { Sheet } from '../../components/Sheet';
 import { Button } from '../../components/Button';
 import { Icon } from '../../components/Icon';
+import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
@@ -100,6 +101,9 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
         {target ? (
           target.isCompleted ? (
             <View>
+              <View style={[styles.badge, styles.badgeMuted]}>
+                <Icon name="refresh" size={26} color={colors.textSecondary} strokeWidth={1.6} />
+              </View>
               <Text style={[t.heading, styles.center]}>Mark “{target.title}” as not done?</Text>
               <View style={styles.actions}>
                 <Button label="Mark as not done" variant="secondary" size="lg" onPress={undo} loading={undoing} />
@@ -109,8 +113,9 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           ) : (
             <View>
               <View style={styles.badge}>
-                <Icon name="check-circle" size={28} color={colors.success} strokeWidth={1.6} />
+                <RealIcon name="check" size={56} />
               </View>
+              <Text style={styles.eyebrow}>An honest check</Text>
               <Text style={[t.heading, styles.center]}>Did you do “{target.title}” today?</Text>
               <View style={styles.actions}>
                 <Button label="Yes, done" variant="success" size="lg" icon="check" onPress={() => confirm()} loading={completing} />
@@ -132,15 +137,24 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'center',
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
     backgroundColor: colors.successSoft,
     borderWidth: 1,
-    borderColor: 'rgba(140,211,179,0.35)',
+    borderColor: colors.successSoft,
+  },
+  badgeMuted: {
+    backgroundColor: colors.glassStrong,
+    borderColor: colors.borderStrong,
+  },
+  eyebrow: {
+    ...t.micro,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   actions: {
     marginTop: spacing.xl,

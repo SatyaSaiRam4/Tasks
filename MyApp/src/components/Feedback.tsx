@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, motion, radius, spacing, type as t } from '../theme';
+import { colors, motion, radius, spacing, type as t, withAlpha } from '../theme';
 import { useMotion } from '../hooks/useMotion';
 import { easeOut } from '../animations';
 import { Button } from './Button';
@@ -55,8 +55,8 @@ export function Skeleton({ width = '100%', height = 16, rounded = radius.sm, sty
       {w && !reduced ? (
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
           <View style={styles.shimmerRow}>
-            <Gradient colors={['rgba(217,188,130,0)', 'rgba(217,188,130,0.07)']} direction="horizontal" style={styles.flex} />
-            <Gradient colors={['rgba(217,188,130,0.07)', 'rgba(217,188,130,0)']} direction="horizontal" style={styles.flex} />
+            <Gradient colors={[withAlpha(colors.gold, 0), withAlpha(colors.gold, 0.1)]} direction="horizontal" style={styles.flex} />
+            <Gradient colors={[withAlpha(colors.gold, 0.1), withAlpha(colors.gold, 0)]} direction="horizontal" style={styles.flex} />
           </View>
         </Animated.View>
       ) : null}
@@ -94,7 +94,7 @@ export function EmptyState({
 }) {
   return (
     <FadeIn style={[styles.empty, compact && styles.emptyCompact]}>
-      <Emblem icon={icon} size={compact ? 128 : 168} />
+      <Emblem icon={icon} size={compact ? 132 : 176} />
       <Text style={[t.heading, styles.center, styles.emptyTitle]}>{title}</Text>
       {message ? <Text style={[t.body, styles.emptyMessage]}>{message}</Text> : null}
       {actionLabel && onAction ? (
@@ -107,7 +107,7 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View style={styles.empty} accessibilityRole="alert">
-      <Emblem icon="alert" size={140} tint={colors.danger} ring={[colors.danger, '#8A4B5A']} />
+      <Emblem icon="alert" size={150} tint={colors.danger} ring={[colors.danger, colors.danger]} />
       <Text style={[t.heading, styles.center, styles.emptyTitle]}>Something went wrong</Text>
       <Text style={[t.body, styles.emptyMessage]}>{message}</Text>
       {onRetry ? <Button label="Try again" icon="refresh" variant="secondary" onPress={onRetry} fullWidth={false} style={styles.emptyAction} /> : null}
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   skeleton: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glassStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -141,13 +141,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   emptyTitle: {
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    fontSize: 26,
+    lineHeight: 30,
   },
   emptyMessage: {
     marginTop: spacing.sm,
     color: colors.textSecondary,
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 340,
   },
   emptyAction: {
     marginTop: spacing.xl,

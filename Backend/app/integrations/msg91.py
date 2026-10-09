@@ -24,6 +24,8 @@ dashboard shows it per-template under Templates → Code{JSON}), and the
 `/bulk/` endpoint is the one that actually works, not the non-bulk one.
 """
 
+import logging
+
 import httpx
 
 from app.core.config import (
@@ -34,6 +36,8 @@ from app.core.config import (
 )
 
 MSG91_WHATSAPP_URL = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/"
+
+logger = logging.getLogger("msg91")
 
 
 def is_configured() -> bool:
@@ -77,6 +81,17 @@ def send_whatsapp_reminder(to_number: str, message: str) -> bool:
 
     try:
         response = httpx.post(MSG91_WHATSAPP_URL, json=payload, headers=headers, timeout=10.0)
-        return response.is_success
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        logger.warning("MSG91 request to %s failed: %s", bare_number, exc)
         return False
+
+    # MSG91 can answer 200 with {"hasError": true, ...}; that is not a send.
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if not response.is_success or (isinstance(body, dict) and body.get("hasError")):
+        logger.warning("MSG91 rejected WhatsApp to %s: HTTP %s %s", bare_number, response.status_code, response.text[:300])
+        return False
+    logger.info("MSG91 accepted WhatsApp to %s (request_id=%s)", bare_number, body.get("request_id") if isinstance(body, dict) else None)
+    return True

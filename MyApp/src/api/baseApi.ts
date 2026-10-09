@@ -134,6 +134,7 @@ export const baseApi = createApi({
     'VaultEntry',
     'AdminUser',
     'AdminDashboard',
+    'Wallet',
   ],
   endpoints: () => ({}),
 });

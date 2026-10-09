@@ -15,6 +15,7 @@ import notifee, {
   AuthorizationStatus,
   TriggerType,
 } from 'react-native-notify-kit';
+import { formatClock } from '../utils/date';
 
 const CHANNELS = {
   reminders: { id: 'reminders', name: 'Reminders', importance: AndroidImportance.HIGH },
@@ -23,6 +24,8 @@ const CHANNELS = {
 };
 
 const ACTION_PREFIX = 'action-';
+/** Memo's champagne, used to tint the small status-bar icon. */
+const NOTIFICATION_TINT = '#D4AF6A';
 const STREAK_PREFIX = 'streak-risk-';
 /** Local hour at which an unfinished day triggers a streak-at-risk warning. */
 export const STREAK_WARNING_HOUR = 20;
@@ -50,15 +53,34 @@ export async function hasNotificationPermission(): Promise<boolean> {
 async function schedule(id: string, channelId: string, title: string, body: string, at: Date): Promise<void> {
   if (at.getTime() <= Date.now()) return;
   await notifee.createTriggerNotification(
-    { id, title, body, android: { channelId, smallIcon: 'ic_notification', pressAction: { id: 'default' } } },
+    {
+      id,
+      title,
+      body,
+      android: {
+        channelId,
+        // The status-bar icon must be a one-colour silhouette (Android's rule), so it is
+        // tinted gold; the full-colour Memo logo shows as the large icon beside the text.
+        smallIcon: 'ic_notification',
+        color: NOTIFICATION_TINT,
+        largeIcon: 'ic_launcher',
+        pressAction: { id: 'default' },
+      },
+    },
     { type: TriggerType.TIMESTAMP, timestamp: at.getTime(), alarmManager: true },
   );
 }
 
 // ---- Reminders -----------------------------------------------------------------
 
-/** Schedules (or reschedules) a one-off notification for a reminder, keyed by its id. */
-export async function scheduleReminderNotification(reminderId: string, title: string, body: string, at: Date): Promise<void> {
+/**
+ * Schedules (or reschedules) a one-off notification for a reminder, keyed by
+ * its id, so scheduling again replaces it rather than adding a second one.
+ * The body is the note, or the time when there is none (never the title
+ * again, which would show it twice).
+ */
+export async function scheduleReminderNotification(reminderId: string, title: string, note: string | null | undefined, at: Date): Promise<void> {
+  const body = note?.trim() || `Reminder · ${formatClock(at)}`;
   await schedule(reminderId, CHANNELS.reminders.id, title, body, at);
 }
 

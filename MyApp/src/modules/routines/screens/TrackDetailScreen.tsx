@@ -4,8 +4,6 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, type as t } from '../../../theme';
-import { Eyebrow } from '../../../components/ScreenHeader';
-import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { IconButton } from '../../../components/Controls';
@@ -113,14 +111,49 @@ export function TrackDetailScreen() {
       refreshing={track.isFetching || grid.isFetching}
     >
       <ScreenHeader
+        title={tr?.name}
+        subtitle="Category"
         right={<IconButton icon="edit" accessibilityLabel="Edit category" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
       />
       {tr ? (
-        <View style={styles.meta}>
-          <Text style={styles.period}>{periodLabel(tr)}</Text>
-          <Text style={styles.taskCount}>{tr.action_count}/15 tasks</Text>
-        </View>
+        <Text style={styles.meta}>
+          {periodLabel(tr)}
+          {tr.today_required > 0 ? ` · ${Math.min(tr.today_completed, tr.today_required)}/${tr.today_required} today` : ''}
+        </Text>
       ) : null}
+
+      {/* The add box stays at the top, so it never moves as tasks are added. */}
+      <View style={styles.addRow}>
+        <View style={styles.flex}>
+          <TextField
+            value={newTask}
+            onChangeText={setNewTask}
+            placeholder={taskLimitReached ? 'Task limit reached' : rows.length ? 'Add another task' : 'Add a task, e.g. Workout'}
+            onSubmitEditing={() => {
+              if (!adding && !taskLimitReached) add();
+            }}
+            returnKeyType="done"
+            blurOnSubmit={false}
+            maxLength={200}
+            editable={!adding && !taskLimitReached}
+          />
+        </View>
+        <IconButton
+          icon="plus"
+          size={22}
+          color={colors.gold}
+          style={styles.addButton}
+          accessibilityLabel={taskLimitReached ? 'Task limit reached' : 'Add task'}
+          onPress={() => {
+            if (taskLimitReached) {
+              Toast.info('Task limit reached. Remove a task to add another.', 2);
+            } else if (!adding) {
+              add();
+            }
+          }}
+        />
+      </View>
+      {taskLimitReached ? <Text style={styles.limit}>A category can have up to 15 tasks, with 150 across your account.</Text> : null}
 
       {!grid.data ? (
         <Skeleton height={160} />
@@ -137,43 +170,15 @@ export function TrackDetailScreen() {
           <Text style={styles.hint}>Tick today’s box when you finish a task.</Text>
         </>
       ) : (
-        <Text style={styles.empty}>Add your tasks below. Each task gets a box to tick every day.</Text>
+        <Text style={styles.empty}>No tasks yet. Each task you add gets a box to tick every day.</Text>
       )}
 
-      <View style={styles.addRow}>
-        <View style={styles.flex}>
-          <TextField
-            value={newTask}
-            onChangeText={setNewTask}
-            placeholder={taskLimitReached ? 'Task limit reached' : rows.length ? 'Add another task' : 'Task name, e.g. Workout'}
-            onSubmitEditing={() => {
-              if (!adding && !taskLimitReached) add();
-            }}
-            returnKeyType="done"
-            maxLength={200}
-            editable={!adding && !taskLimitReached}
-          />
-        </View>
-        <IconButton
-          icon="plus"
-          accessibilityLabel={taskLimitReached ? 'Task limit reached' : 'Add task'}
-          onPress={() => {
-            if (taskLimitReached) {
-              Toast.info('Task limit reached. Remove or deactivate a task to add another.', 2);
-            } else if (!adding) {
-              add();
-            }
-          }}
-        />
-      </View>
-      {taskLimitReached ? <Text style={styles.limit}>A category can have up to 15 active tasks, with 150 across your account.</Text> : null}
-
-      <Button label="Delete category" variant="ghost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
+      <Button label="Delete category" icon="trash" variant="dangerGhost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
 
       <Sheet visible={Boolean(editing)} onClose={() => setEditing(null)} title="Edit task">
         <TextField value={editName} onChangeText={setEditName} placeholder="Task name" maxLength={200} />
         <Button label="Save" onPress={rename} loading={renaming} />
-        <Button label="Delete task" variant="ghost" onPress={removeTask} loading={deletingTask} style={styles.mtSm} />
+        <Button label="Delete task" icon="trash" variant="dangerGhost" onPress={removeTask} loading={deletingTask} style={styles.mtSm} />
       </Sheet>
 
       <ConfirmSheet
@@ -192,20 +197,15 @@ export function TrackDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  period: {
-    ...t.caption,
-  },
   meta: {
-    marginTop: -spacing.sm,
+    ...t.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: -spacing.xs,
     marginBottom: spacing.lg,
   },
-  taskCount: {
-    ...t.micro,
-    color: colors.textTertiary,
-    marginTop: 4,
+  flex: {
+    flex: 1,
   },
   limit: {
     ...t.caption,
@@ -214,25 +214,26 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...t.aside,
-    fontSize: 13,
+    fontSize: 15,
     marginTop: spacing.md,
     textAlign: 'center',
   },
   empty: {
-    ...t.aside,
-    marginBottom: spacing.md,
+    ...t.caption,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
   addRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
-    marginTop: spacing.xl,
   },
   addButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
     borderColor: colors.goldLine,
+    backgroundColor: colors.goldSoft,
   },
   delete: {
     marginTop: spacing.xl,

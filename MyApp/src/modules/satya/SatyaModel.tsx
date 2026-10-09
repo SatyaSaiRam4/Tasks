@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, font, gradients } from '../../theme';
+import { brand, colors, gradients } from '../../theme';
 import { useMotion } from '../../hooks/useMotion';
 import { Glow, Gradient } from '../../components/Gradient';
+import { Skeleton } from '../../components/Feedback';
+import { Icon } from '../../components/Icon';
 
 const MODEL_PAGE = 'file:///android_asset/web/satya/index.html';
 const LOAD_TIMEOUT_MS = 8000;
@@ -12,8 +14,9 @@ type Phase = 'loading' | 'ready' | 'fallback';
 
 /**
  * Satya, rendered from the bundled GLB through <model-viewer> in a WebView.
- * Never blocks the screen: an animated orb shows immediately and stays as the
- * fallback if WebGL is missing, the model fails, or loading takes too long.
+ * Never blocks the screen: a shimmering figure shows while it loads, and an
+ * animated orb is the fallback if WebGL is missing, the model fails, or
+ * loading takes too long.
  *
  * `intro="long"` plays the fuller entrance (first visit); "short" otherwise.
  */
@@ -35,7 +38,7 @@ export function SatyaModel({ size = 220, intro = 'short' }: { size?: number; int
   return (
     <View style={{ width: size, height: size }} accessible accessibilityLabel="Satya, your guide">
       <Glow color={colors.gold} size={size * 1.25} intensity={0.32} style={[styles.glow, { left: -size * 0.125, top: -size * 0.125 }]} />
-      {phase !== 'ready' ? <SatyaOrb size={size * 0.62} /> : null}
+      {phase === 'loading' ? <SatyaSkeleton size={size} /> : phase === 'fallback' ? <SatyaOrb size={size * 0.62} /> : null}
       {canRender3D && phase !== 'fallback' ? (
         <WebView
           source={{ uri }}
@@ -64,7 +67,17 @@ export function SatyaModel({ size = 220, intro = 'short' }: { size?: number; int
   );
 }
 
-/** The non-3D Satya: a breathing gradient orb. Used while loading and as the fallback. */
+/** A shimmering head-and-body silhouette shown while the 3D model loads. */
+function SatyaSkeleton({ size }: { size: number }) {
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.center]} accessibilityLabel="Loading Satya">
+      <Skeleton width={size * 0.26} height={size * 0.26} rounded={size * 0.13} />
+      <Skeleton width={size * 0.44} height={size * 0.42} rounded={size * 0.16} style={{ marginTop: size * 0.04 }} />
+    </View>
+  );
+}
+
+/** The non-3D Satya: a breathing gradient orb with a sparkle. Used when 3D isn't available. */
 export function SatyaOrb({ size = 120 }: { size?: number }) {
   const { reduced } = useMotion();
   const breathe = useRef(new Animated.Value(0)).current;
@@ -89,7 +102,7 @@ export function SatyaOrb({ size = 120 }: { size?: number }) {
       <Animated.View style={{ transform: [{ scale }, { translateY }] }}>
         <Gradient colors={gradients.gold} borderRadius={size / 2} style={[styles.orb, { width: size, height: size }]}>
           <View style={[styles.orbInner, { width: size * 0.7, height: size * 0.7, borderRadius: size * 0.35 }]}>
-            <Text style={[styles.orbText, { fontSize: size * 0.32 }]}>S</Text>
+            <Icon name="sparkles" size={size * 0.34} color={brand.champagneLight} strokeWidth={1.6} />
           </View>
         </Gradient>
       </Animated.View>
@@ -116,15 +129,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orbInner: {
-    backgroundColor: '#101730',
+    backgroundColor: brand.midnight,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  orbText: {
-    ...font.serif,
-    color: colors.goldBright,
-    includeFontPadding: false,
   },
 });
