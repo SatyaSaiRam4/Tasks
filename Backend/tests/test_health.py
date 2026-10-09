@@ -3,3 +3,7 @@ def test_health_needs_no_auth_and_reveals_nothing(client):
     assert res.status_code == 200
     assert res.json() == {"status": "ok"}
     assert client.get("/health/live").json() == {"status": "ok"}
+
+
+def test_health_answers_head_requests(client):
+    assert client.head("/health").status_code == 200
