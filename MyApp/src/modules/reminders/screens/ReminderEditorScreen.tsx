@@ -45,7 +45,7 @@ function defaultTime(): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
-/** Add or edit a reminder: what, which day, what time, and optional WhatsApp. */
+/** Add or edit a reminder: what, which day, what time, and optional alarm and WhatsApp. */
 export function ReminderEditorScreen() {
   const navigation = useNavigation();
   const { gutter } = useLayout();
@@ -63,6 +63,7 @@ export function ReminderEditorScreen() {
   const [day, setDay] = useState(params?.date && params.date >= todayKey ? params.date : todayKey);
   const [time, setTime] = useState<string | null>(params?.date && params.date > todayKey ? '09:00:00' : defaultTime());
   const [whatsapp, setWhatsapp] = useState(false);
+  const [alarm, setAlarm] = useState(false);
   const [number, setNumber] = useState('');
   const [alarmPrompt, setAlarmPrompt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -76,6 +77,7 @@ export function ReminderEditorScreen() {
     setDay(toDateKey(when));
     setTime(`${pad(when.getHours())}:${pad(when.getMinutes())}:00`);
     setWhatsapp(Boolean(r.whatsapp_number));
+    setAlarm(r.alarm_enabled);
     setNumber(r.whatsapp_number ?? '');
   }, [existing.data]);
 
@@ -90,12 +92,12 @@ export function ReminderEditorScreen() {
     const phone = whatsapp ? normalizeWhatsapp(number) : '';
     if (whatsapp && !/^\+\d{8,15}$/.test(phone)) return setError('Enter a WhatsApp number, e.g. 9876543210.');
 
-    const payload = { title: title.trim(), remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined };
+    const payload = { title: title.trim(), remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined, alarm_enabled: alarm };
     try {
       const saved = editing
         ? await update({ id: reminderId!, ...payload, clear_whatsapp_number: !whatsapp }).unwrap()
         : await create(payload).unwrap();
-      await scheduleReminderNotification(saved.id, saved.title, saved.note, new Date(saved.remind_at));
+      await scheduleReminderNotification(saved.id, saved.title, saved.note, new Date(saved.remind_at), saved.alarm_enabled);
       Toast.success(editing ? 'Saved.' : 'Reminder set.', 1.2);
       if (!(await hasExactAlarmPermission())) setAlarmPrompt(true);
       else navigation.goBack();
@@ -155,6 +157,13 @@ export function ReminderEditorScreen() {
 
         <Text style={[styles.label, styles.section]}>Delivery</Text>
         <ListGroup>
+          <ListRow
+            icon="bell"
+            iconColor={colors.danger}
+            title="Ring like an alarm"
+            subtitle="Loud sound until you press Stop. Change the sound in Settings."
+            right={<Toggle value={alarm} onChange={setAlarm} accessibilityLabel="Ring like an alarm" />}
+          />
           <ListRow
             icon="message"
             subtitle="In addition to the notification on this device"

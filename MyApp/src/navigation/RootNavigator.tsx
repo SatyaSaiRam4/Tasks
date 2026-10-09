@@ -10,7 +10,8 @@
  *               + stack screens pushed on top of the tabs. The tab bar (or
  *               the desktop rail) is drawn over every signed-in screen, so
  *               the five destinations are always one tap away.
- *   First time (or "Replay tour") → Satya's tour, drawn over the real app.
+ *   First sign-in → the welcome story (once per account on this device),
+ *   then Satya's tour drawn over the real app. Both replay from Settings.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -27,7 +28,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAppSelector } from '../app/hooks';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { storyClosed, storyOpened } from '../app/preferencesSlice';
 import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
 import { brand, colors, font, gradients, radius, RAIL_WIDTH, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
 import { RealIcon, type RealIconName } from '../components/RealIcon';
@@ -42,6 +45,7 @@ import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
 import { SatyaTour } from '../modules/onboarding/SatyaTour';
+import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
 import { TrackDetailScreen } from '../modules/routines/screens/TrackDetailScreen';
@@ -307,11 +311,30 @@ const navTheme: Theme = {
 };
 
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
+const storySeenKey = (userId: string) => `@memo/story_seen_${userId}`;
 
 export function RootNavigator() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectCurrentUser);
-  const showTour = isAuthenticated && user && !user.onboarding_completed;
+  const dispatch = useAppDispatch();
+  const storyOpen = useAppSelector(s => s.preferences.storyOpen);
+  const isNewUser = Boolean(isAuthenticated && user && !user.onboarding_completed);
+  const showTour = isNewUser && !storyOpen;
+
+  // A new user sees the story first, once; the tour follows when it closes.
+  useEffect(() => {
+    if (!isNewUser || !user) return;
+    AsyncStorage.getItem(storySeenKey(user.id))
+      .then(seen => {
+        if (!seen) dispatch(storyOpened());
+      })
+      .catch(() => undefined);
+  }, [isNewUser, user, dispatch]);
+
+  const closeStory = useCallback(() => {
+    if (user) AsyncStorage.setItem(storySeenKey(user.id), '1').catch(() => undefined);
+    dispatch(storyClosed());
+  }, [user, dispatch]);
   const { isDesktop } = useLayout();
   const keyboardOpen = useKeyboardOpen();
   const [active, setActive] = useState<TabKey>('HomeTab');
@@ -369,6 +392,7 @@ export function RootNavigator() {
         )}
       </RailContext.Provider>
       {showTour ? <SatyaTour goToTab={goToTab} /> : null}
+      {isAuthenticated && storyOpen ? <WelcomeStory onDone={closeStory} /> : null}
     </NavigationContainer>
   );
 }

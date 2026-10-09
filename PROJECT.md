@@ -18,9 +18,9 @@ component names still say "category", e.g. `CategoryCard`).
 ### Plans and tasks
 
 - Plans have a name and a start/end date. They group daily tasks around a goal.
-- The Plans tab shows today's progress across all plans, then plans grouped as
-  Active, Starting soon and Finished. With no plans it shows a three-step
-  "How it works" guide.
+- The Plans tab shows today's progress across all plans, then one list of
+  plans (active first; each card says Day X of Y, Starts soon or Finished).
+  With no plans it shows a three-step "How it works" guide.
 - A new plan is created in three numbered steps: name (with quick ideas),
   length (7/21/30/90-day presets or dates) and daily tasks. More tasks can be
   added later from the plan. Tasks use daily recurrence.
@@ -44,8 +44,10 @@ component names still say "category", e.g. `CategoryCard`).
   completion bonuses.
 - The app includes streak history, achievement badges, and an optional local
   evening streak warning.
-- Home shows the current streak beside a flame, the streak badges, and plain
-  rows into today's plans and the next reminder.
+- Home shows only three things: the streak count under a flame, centered; a
+  "My plans" card listing active and upcoming plans (tap one to open it); and
+  a "Next reminder" card with its date and time. Each card's arrow opens its
+  tab. Badges are on Profile.
 - Streak badges are premium tiers earned by the best streak: Bronze (7
   days), Silver (30), Gold (100), Platinum (250), Diamond (500) and Master
   (1000). Tapping a badge shows its steps and progress. They are computed in
@@ -65,6 +67,12 @@ component names still say "category", e.g. `CategoryCard`).
 - Reminders have a title, optional note, date/time, priority, and optional link
   to a plan. The Reminders tab supports date selection, completion,
   snoozing, editing, and deletion.
+- A reminder can "Ring like an alarm" (`alarm_enabled`): a full-screen,
+  looping alarm with a Stop button that stops by itself after 10, 30 or 60
+  seconds. The sound (Classic, Chime, Digital, Gentle) and length are chosen
+  per device in Settings, which also has "Test alarm". Sounds are WAV files in
+  `MyApp/android/app/src/main/res/raw`; each has its own Android channel
+  because Android fixes a channel's sound. iOS uses its default sound.
 - Reminder, task, and streak-warning notifications are scheduled locally on
   the device. Android exact-time delivery may require the system's Alarms &
   reminders permission.
@@ -163,6 +171,18 @@ component names still say "category", e.g. `CategoryCard`).
 - Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
   reminder/task alarms and the streak warning while signed in.
 - Satya's model is rendered in a WebView from the mobile app's bundled assets.
+  The GLB is a glove puppet with no skeleton or animations, so
+  `assets/web/satya/index.html` animates it as a whole: an idle sway and
+  breath, plus gestures (`talk`, `wave`, `hop`, `nod`, `spin`, `lookLeft`,
+  `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
+  prop. Turning orbits the camera, because the model's origin is off-center.
+- New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
+  a boy asks his mom to remind him about his project, she forgets, and Memo
+  remembers. The boy and mom are SVG characters
+  (`modules/onboarding/Characters.tsx`) and Satya narrates. It plays once
+  per account on a device, then Satya's tour runs; both replay from Settings.
+- Satya's tour has nine steps with a title, typed-out text and a gesture
+  each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
   (`keepUnusedDataFor` in `baseApi.ts`), so revisited screens open from cache
   while refetching. Plan cards prefetch the plan on press-in, and the plan

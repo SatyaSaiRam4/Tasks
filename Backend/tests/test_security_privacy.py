@@ -188,6 +188,21 @@ def test_reminder_snooze_and_complete(client, auth, clock):
     assert client.post(f"{API}/reminders/{r['id']}/uncomplete", headers=auth).json()["completed_at"] is None
 
 
+def test_reminder_alarm_option(client, auth, clock):
+    at = (clock.now + timedelta(hours=1)).isoformat()
+    plain = client.post(f"{API}/reminders", json={"title": "Water plants", "remind_at": at}, headers=auth).json()
+    assert plain["alarm_enabled"] is False
+
+    alarm = client.post(f"{API}/reminders", json={"title": "Science project", "remind_at": at, "alarm_enabled": True}, headers=auth).json()
+    assert alarm["alarm_enabled"] is True
+
+    # Editing other fields leaves the alarm as it was; it can be switched off.
+    renamed = client.patch(f"{API}/reminders/{alarm['id']}", json={"title": "Science fair"}, headers=auth).json()
+    assert renamed["alarm_enabled"] is True
+    off = client.patch(f"{API}/reminders/{alarm['id']}", json={"alarm_enabled": False}, headers=auth).json()
+    assert off["alarm_enabled"] is False
+
+
 def test_reminder_track_must_belong_to_the_user(client, auth, clock):
     other, _ = register(client, email="other@example.com", name="Other")
     track = client.post(f"{API}/tracks", json={"name": "Mine"}, headers=other).json()

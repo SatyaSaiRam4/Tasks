@@ -11,6 +11,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { name as appName } from './app.json';
 import { applyAccent, applyTheme, colors } from './src/theme';
 import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from './src/utils/storage';
+import notifee from 'react-native-notify-kit';
+import { handleNotificationEvent } from './src/notifications';
+
+// Stops a ringing alarm when Stop is pressed while the app is closed.
+notifee.onBackgroundEvent(handleNotificationEvent);
 
 function Bootstrap() {
   const [App, setApp] = useState(null);

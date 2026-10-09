@@ -2,7 +2,13 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useAppSelector } from '../../app/hooks';
 import { addDays, fromDateKey, toDateKey } from '../../utils/date';
-import { scheduleReminderNotification, syncActionNotifications, syncStreakWarning, type PlannedAction } from '../../notifications';
+import {
+  loadAlarmPreferences,
+  scheduleReminderNotification,
+  syncActionNotifications,
+  syncStreakWarning,
+  type PlannedAction,
+} from '../../notifications';
 import { useGetMeQuery } from '../users/usersApi';
 import { useGetDashboardQuery } from '../streaks/streaksApi';
 import { useGetAgendaQuery, type Agenda } from '../routines/routinesApi';
@@ -61,16 +67,20 @@ export function BackgroundSync() {
     }).catch(() => undefined);
   }, [dashboard.data, tomorrow.data, prefs.notifyActions, prefs.notifyStreakWarnings]);
 
+  // Re-runs when the alarm sound or length changes in Settings, so alarms
+  // already scheduled pick up the new choice.
   useEffect(() => {
     if (!reminders.data || !prefs.notifyReminders) return;
     const now = Date.now();
-    for (const r of reminders.data) {
-      const at = new Date(r.remind_at);
-      if (r.status === 'ACTIVE' && !r.completed_at && at.getTime() > now) {
-        scheduleReminderNotification(r.id, r.title, r.note, at).catch(() => undefined);
+    loadAlarmPreferences().then(() => {
+      for (const r of reminders.data!) {
+        const at = new Date(r.remind_at);
+        if (r.status === 'ACTIVE' && !r.completed_at && at.getTime() > now) {
+          scheduleReminderNotification(r.id, r.title, r.note, at, r.alarm_enabled).catch(() => undefined);
+        }
       }
-    }
-  }, [reminders.data, prefs.notifyReminders]);
+    });
+  }, [reminders.data, prefs.notifyReminders, prefs.alarmVersion]);
 
   return null;
 }

@@ -26,6 +26,7 @@ class ReminderCreate(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
     remind_at: datetime
     whatsapp_number: str | None = None
+    alarm_enabled: bool = False
     priority: Priority = "NORMAL"
     track_id: UUID | None = None
 
@@ -41,6 +42,7 @@ class ReminderUpdate(BaseModel):
     remind_at: datetime | None = None
     whatsapp_number: str | None = None
     clear_whatsapp_number: bool = False
+    alarm_enabled: bool | None = None
     priority: Priority | None = None
     track_id: UUID | None = None
     clear_track: bool = False
@@ -61,6 +63,7 @@ class ReminderOut(BaseModel):
     status: ReminderStatus
     whatsapp_number: str | None
     whatsapp_status: WhatsAppStatus
+    alarm_enabled: bool
     priority: str
     track_id: UUID | None
     completed_at: datetime | None

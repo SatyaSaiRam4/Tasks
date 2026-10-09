@@ -14,6 +14,10 @@ export interface PreferencesState {
   notifyActions: boolean;
   notifyReminders: boolean;
   notifyStreakWarnings: boolean;
+  /** Bumped when the alarm sound or length changes, so scheduled alarms are redone. */
+  alarmVersion: number;
+  /** The welcome story is open (first sign-in, or replayed from Settings). */
+  storyOpen: boolean;
 }
 
 const initialState: PreferencesState = {
@@ -25,6 +29,8 @@ const initialState: PreferencesState = {
   notifyActions: true,
   notifyReminders: true,
   notifyStreakWarnings: true,
+  alarmVersion: 0,
+  storyOpen: false,
 };
 
 const preferencesSlice = createSlice({
@@ -37,8 +43,17 @@ const preferencesSlice = createSlice({
     preferencesReset() {
       return initialState;
     },
+    alarmChanged(state) {
+      state.alarmVersion += 1;
+    },
+    storyOpened(state) {
+      state.storyOpen = true;
+    },
+    storyClosed(state) {
+      state.storyOpen = false;
+    },
   },
 });
 
-export const { preferencesSynced, preferencesReset } = preferencesSlice.actions;
+export const { preferencesSynced, preferencesReset, alarmChanged, storyOpened, storyClosed } = preferencesSlice.actions;
 export default preferencesSlice.reducer;
