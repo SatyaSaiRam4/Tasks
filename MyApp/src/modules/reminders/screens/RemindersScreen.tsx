@@ -4,14 +4,13 @@ import Toast from '@ant-design/react-native/lib/toast';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { brand, colors, font, radius, spacing, type as t, withAlpha } from '../../../theme';
+import { colors, font, radius, spacing, type as t, withAlpha } from '../../../theme';
 import { useLayout } from '../../../hooks/useLayout';
 import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
-import { Fab, IconButton, Medallion, SectionHeader } from '../../../components/Controls';
+import { Fab, IconButton, SectionHeader } from '../../../components/Controls';
 import { Card } from '../../../components/Card';
-import { Glow } from '../../../components/Gradient';
 import { Checkbox } from '../../../components/Checkbox';
 import { DateStrip, type DayMark } from '../../../components/DateStrip';
 import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
@@ -66,16 +65,6 @@ export function RemindersScreen() {
   const tracks = useListTracksQuery();
   const trackNames = useMemo(() => new Map((tracks.data ?? []).map(tr => [tr.id, tr.name])), [tracks.data]);
 
-  // The assistant's brief: what's left today and what comes next.
-  const brief = useMemo(() => {
-    const open = (data ?? []).filter(r => !r.completed_at);
-    const todayOpen = open.filter(r => dayOf(r) === todayKey);
-    const next = open
-      .filter(r => new Date(r.remind_at).getTime() > Date.now())
-      .sort((a, b) => a.remind_at.localeCompare(b.remind_at))[0];
-    return { todayOpen: todayOpen.length, next };
-  }, [data, todayKey]);
-
   const upcoming = useMemo(
     () =>
       (data ?? [])
@@ -95,7 +84,7 @@ export function RemindersScreen() {
       const updated = await setCompleted({ id: r.id, completed: !r.completed_at }).unwrap();
       if (updated.completed_at) cancelReminderNotification(r.id).catch(() => undefined);
       else if (new Date(updated.remind_at).getTime() > Date.now()) {
-        scheduleReminderNotification(r.id, r.title, r.note || r.title, new Date(updated.remind_at)).catch(() => undefined);
+        scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at)).catch(() => undefined);
       }
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
@@ -106,7 +95,7 @@ export function RemindersScreen() {
     setMenuFor(null);
     try {
       const updated = await snooze({ id: r.id, minutes }).unwrap();
-      await scheduleReminderNotification(r.id, r.title, r.note || r.title, new Date(updated.remind_at));
+      await scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at));
       Toast.success(`Moved to ${formatClock(updated.remind_at)}.`, 1.4);
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
@@ -137,9 +126,7 @@ export function RemindersScreen() {
     >
       <View style={[styles.pad, { paddingHorizontal: gutter }]}>
         <LargeTitle
-          eyebrow="Your assistant"
           title="Reminders"
-          hideNotifications
           right={
             <DatePicker
               value={fromDateKey(day)}
@@ -154,28 +141,6 @@ export function RemindersScreen() {
           }
         />
       </View>
-
-      {data ? (
-        <View style={[styles.pad, { paddingHorizontal: gutter }]}>
-          <FadeIn style={styles.briefWrap}>
-            <Card tone="hero" contentStyle={styles.brief}>
-              <Glow color={brand.azure} size={300} intensity={0.16} style={styles.briefGlow} />
-              <Medallion icon="bell" size={50} color={brand.champagne} filled />
-              <View style={styles.flex}>
-                <Text style={styles.briefEyebrow}>Today’s brief</Text>
-                <Text style={styles.briefTitle}>
-                  {brief.todayOpen === 0
-                    ? 'Your day is clear'
-                    : `${brief.todayOpen} ${brief.todayOpen === 1 ? 'reminder' : 'reminders'} today`}
-                </Text>
-                <Text style={styles.briefNext} numberOfLines={2}>
-                  {brief.next ? `Next: ${brief.next.title} · ${formatDateTime(brief.next.remind_at)}` : 'Nothing else is scheduled.'}
-                </Text>
-              </View>
-            </Card>
-          </FadeIn>
-        </View>
-      ) : null}
 
       <DateStrip selected={day} today={todayKey} onSelect={setDay} marks={marks} daysBack={3} daysForward={30} />
 
@@ -377,39 +342,6 @@ const styles = StyleSheet.create({
   },
   mtSm: {
     marginTop: spacing.sm,
-  },
-  briefWrap: {
-    marginBottom: spacing.md,
-  },
-  brief: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    padding: spacing.xl,
-  },
-  briefGlow: {
-    position: 'absolute',
-    top: -150,
-    right: -120,
-  },
-  briefEyebrow: {
-    ...font.bold,
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: brand.champagne,
-  },
-  briefTitle: {
-    ...t.heading,
-    color: colors.heroText,
-    marginTop: 4,
-  },
-  briefNext: {
-    ...font.medium,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.heroTextSecondary,
-    marginTop: 4,
   },
   dayHead: {
     flexDirection: 'row',

@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import { colors, gradients, hitSlop } from '../theme';
+import { colors, hitSlop } from '../theme';
 import { useMotion } from '../hooks/useMotion';
-import { Gradient } from './Gradient';
-import { Icon } from './Icon';
+import { RealIcon } from './RealIcon';
 
 /** The completion circle used on tasks and reminders. Pops with a soft ring when checked. */
 export function Checkbox({
@@ -69,11 +68,8 @@ export function Checkbox({
             disabled && styles.disabled,
           ]}
         >
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: fill }]}>
-            <Gradient colors={gradients.success} borderRadius={size / 2} style={StyleSheet.absoluteFill} />
-          </Animated.View>
-          <Animated.View style={{ opacity: fill }}>
-            <Icon name="check" size={size * 0.56} color={colors.onPrimary} strokeWidth={2.6} />
+          <Animated.View style={[StyleSheet.absoluteFill, styles.center, { opacity: fill }]}>
+            <RealIcon name="check" size={size + 2} />
           </Animated.View>
         </View>
       </Animated.View>
@@ -82,6 +78,10 @@ export function Checkbox({
 }
 
 const styles = StyleSheet.create({
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   box: {
     borderWidth: 1.5,
     alignItems: 'center',

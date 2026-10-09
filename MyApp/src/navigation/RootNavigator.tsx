@@ -7,27 +7,30 @@
  *
  *   Signed out → Login / Register / ForgotPassword / ResetPassword
  *   Signed in → Main tabs (Home · Categories · Reminders · Vault · Profile)
- *               + stack screens pushed on top of the tabs.
+ *               + stack screens pushed on top of the tabs. The tab bar (or
+ *               the desktop rail) is drawn over every signed-in screen, so
+ *               the five destinations are always one tap away.
  *   First time (or "Replay tour") → Satya's tour, drawn over the real app.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
   NavigationContainer,
+  StackActions,
   type NavigatorScreenParams,
   type Theme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppSelector } from '../app/hooks';
 import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
 import { brand, colors, font, gradients, radius, RAIL_WIDTH, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
-import { Icon, type IconName } from '../components/Icon';
+import { RealIcon, type RealIconName } from '../components/RealIcon';
 import { Glow, Gradient, Sheen } from '../components/Gradient';
 import { Wordmark } from '../components/Brand';
 import { Avatar } from '../components/Controls';
@@ -55,6 +58,7 @@ import { SettingsScreen } from '../modules/settings/screens/SettingsScreen';
 import { ChangePasswordScreen } from '../modules/settings/screens/ChangePasswordScreen';
 import { AdminDashboardScreen } from '../modules/admin/screens/AdminDashboardScreen';
 import { AdminUsersScreen } from '../modules/admin/screens/AdminUsersScreen';
+import { WalletScreen } from '../modules/wallet/screens/WalletScreen';
 
 // --- Param lists ----------------------------------------------------------------
 
@@ -83,11 +87,12 @@ export type RootStackParamList = {
   ChangePassword: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
+  Wallet: undefined;
 };
 
 // --- Tab bar ----------------------------------------------------------------------
 
-const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = {
+const TABS: Record<keyof MainTabParamList, { label: string; icon: RealIconName }> = {
   HomeTab: { label: 'Home', icon: 'home' },
   RoutinesTab: { label: 'Categories', icon: 'target' },
   RemindersTab: { label: 'Reminders', icon: 'bell' },
@@ -95,16 +100,12 @@ const TABS: Record<keyof MainTabParamList, { label: string; icon: IconName }> = 
   ProfileTab: { label: 'Profile', icon: 'user' },
 };
 
-/** Navigation chrome: the floating bar on phones and tablets, the rail on desktop. */
-function TabBar(props: BottomTabBarProps) {
-  const { hasRail } = useLayout();
-  return hasRail ? <NavRail {...props} /> : <FloatingTabBar {...props} />;
-}
+type TabKey = keyof MainTabParamList;
+const TAB_ORDER = Object.keys(TABS) as TabKey[];
 
-function pressTab({ state, navigation }: BottomTabBarProps, index: number) {
-  const route = state.routes[index];
-  const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-  if (state.index !== index && !event.defaultPrevented) navigation.navigate(route.name);
+interface ChromeProps {
+  active: TabKey;
+  onPress: (tab: TabKey) => void;
 }
 
 /**
@@ -112,17 +113,17 @@ function pressTab({ state, navigation }: BottomTabBarProps, index: number) {
  * active tab and its icon lifts slightly; on tablets the bar is centered at
  * a fixed width. It stays midnight in both themes, like a jewellery case.
  */
-function FloatingTabBar(props: BottomTabBarProps) {
-  const { state } = props;
+function FloatingTabBar({ active, onPress }: ChromeProps) {
+  const index = TAB_ORDER.indexOf(active);
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
   const { isTablet } = useLayout();
   const [barWidth, setBarWidth] = useState(0);
-  const x = useRef(new Animated.Value(state.index)).current;
+  const x = useRef(new Animated.Value(index)).current;
   useEffect(() => {
-    Animated.spring(x, { toValue: state.index, useNativeDriver: true, speed: reduced ? 1000 : 14, bounciness: reduced ? 0 : 5 }).start();
-  }, [state.index, reduced, x]);
-  const slot = barWidth ? (barWidth - spacing.sm * 2) / state.routes.length : 0;
+    Animated.spring(x, { toValue: index, useNativeDriver: true, speed: reduced ? 1000 : 14, bounciness: reduced ? 0 : 5 }).start();
+  }, [index, reduced, x]);
+  const slot = barWidth ? (barWidth - spacing.sm * 2) / TAB_ORDER.length : 0;
 
   return (
     <View style={[styles.tabWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]} pointerEvents="box-none">
@@ -144,19 +145,21 @@ function FloatingTabBar(props: BottomTabBarProps) {
             <View style={styles.tabIndicatorLine} />
           </Animated.View>
         ) : null}
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const tab = TABS[route.name as keyof MainTabParamList];
+        {TAB_ORDER.map(name => {
+          const focused = name === active;
+          const tab = TABS[name];
           return (
             <Pressable
-              key={route.key}
+              key={name}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={tab.label}
-              onPress={() => pressTab(props, index)}
+              onPress={() => onPress(name)}
               style={styles.tabItem}
             >
-              <Icon name={tab.icon} size={21} color={focused ? brand.champagneLight : colors.heroTextTertiary} strokeWidth={focused ? 1.9 : 1.6} />
+              <View style={!focused && styles.tabIconIdle}>
+                <RealIcon name={tab.icon} size={focused ? 26 : 23} />
+              </View>
               <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} numberOfLines={1}>
                 {tab.label}
               </Text>
@@ -169,8 +172,7 @@ function FloatingTabBar(props: BottomTabBarProps) {
 }
 
 /** The desktop navigation rail: brand, the five destinations, and the signed-in member. */
-function NavRail(props: BottomTabBarProps) {
-  const { state } = props;
+function NavRail({ active, onPress }: ChromeProps) {
   const user = useAppSelector(selectCurrentUser);
   const insets = useSafeAreaInsets();
   return (
@@ -181,20 +183,22 @@ function NavRail(props: BottomTabBarProps) {
         <Wordmark light />
       </View>
       <Text style={styles.railSection}>Navigate</Text>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const tab = TABS[route.name as keyof MainTabParamList];
+      {TAB_ORDER.map(name => {
+        const focused = name === active;
+        const tab = TABS[name];
         return (
           <Pressable
-            key={route.key}
+            key={name}
             accessibilityRole="tab"
             accessibilityState={{ selected: focused }}
             accessibilityLabel={tab.label}
-            onPress={() => pressTab(props, index)}
+            onPress={() => onPress(name)}
             style={({ pressed }) => [styles.railItem, focused && styles.railItemActive, pressed && !focused && styles.railItemPressed]}
           >
             {focused ? <View style={styles.railMarker} /> : null}
-            <Icon name={tab.icon} size={19} color={focused ? brand.champagneLight : colors.heroTextSecondary} strokeWidth={focused ? 1.9 : 1.6} />
+            <View style={!focused && styles.tabIconIdle}>
+              <RealIcon name={tab.icon} size={22} />
+            </View>
             <Text style={[styles.railLabel, focused && styles.railLabelActive]}>{tab.label}</Text>
           </Pressable>
         );
@@ -202,7 +206,7 @@ function NavRail(props: BottomTabBarProps) {
       <View style={styles.flex} />
       {user ? (
         <Pressable
-          onPress={() => pressTab(props, state.routes.findIndex(r => r.name === 'ProfileTab'))}
+          onPress={() => onPress('ProfileTab')}
           accessibilityRole="button"
           accessibilityLabel="Profile"
           style={styles.railMember}
@@ -227,29 +231,66 @@ function NavRail(props: BottomTabBarProps) {
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
+const hideTabBar = () => null;
+
+/**
+ * Tabs slide in from the side they sit on: moving to a tab on the right
+ * brings it in from the right, and the old one leaves to the left.
+ */
+type SceneInterpolator = NonNullable<BottomTabNavigationOptions['sceneStyleInterpolator']>;
+
+function slideScenes(width: number): SceneInterpolator {
+  return ({ current }) => ({
+    sceneStyle: {
+      opacity: current.progress.interpolate({ inputRange: [-1, -0.6, 0, 0.6, 1], outputRange: [0, 0, 1, 0, 0] }),
+      transform: [{ translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-width * 0.3, 0, width * 0.3] }) }],
+    },
+  });
+}
 
 function MainTabs() {
-  const { isDesktop } = useLayout();
+  const { width } = useWindowDimensions();
+  const { reduced } = useMotion();
   return (
-    <RailContext.Provider value={isDesktop}>
-      <Tab.Navigator
-        tabBar={renderTabBar}
-        screenOptions={{
-          headerShown: false,
-          animation: 'shift',
-          sceneStyle: { backgroundColor: colors.background },
-          tabBarPosition: isDesktop ? 'left' : 'bottom',
-        }}
-      >
-        <Tab.Screen name="HomeTab" component={DashboardScreen} />
-        <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
-        <Tab.Screen name="RemindersTab" component={RemindersScreen} />
-        <Tab.Screen name="VaultTab" component={VaultScreen} />
-        <Tab.Screen name="ProfileTab" component={ProfileScreen} />
-      </Tab.Navigator>
-    </RailContext.Provider>
+    <Tab.Navigator
+      tabBar={hideTabBar}
+      screenOptions={{
+        headerShown: false,
+        animation: reduced ? 'none' : 'shift',
+        sceneStyleInterpolator: reduced ? undefined : slideScenes(width),
+        transitionSpec: { animation: 'timing', config: { duration: 280 } },
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <Tab.Screen name="HomeTab" component={DashboardScreen} />
+      <Tab.Screen name="RoutinesTab" component={RoutinesScreen} />
+      <Tab.Screen name="RemindersTab" component={RemindersScreen} />
+      <Tab.Screen name="VaultTab" component={VaultScreen} />
+      <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+    </Tab.Navigator>
   );
+}
+
+/** The tab under the current screen: the open tab, or the one a pushed screen sits on. */
+function activeTab(): TabKey {
+  const root = navigationRef.isReady() ? navigationRef.getRootState() : undefined;
+  const main = root?.routes.find(r => r.name === 'Main');
+  const tabs = main?.state;
+  const name = tabs?.routes[tabs.index ?? 0]?.name;
+  return name && name in TABS ? (name as TabKey) : 'HomeTab';
+}
+
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return open;
 }
 
 const navTheme: Theme = {
@@ -271,40 +312,62 @@ export function RootNavigator() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectCurrentUser);
   const showTour = isAuthenticated && user && !user.onboarding_completed;
+  const { isDesktop } = useLayout();
+  const keyboardOpen = useKeyboardOpen();
+  const [active, setActive] = useState<TabKey>('HomeTab');
+  const hasRail = Boolean(isAuthenticated && isDesktop);
 
-  const goToTab = useCallback((tab: keyof MainTabParamList) => {
-    if (navigationRef.isReady()) navigationRef.navigate('Main', { screen: tab });
+  // Back to the tabs (popping any pushed screens), then to the chosen tab.
+  const goToTab = useCallback((tab: TabKey) => {
+    if (navigationRef.isReady()) navigationRef.dispatch(StackActions.popTo('Main', { screen: tab }));
   }, []);
 
+  const navigator = (
+    <RootStack.Navigator
+      screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.background } }}
+    >
+      {!isAuthenticated ? (
+        <RootStack.Group screenOptions={{ animation: 'fade' }}>
+          <RootStack.Screen name="Login" component={LoginScreen} />
+          <RootStack.Screen name="Register" component={RegisterScreen} />
+          <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </RootStack.Group>
+      ) : (
+        <RootStack.Group>
+          <RootStack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
+          <RootStack.Screen name="TrackDetail" component={TrackDetailScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="TrackEditor" component={TrackEditorScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="Consistency" component={ConsistencyScreen} options={{ animation: 'slide_from_left' }} />
+          <RootStack.Screen name="Achievements" component={AchievementsScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="VaultEntry" component={VaultEntryScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="Discover" component={DiscoverScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="Wallet" component={WalletScreen} options={{ animation: 'slide_from_right' }} />
+        </RootStack.Group>
+      )}
+    </RootStack.Navigator>
+  );
+
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
-      <RootStack.Navigator
-        screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.background } }}
-      >
-        {!isAuthenticated ? (
-          <RootStack.Group screenOptions={{ animation: 'fade' }}>
-            <RootStack.Screen name="Login" component={LoginScreen} />
-            <RootStack.Screen name="Register" component={RegisterScreen} />
-            <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          </RootStack.Group>
+    <NavigationContainer ref={navigationRef} theme={navTheme} onReady={() => setActive(activeTab())} onStateChange={() => setActive(activeTab())}>
+      <RailContext.Provider value={hasRail}>
+        {hasRail ? (
+          <View style={styles.railLayout}>
+            <NavRail active={active} onPress={goToTab} />
+            <View style={styles.flex}>{navigator}</View>
+          </View>
         ) : (
-          <RootStack.Group>
-            <RootStack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
-            <RootStack.Screen name="TrackDetail" component={TrackDetailScreen} />
-            <RootStack.Screen name="TrackEditor" component={TrackEditorScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="Consistency" component={ConsistencyScreen} />
-            <RootStack.Screen name="Achievements" component={AchievementsScreen} />
-            <RootStack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="VaultEntry" component={VaultEntryScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="Discover" component={DiscoverScreen} />
-            <RootStack.Screen name="Settings" component={SettingsScreen} />
-            <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-            <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} />
-          </RootStack.Group>
+          <>
+            {navigator}
+            {isAuthenticated && !keyboardOpen ? <FloatingTabBar active={active} onPress={goToTab} /> : null}
+          </>
         )}
-      </RootStack.Navigator>
+      </RailContext.Provider>
       {showTour ? <SatyaTour goToTab={goToTab} /> : null}
     </NavigationContainer>
   );
@@ -313,6 +376,11 @@ export function RootNavigator() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  railLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.background,
   },
   tabWrap: {
     position: 'absolute',
@@ -372,7 +440,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 3,
+  },
+  tabIconIdle: {
+    opacity: 0.6,
   },
   tabLabel: {
     ...font.semibold,

@@ -48,11 +48,12 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
 
 # ---------------------------------------------------------------------------
-# SMTP / email settings (reserved for future OTP / password-reset emails)
+# SMTP / email settings (password-reset codes)
 # ---------------------------------------------------------------------------
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587").strip())
-SMTP_USER = os.getenv("SMTP_USER", "").strip()
+# SMTP_SERVER / SMTP_EMAIL are accepted as aliases of SMTP_HOST / SMTP_USER.
+SMTP_HOST = (os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER") or "smtp.gmail.com").strip()
+SMTP_PORT = int((os.getenv("SMTP_PORT") or "587").strip())
+SMTP_USER = (os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL") or "").strip()
 # Gmail App Passwords are displayed in 4-char groups for readability but must
 # be used without spaces. Strip all whitespace to be safe.
 SMTP_PASSWORD = "".join(os.getenv("SMTP_PASSWORD", "").split())

@@ -17,7 +17,7 @@ import { ListGroup, ListRow } from '../../../components/ListRow';
 import { getErrorMessage } from '../../../utils/apiError';
 import { selectIsAdmin } from '../../auth/authSlice';
 import { useGetMyProfileQuery } from '../../users/usersApi';
-import { AchievementBadge } from '../../streaks/screens/AchievementsScreen';
+import { TierRow } from '../../streaks/Tiers';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -29,7 +29,7 @@ export function ProfileScreen() {
 
   return (
     <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
-      <LargeTitle eyebrow="Member" title="Profile" hideProfile />
+      <LargeTitle title="Profile" />
       {isLoading ? (
         <>
           <Skeleton height={200} rounded={radius.xl} />
@@ -46,7 +46,7 @@ export function ProfileScreen() {
               <Sheen color={gradients.heroSheen} inset="20%" />
               <View style={styles.avatarWrap}>
                 <Glow color={brand.champagne} size={200} intensity={0.3} style={styles.avatarGlow} />
-                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={104} />
+                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={84} />
               </View>
               <Text style={[t.title, styles.name]}>{data.me.display_name}</Text>
               <View style={styles.idRow}>
@@ -82,23 +82,8 @@ export function ProfileScreen() {
             </Card>
           </FadeIn>
 
-          <SectionHeader title="Badges" action="See all" onAction={() => navigation.navigate('Achievements')} />
-          {data.achievements.length === 0 ? (
-            <Card onPress={() => navigation.navigate('Achievements')}>
-              <Text style={styles.emptyBadges}>Badges show up here as you keep your streak going. Your first one comes after your first full day.</Text>
-            </Card>
-          ) : (
-            <View style={styles.badges}>
-              {data.achievements.slice(0, 8).map(a => (
-                <View key={a.code} style={styles.badge} accessible accessibilityLabel={a.title}>
-                  <AchievementBadge icon={a.icon} size={60} />
-                  <Text style={styles.badgeText} numberOfLines={2}>
-                    {a.title}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          <SectionHeader title="Badges" />
+          <TierRow best={data.stats.best_streak} />
 
           <SectionHeader title="More" />
           <ListGroup>
@@ -125,15 +110,12 @@ function Stat({ icon, color, label, value }: { icon: 'flame' | 'trophy' | 'check
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   mtLg: {
     marginTop: spacing.lg,
   },
   hero: {
     alignItems: 'center',
-    paddingVertical: spacing.xxxl,
+    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xxl,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.heroLine,
@@ -153,20 +135,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   avatarWrap: {
-    width: 128,
-    height: 128,
+    width: 100,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarGlow: {
     position: 'absolute',
-    left: -36,
-    top: -36,
+    left: -50,
+    top: -50,
   },
   name: {
     ...t.display,
-    fontSize: 36,
-    lineHeight: 40,
+    fontSize: 28,
+    lineHeight: 34,
     textAlign: 'center',
     color: colors.heroText,
     marginTop: spacing.sm,
@@ -206,26 +188,5 @@ const styles = StyleSheet.create({
   statLabel: {
     ...t.caption,
     fontSize: 11.5,
-  },
-  emptyBadges: {
-    ...t.aside,
-    fontSize: 16,
-  },
-  badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
-  },
-  badge: {
-    width: 78,
-    alignItems: 'center',
-    gap: 8,
-  },
-  badgeText: {
-    ...font.semibold,
-    color: colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 14,
-    textAlign: 'center',
   },
 });

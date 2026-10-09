@@ -13,6 +13,7 @@ def import_all_models() -> None:
     from app.modules.tracks import models as _tracks  # noqa: F401
     from app.modules.users import models as _users  # noqa: F401
     from app.modules.vault import models as _vault  # noqa: F401
+    from app.modules.wallet import models as _wallet  # noqa: F401
 
 
 # Tables kept in the database for data preservation but no longer mapped by

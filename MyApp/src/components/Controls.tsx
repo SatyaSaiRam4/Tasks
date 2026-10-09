@@ -13,6 +13,7 @@ import { Icon, type IconName } from './Icon';
 /** A round glass button with a hairline edge. */
 export function IconButton({
   icon,
+  glyph,
   onPress,
   accessibilityLabel,
   color = colors.text,
@@ -20,7 +21,9 @@ export function IconButton({
   variant = 'surface',
   style,
 }: {
-  icon: IconName;
+  icon?: IconName;
+  /** A custom picture (e.g. a RealIcon) in place of the line icon. */
+  glyph?: React.ReactNode;
   onPress: () => void;
   accessibilityLabel: string;
   color?: string;
@@ -45,7 +48,7 @@ export function IconButton({
           style,
         ]}
       >
-        <Icon name={icon} size={size} color={color} strokeWidth={1.7} />
+        {glyph ?? (icon ? <Icon name={icon} size={size} color={color} strokeWidth={1.7} /> : null)}
       </Pressable>
     </Animated.View>
   );
@@ -234,7 +237,7 @@ export function GoldRule({ style }: { style?: StyleProp<ViewStyle> }) {
 
 // ---- Avatar -------------------------------------------------------------------------
 
-/** Serif initials (or an emoji) on midnight, inside a fine champagne ring. */
+/** Initials (or an emoji) on midnight, inside a fine champagne ring. */
 export function Avatar({ name, emoji, size = 44 }: { name: string; emoji?: string | null; size?: number }) {
   const initials = name
     .split(/\s+/)
@@ -246,16 +249,8 @@ export function Avatar({ name, emoji, size = 44 }: { name: string; emoji?: strin
   return (
     <Gradient colors={gradients.gold} borderRadius={size / 2} style={{ width: size, height: size, padding: ring }}>
       <Gradient colors={gradients.hero} borderRadius={size / 2} style={styles.avatarInner}>
-        <Text
-          style={{
-            ...(emoji ? font.regular : font.serif),
-            fontSize: emoji ? size * 0.46 : size * 0.44,
-            lineHeight: emoji ? size * 0.6 : size * 0.56,
-            color: brand.champagneLight,
-            includeFontPadding: false,
-            letterSpacing: emoji ? 0 : 0.5,
-          }}
-        >
+        {/* A natural line height (no fixed one), so the glyph is never clipped by the circle. */}
+        <Text style={[styles.avatarText, emoji ? font.regular : font.bold, { fontSize: size * (emoji ? 0.46 : initials.length > 1 ? 0.36 : 0.42) }]}>
           {emoji || initials || '•'}
         </Text>
       </Gradient>
@@ -510,6 +505,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarText: {
+    color: brand.champagneLight,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   fabWrap: {
     position: 'absolute',

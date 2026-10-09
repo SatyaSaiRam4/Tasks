@@ -1,13 +1,12 @@
 import React from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '../app/hooks';
-import { selectCurrentUser } from '../modules/auth/authSlice';
-import { colors, hitSlop, spacing, type as t, withAlpha } from '../theme';
+import { colors, spacing, type as t, withAlpha } from '../theme';
 import { riseStyle, useEntrance } from '../animations';
 import { useLayout } from '../hooks/useLayout';
 import { Wordmark } from './Brand';
-import { Avatar, IconButton } from './Controls';
+import { IconButton } from './Controls';
+import { RealIcon } from './RealIcon';
 import { Gradient } from './Gradient';
 
 /**
@@ -28,8 +27,9 @@ export function ScreenHeader({
   onBack?: () => void;
 }) {
   const navigation = useNavigation();
+  const drop = useEntrance(0, 420);
   return (
-    <View style={styles.row}>
+    <Animated.View style={[styles.row, riseStyle(drop, -14)]}>
       <IconButton
         icon={close ? 'x' : 'chevron-left'}
         accessibilityLabel={close ? 'Close' : 'Back'}
@@ -48,7 +48,7 @@ export function ScreenHeader({
         ) : null}
       </View>
       <View style={styles.right}>{right}</View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -56,55 +56,30 @@ type Navigate = { navigate: (...args: unknown[]) => void };
 
 /**
  * The brand bar at the top of every tab: the Memo mark on the left, then
- * screen actions, Notifications (Reminders), Settings and the Profile
- * avatar on the right. With the desktop rail the mark lives in the rail.
+ * screen actions, Search (find a friend by User ID), Wallet and Settings
+ * on the right. Reminders and
+ * Profile live in the tab bar, which is on every screen. With the desktop
+ * rail the mark lives in the rail.
  */
-export function TopBar({
-  actions,
-  hideProfile = false,
-  hideSettings = false,
-  hideNotifications = false,
-}: {
-  actions?: React.ReactNode;
-  hideProfile?: boolean;
-  hideSettings?: boolean;
-  hideNotifications?: boolean;
-}) {
+export function TopBar({ actions }: { actions?: React.ReactNode }) {
   // Loosely typed: this bar is rendered inside both tab and stack screens.
   const navigation = useNavigation<Navigate>();
-  const user = useAppSelector(selectCurrentUser);
   const { hasRail } = useLayout();
+  const drop = useEntrance(0, 420);
   return (
-    <View style={[styles.topBar, hasRail && styles.topBarRail]}>
+    <Animated.View style={[styles.topBar, hasRail && styles.topBarRail, riseStyle(drop, -14)]}>
       {hasRail ? <View /> : <Wordmark size="sm" />}
       <View style={styles.topActions}>
         {actions}
-        {hideNotifications ? null : (
-          <IconButton
-            icon="bell"
-            accessibilityLabel="Reminders"
-            onPress={() => navigation.navigate('Main', { screen: 'RemindersTab' })}
-          />
-        )}
-        {hideSettings ? null : (
-          <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
-        )}
-        {hideProfile || !user ? null : (
-          <Pressable
-            onPress={() => navigation.navigate('Main', { screen: 'ProfileTab' })}
-            hitSlop={hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel="Profile"
-          >
-            <Avatar name={user.display_name} emoji={user.avatar} size={42} />
-          </Pressable>
-        )}
+        <IconButton icon="search" accessibilityLabel="Find a friend by User ID" onPress={() => navigation.navigate('Discover')} />
+        <IconButton glyph={<RealIcon name="wallet" size={24} />} accessibilityLabel="Wallet" onPress={() => navigation.navigate('Wallet')} />
+        <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
-/** The editorial title block at the top of each tab, under the brand bar. */
+/** The title block at the top of each tab, under the brand bar. */
 export function LargeTitle({
   eyebrow,
   title,
@@ -112,8 +87,6 @@ export function LargeTitle({
   right,
   topBar = true,
   topBarActions,
-  hideProfile,
-  hideNotifications,
 }: {
   eyebrow?: string;
   title: string;
@@ -121,17 +94,15 @@ export function LargeTitle({
   right?: React.ReactNode;
   topBar?: boolean;
   topBarActions?: React.ReactNode;
-  hideProfile?: boolean;
-  hideNotifications?: boolean;
 }) {
   const enter = useEntrance(60, 760);
   return (
     <View>
-      {topBar ? <TopBar actions={topBarActions} hideProfile={hideProfile} hideNotifications={hideNotifications} /> : null}
+      {topBar ? <TopBar actions={topBarActions} /> : null}
       <Animated.View style={[styles.large, riseStyle(enter, 16)]}>
         <View style={styles.flex}>
           {eyebrow ? <Eyebrow label={eyebrow} /> : null}
-          <Text style={[t.display, styles.largeTitle]} accessibilityRole="header">
+          <Text style={styles.largeTitle} accessibilityRole="header">
             {title}
           </Text>
           {subtitle ? <Text style={styles.largeSubtitle}>{subtitle}</Text> : null}
@@ -164,8 +135,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   titles: {
     flex: 1,
@@ -173,7 +144,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...t.heading,
-    fontSize: 22,
+    fontSize: 20,
     lineHeight: 26,
     textAlign: 'center',
   },
@@ -192,8 +163,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   topBarRail: {
     paddingTop: spacing.sm,
@@ -205,12 +176,12 @@ const styles = StyleSheet.create({
   },
   large: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    alignItems: 'center',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
   largeTitle: {
-    marginTop: spacing.md,
+    ...t.title,
   },
   largeSubtitle: {
     ...t.aside,

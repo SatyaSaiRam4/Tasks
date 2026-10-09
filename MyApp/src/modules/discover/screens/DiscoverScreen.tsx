@@ -15,7 +15,7 @@ import { AchievementBadge } from '../../streaks/screens/AchievementsScreen';
 
 const RECENT_KEY = '@rememberly/recent_friend_searches';
 
-/** Find a friend's streak by their User ID, and choose whether friends can find you. */
+/** Search: find another user by their User ID and see their streak; below, your own ID. */
 export function DiscoverScreen() {
   const me = useGetMeQuery();
   const [updateSettings] = useUpdateSettingsMutation();
@@ -42,36 +42,7 @@ export function DiscoverScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Find friends" subtitle="Community" />
-      <Text style={styles.intro}>Look up a friend by their User ID to see the streak they’ve chosen to share.</Text>
-
-      {/* Your own ID, and whether friends can find you */}
-      <Card tone="hero" style={styles.mb}>
-        <View style={styles.row}>
-          <View style={styles.flex}>
-            <Text style={[t.micro, { color: brand.champagne }]}>Your ID</Text>
-            <Text style={styles.myId}>{me.data?.public_id ?? '…'}</Text>
-          </View>
-          <IconButton
-            icon="copy"
-            color={colors.heroText}
-            style={styles.heroButton}
-            accessibilityLabel="Share your ID"
-            onPress={() => me.data && Share.share({ message: `Find me on Memo: ${me.data.public_id}` })}
-          />
-        </View>
-        <View style={[styles.row, styles.toggleRow]}>
-          <View style={styles.flex}>
-            <Text style={[t.bodyStrong, { color: colors.heroText }]}>Let friends find me</Text>
-            <Text style={[t.caption, { color: colors.heroTextSecondary }]}>{isPublic ? 'Friends can see your streak.' : 'Nobody can find you right now.'}</Text>
-          </View>
-          <Toggle
-            value={isPublic}
-            onChange={v => updateSettings({ is_public_profile: v })}
-            accessibilityLabel="Let friends find me"
-          />
-        </View>
-      </Card>
+      <ScreenHeader title="Search" />
 
       {/* Search */}
       <View style={styles.search}>
@@ -79,7 +50,7 @@ export function DiscoverScreen() {
         <TextInput
           value={id}
           onChangeText={v => setId(v.toUpperCase())}
-          placeholder="Friend's ID, e.g. SATYA_8F29A"
+          placeholder="Search a User ID, e.g. SATYA_8F29A"
           placeholderTextColor={colors.textTertiary}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -158,6 +129,34 @@ export function DiscoverScreen() {
           </FadeIn>
         ) : null}
       </View>
+      {/* Your own ID, and whether friends can find you */}
+      <Card tone="hero" style={styles.own}>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Text style={[t.micro, { color: brand.champagne }]}>Your ID</Text>
+            {me.data ? <Text style={styles.myId}>{me.data.public_id}</Text> : <Skeleton width={160} height={26} style={styles.myIdSkeleton} />}
+          </View>
+          <IconButton
+            icon="copy"
+            color={colors.heroText}
+            style={styles.heroButton}
+            accessibilityLabel="Share your ID"
+            onPress={() => me.data && Share.share({ message: `Find me on Memo: ${me.data.public_id}` })}
+          />
+        </View>
+        <View style={[styles.row, styles.toggleRow]}>
+          <View style={styles.flex}>
+            <Text style={[t.bodyStrong, { color: colors.heroText }]}>Let friends find me</Text>
+            <Text style={[t.caption, { color: colors.heroTextSecondary }]}>{isPublic ? 'Friends can see your streak.' : 'Nobody can find you right now.'}</Text>
+          </View>
+          <Toggle
+            value={isPublic}
+            onChange={v => updateSettings({ is_public_profile: v })}
+            accessibilityLabel="Let friends find me"
+          />
+        </View>
+      </Card>
+
     </Screen>
   );
 }
@@ -166,17 +165,13 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  mb: {
-    marginBottom: spacing.xl,
+  own: {
+    marginTop: spacing.xxl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  intro: {
-    ...t.aside,
-    marginBottom: spacing.xl,
   },
   heroButton: {
     backgroundColor: colors.heroGlass,
@@ -189,6 +184,9 @@ const styles = StyleSheet.create({
     color: brand.champagneLight,
     letterSpacing: 1.4,
     marginTop: 4,
+  },
+  myIdSkeleton: {
+    marginTop: 6,
   },
   publicId: {
     ...font.bold,

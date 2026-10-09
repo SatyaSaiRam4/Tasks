@@ -8,7 +8,8 @@ import { colors, font, radius, spacing, type as t, withAlpha } from '../../../th
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
-import { Fab, IconButton, Medallion } from '../../../components/Controls';
+import { RealIcon } from '../../../components/RealIcon';
+import { Fab, IconButton } from '../../../components/Controls';
 import { EmptyState, ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
 import { ConfirmSheet } from '../../../components/Sheet';
 import { Icon } from '../../../components/Icon';
@@ -32,7 +33,7 @@ export function VaultScreen() {
   if (!unlocked) {
     return (
       <Screen glowColor={colors.violet}>
-        <LargeTitle eyebrow="Private" title="Vault" />
+        <LargeTitle title="Vault" />
         {status.isLoading ? (
           <SkeletonList count={1} height={300} />
         ) : status.isError || !status.data ? (
@@ -69,7 +70,6 @@ function UnlockedVault() {
         footer={showDeleted ? null : <Fab accessibilityLabel="New note" onPress={() => navigation.navigate('VaultEntry')} />}
       >
         <LargeTitle
-          eyebrow="Private"
           title={showDeleted ? 'Deleted notes' : 'Vault'}
           right={<IconButton icon="lock" accessibilityLabel="Lock Vault" onPress={lock} />}
         />
@@ -78,15 +78,7 @@ function UnlockedVault() {
             <Icon name="chevron-left" size={16} color={colors.primary} />
             <Text style={styles.link}>Back to notes</Text>
           </Pressable>
-        ) : (
-          <Card tone="hero" style={styles.noteCard} contentStyle={styles.note}>
-            <Medallion icon="shield" size={44} color={colors.violet} filled />
-            <View style={styles.flex}>
-              <Text style={styles.noteTitle}>Encrypted & private</Text>
-              <Text style={styles.noteText}>Search, edit, or delete notes here. The Vault locks when you leave Memo.</Text>
-            </View>
-          </Card>
-        )}
+        ) : null}
 
         {!showDeleted ? (
           <View style={styles.search}>
@@ -111,7 +103,7 @@ function UnlockedVault() {
           <EmptyState
             icon={showDeleted ? 'trash' : 'lock'}
             title={showDeleted ? 'Nothing deleted' : query ? 'No notes found' : 'No notes yet'}
-            message={showDeleted || query ? undefined : 'Save passwords, recovery codes, or personal notes. Only you can open them with your Vault PIN.'}
+            message={showDeleted || query ? undefined : 'Only you can open them, with your PIN.'}
             actionLabel={showDeleted || query ? undefined : 'New note'}
             onAction={() => navigation.navigate('VaultEntry')}
           />
@@ -120,7 +112,7 @@ function UnlockedVault() {
             <FadeIn key={e.id} index={i}>
               <Card onPress={() => navigation.navigate('VaultEntry', { entryId: e.id })} style={styles.entry} accessibilityLabel={e.title ?? 'Untitled note'}>
                 <View style={styles.entryRow}>
-                  <Medallion icon="key" size={42} color={colors.violet} />
+                  <RealIcon name="lock" size={30} />
                   <View style={styles.flex}>
                     <Text style={styles.entryTitle} numberOfLines={1}>
                       {e.title || 'Untitled'}
@@ -177,28 +169,6 @@ function UnlockedVault() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-  },
-  noteCard: {
-    marginBottom: spacing.xl,
-  },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    padding: spacing.lg + 2,
-  },
-  noteTitle: {
-    ...t.heading,
-    fontSize: 20,
-    lineHeight: 24,
-    color: colors.heroText,
-  },
-  noteText: {
-    ...font.medium,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.heroTextSecondary,
-    marginTop: 2,
   },
   back: {
     flexDirection: 'row',

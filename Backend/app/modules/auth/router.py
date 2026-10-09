@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core import rate_limit
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.integrations.email import EmailNotConfigured
+from app.integrations.email import EmailNotConfigured, EmailSendFailed
 
 from . import service
 from .models import User
@@ -66,6 +66,8 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
         service.request_password_reset(db, payload.email)
     except EmailNotConfigured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Password reset email isn't available right now.")
+    except EmailSendFailed:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "We couldn't send the email. Please try again in a minute.")
     return {"message": "If that email has an account, a reset code is on its way."}
 
 

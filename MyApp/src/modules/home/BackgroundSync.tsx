@@ -67,7 +67,7 @@ export function BackgroundSync() {
     for (const r of reminders.data) {
       const at = new Date(r.remind_at);
       if (r.status === 'ACTIVE' && !r.completed_at && at.getTime() > now) {
-        scheduleReminderNotification(r.id, r.title, r.note || r.title, at).catch(() => undefined);
+        scheduleReminderNotification(r.id, r.title, r.note, at).catch(() => undefined);
       }
     }
   }, [reminders.data, prefs.notifyReminders]);

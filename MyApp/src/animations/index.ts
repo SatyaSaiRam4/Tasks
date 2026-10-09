@@ -2,8 +2,9 @@
  * Motion primitives shared by every component. All of them respect
  * reduced motion (system setting or the user's own preference).
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useMotion } from '../hooks/useMotion';
 import { motion } from '../theme';
 
@@ -68,7 +69,24 @@ export function useEntrance(delay = 0, duration: number = motion.slow) {
   return value;
 }
 
-/** Fade + rise style for an entrance value from useEntrance. */
+/** Like useEntrance, but replays every time the screen comes back into focus. */
+export function useFocusEntrance(duration = 420) {
+  const { reduced } = useMotion();
+  const value = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useFocusEffect(
+    useCallback(() => {
+      if (reduced) {
+        value.setValue(1);
+        return;
+      }
+      value.setValue(0);
+      Animated.timing(value, { toValue: 1, duration, easing: easeOut, useNativeDriver: true }).start();
+    }, [duration, reduced, value]),
+  );
+  return value;
+}
+
+/** Fade + rise style for an entrance value from useEntrance (a negative distance drops in from above). */
 export function riseStyle(value: Animated.Value, distance = 14) {
   return {
     opacity: value,

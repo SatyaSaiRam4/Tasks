@@ -14,6 +14,7 @@ import { IconButton, Toggle } from '../../../components/Controls';
 import { ListGroup, ListRow } from '../../../components/ListRow';
 import { Button } from '../../../components/Button';
 import { ConfirmSheet } from '../../../components/Sheet';
+import { Skeleton } from '../../../components/Feedback';
 import { getErrorMessage } from '../../../utils/apiError';
 import { formatFullDate, fromDateKey, toDateKey } from '../../../utils/date';
 import {
@@ -38,11 +39,9 @@ function normalizeWhatsapp(raw: string): string {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** One hour from now, rounded up to the next 5 minutes, as "HH:MM:00". */
+/** The next whole minute from now, as "HH:MM:00". */
 function defaultTime(): string {
-  const d = new Date(Date.now() + 60 * 60 * 1000);
-  const m = Math.ceil(d.getMinutes() / 5) * 5;
-  d.setMinutes(m, 0, 0);
+  const d = new Date(Date.now() + 60 * 1000);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
@@ -96,7 +95,7 @@ export function ReminderEditorScreen() {
       const saved = editing
         ? await update({ id: reminderId!, ...payload, clear_whatsapp_number: !whatsapp }).unwrap()
         : await create(payload).unwrap();
-      await scheduleReminderNotification(saved.id, saved.title, saved.note || saved.title, new Date(saved.remind_at));
+      await scheduleReminderNotification(saved.id, saved.title, saved.note, new Date(saved.remind_at));
       Toast.success(editing ? 'Saved.' : 'Reminder set.', 1.2);
       if (!(await hasExactAlarmPermission())) setAlarmPrompt(true);
       else navigation.goBack();
@@ -115,6 +114,17 @@ export function ReminderEditorScreen() {
       Toast.fail(getErrorMessage(err), 2);
     }
   };
+
+  if (editing && existing.isLoading) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        <ScreenHeader title="Edit reminder" subtitle="Reminder" close />
+        <Skeleton height={56} rounded={14} style={styles.mtLg} />
+        <Skeleton height={72} rounded={14} style={styles.mtLg} />
+        <Skeleton height={56} rounded={14} style={styles.mtLg} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>

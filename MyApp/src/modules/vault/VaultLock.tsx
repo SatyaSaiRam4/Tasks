@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, font, spacing, type as t } from '../../theme';
 import { PinPad } from '../../components/PinPad';
-import { Emblem } from '../../components/Emblem';
+import { RealIcon } from '../../components/RealIcon';
 import { FadeIn } from '../../components/Feedback';
 import { getErrorMessage } from '../../utils/apiError';
 import { useSetupVaultMutation, useUnlockVaultMutation, type VaultStatus } from './vaultApi';
@@ -73,15 +73,15 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
   const subtitle = !status.has_pin
     ? first
       ? 'Enter the same 4 digits again.'
-      : 'Save private notes here, such as passwords or recovery codes. Notes are encrypted and protected by this PIN. It can’t be recovered.'
+      : '4 digits to keep your notes private. It can’t be recovered.'
     : lockedOut
       ? `Too many tries. Try again in ${Math.ceil((lockedUntil - now) / 1000)}s.`
-      : 'Your encrypted notes are only available after you unlock this space.';
+      : 'Enter your 4-digit PIN.';
 
   return (
     <FadeIn style={styles.root}>
       <View style={styles.lockArt}>
-        <Emblem icon="lock" size={170} tint={colors.violet} />
+        <RealIcon name="lock" size={88} />
       </View>
       <Text style={[t.title, styles.center]}>{title}</Text>
       <Text style={[t.body, styles.subtitle]}>{subtitle}</Text>
@@ -99,11 +99,11 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
 
 const styles = StyleSheet.create({
   root: {
-    paddingTop: spacing.xl,
+    paddingTop: spacing.sm,
     alignItems: 'stretch',
   },
   lockArt: {
-    height: 170,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
   },

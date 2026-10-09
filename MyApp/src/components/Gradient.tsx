@@ -1,5 +1,5 @@
-import React, { useId } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useId, useState } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { gradients } from '../theme';
 
@@ -19,21 +19,33 @@ const DIRECTIONS = {
   horizontal: { x1: '0', y1: '0', x2: '1', y2: '0' },
 };
 
-/** A view with an SVG linear-gradient background (no extra native gradient lib needed). */
+/**
+ * A view with an SVG linear-gradient background (no extra native gradient lib
+ * needed). The SVG is drawn at the view's measured size: a "100%" SVG can keep
+ * the size of its first layout pass on Android, leaving a view that later
+ * grows only partly filled.
+ */
 export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], style, children, borderRadius = 0 }: GradientProps) {
   const id = useId().replace(/:/g, '');
   const d = DIRECTIONS[direction];
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setSize(prev => (prev.width === width && prev.height === height ? prev : { width, height }));
+  };
   return (
-    <View style={[{ borderRadius, overflow: 'hidden' }, style]}>
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} preserveAspectRatio="none">
-        <Defs>
-          <LinearGradient id={`g${id}`} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}>
-            <Stop offset="0" stopColor={colors[0]} stopOpacity={opacity[0]} />
-            <Stop offset="1" stopColor={colors[1]} stopOpacity={opacity[1]} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill={`url(#g${id})`} />
-      </Svg>
+    <View style={[{ borderRadius, overflow: 'hidden' }, style]} onLayout={onLayout}>
+      {size.width > 0 && size.height > 0 ? (
+        <Svg key={`${size.width}x${size.height}`} width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id={`g${id}`} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}>
+              <Stop offset="0" stopColor={colors[0]} stopOpacity={opacity[0]} />
+              <Stop offset="1" stopColor={colors[1]} stopOpacity={opacity[1]} />
+            </LinearGradient>
+          </Defs>
+          <Rect width={size.width} height={size.height} fill={`url(#g${id})`} />
+        </Svg>
+      ) : null}
       {children}
     </View>
   );

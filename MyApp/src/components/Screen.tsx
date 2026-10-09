@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewStyle } from 'react-native';
+import { Animated, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { colors, CONTENT_MAX_WIDTH, spacing, WIDE_CONTENT_MAX_WIDTH } from '../theme';
 import { useLayout } from '../hooks/useLayout';
 import { Backdrop } from '../layouts/Backdrop';
 import { OfflineBanner } from './OfflineBanner';
+import { riseStyle, useFocusEntrance } from '../animations';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -24,7 +25,8 @@ interface ScreenProps {
 
 /**
  * Shared screen chrome: the cinematic backdrop, safe areas, an offline
- * banner, and an optional scroll container with pull-to-refresh. Content is
+ * banner, an entrance as the screen comes into view, and an optional scroll
+ * container with pull-to-refresh. Content is
  * centered in a capped column on large screens.
  */
 export function Screen({
@@ -41,6 +43,9 @@ export function Screen({
   footer,
 }: ScreenProps) {
   const { gutter, hasRail } = useLayout();
+  // Content rises in from below whenever the screen comes into view.
+  const enter = useFocusEntrance();
+  const body = <Animated.View style={[styles.fill, riseStyle(enter, 28)]}>{children}</Animated.View>;
   const frame: ViewStyle = {
     width: '100%',
     maxWidth: (wide ? WIDE_CONTENT_MAX_WIDTH : CONTENT_MAX_WIDTH) + gutter * 2,
@@ -86,10 +91,10 @@ export function Screen({
             ) : undefined
           }
         >
-          {children}
+          {body}
         </ScrollView>
       ) : (
-        <View style={[styles.fill, ...inner]}>{children}</View>
+        <View style={[styles.fill, ...inner]}>{body}</View>
       )}
       {footer}
     </SafeAreaView>

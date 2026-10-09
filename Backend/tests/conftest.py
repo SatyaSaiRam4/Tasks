@@ -29,6 +29,7 @@ engine = create_engine(TEST_DATABASE_URL)
 TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 TABLES = [
+    "wallet_redemptions",
     "user_achievements",
     "track_completions",
     "streak_states",

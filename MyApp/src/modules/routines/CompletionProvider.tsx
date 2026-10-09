@@ -6,6 +6,7 @@ import { colors, spacing, type as t } from '../../theme';
 import { Sheet } from '../../components/Sheet';
 import { Button } from '../../components/Button';
 import { Icon } from '../../components/Icon';
+import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
@@ -112,7 +113,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           ) : (
             <View>
               <View style={styles.badge}>
-                <Icon name="check-circle" size={28} color={colors.success} strokeWidth={1.6} />
+                <RealIcon name="check" size={56} />
               </View>
               <Text style={styles.eyebrow}>An honest check</Text>
               <Text style={[t.heading, styles.center]}>Did you do “{target.title}” today?</Text>

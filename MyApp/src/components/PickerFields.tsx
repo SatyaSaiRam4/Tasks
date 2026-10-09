@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import DatePicker from '@ant-design/react-native/lib/date-picker';
-import { colors, font, radius, spacing, type as t } from '../theme';
+import { colors, font, radius, spacing } from '../theme';
 import { formatClock, formatFullDate, formatDateTime, fromDateKey, toDateKey } from '../utils/date';
-import { Chip } from './Controls';
 import { Icon, type IconName } from './Icon';
 import { Sheet } from './Sheet';
 import { Button } from './Button';
@@ -101,13 +100,69 @@ export function DateTimeField({ label, value, onChange }: { label?: string; valu
 
 const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
+const PERIODS = ['AM', 'PM'];
 
 function parseTime(value: string | null): { hour12: number; minute: number; pm: boolean } {
   const [h, m] = value ? value.split(':').map(Number) : [8, 0];
   return { hour12: h % 12 === 0 ? 12 : h % 12, minute: m, pm: h >= 12 };
 }
 
-/** A time of day ("HH:MM:00") picked from hour, any minute, and AM/PM. */
+const ROW = 44;
+const VISIBLE = 5;
+
+/** One scroll wheel: rows snap into the highlighted middle slot. */
+function Wheel({
+  items,
+  index,
+  onChange,
+  label,
+}: {
+  items: string[];
+  index: number;
+  onChange: (index: number) => void;
+  label: string;
+}) {
+  const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  // Scroll to the starting value once laid out (contentOffset is iOS-only).
+  const place = () => ref.current?.scrollTo({ y: index * ROW, animated: false });
+  const settle = (y: number) => {
+    const i = Math.max(0, Math.min(items.length - 1, Math.round(y / ROW)));
+    if (i !== index) onChange(i);
+  };
+  return (
+    <View style={styles.wheel} accessibilityLabel={`${label}: ${items[index]}`}>
+      <View pointerEvents="none" style={styles.wheelBand} />
+      <ScrollView
+        ref={ref}
+        onLayout={place}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ROW}
+        decelerationRate="fast"
+        nestedScrollEnabled
+        contentContainerStyle={styles.wheelContent}
+        onMomentumScrollEnd={e => settle(e.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={e => settle(e.nativeEvent.contentOffset.y)}
+      >
+        {items.map((item, i) => (
+          <Pressable
+            key={item}
+            onPress={() => {
+              ref.current?.scrollTo({ y: i * ROW, animated: true });
+              onChange(i);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`${label} ${item}`}
+            style={styles.wheelRow}
+          >
+            <Text style={[styles.wheelText, i === index && styles.wheelTextOn]}>{item}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** A time of day ("HH:MM:00") picked on hour, minute and AM/PM scroll wheels. */
 export function TimeField({
   label,
   value,
@@ -151,43 +206,13 @@ export function TimeField({
         onClear={() => onChange(null)}
       />
       <Sheet visible={open} onClose={() => setOpen(false)} title="Pick a time">
-        <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={styles.scroll}>
-          <Text style={styles.preview} accessibilityLiveRegion="polite">
-            {hour12}:{String(minute).padStart(2, '0')}
-            <Text style={styles.previewMeridiem}> {pm ? 'PM' : 'AM'}</Text>
-          </Text>
-          <View style={[styles.grid, styles.period]}>
-            <Chip label="AM" selected={!pm} onPress={() => setPm(false)} />
-            <Chip label="PM" selected={pm} onPress={() => setPm(true)} />
-          </View>
-          <Text style={styles.label}>Hour</Text>
-          <View style={styles.grid}>
-            {HOURS.map(h => (
-              <Chip key={h} label={String(h)} selected={h === hour12} onPress={() => setHour12(h)} />
-            ))}
-          </View>
-          <Text style={styles.label}>Minute</Text>
-          <View style={styles.minutes}>
-            {MINUTES.map(m => {
-              const selected = m === minute;
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => setMinute(m)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`${m} minutes`}
-                  style={({ pressed }) => [styles.minute, m % 5 === 0 && styles.minuteMajor, selected && styles.minuteOn, pressed && styles.minutePressed]}
-                >
-                  <Text style={[styles.minuteText, m % 5 === 0 && styles.minuteTextMajor, selected && styles.minuteTextOn]}>
-                    {String(m).padStart(2, '0')}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Button label="Set time" onPress={commit} size="lg" style={styles.commit} />
-        </ScrollView>
+        <View style={styles.wheels}>
+          <Wheel label="Hour" items={HOURS.map(String)} index={HOURS.indexOf(hour12)} onChange={i => setHour12(HOURS[i])} />
+          <Text style={styles.colon}>:</Text>
+          <Wheel label="Minute" items={MINUTES.map(m => String(m).padStart(2, '0'))} index={minute} onChange={setMinute} />
+          <Wheel label="Period" items={PERIODS} index={pm ? 1 : 0} onChange={i => setPm(i === 1)} />
+        </View>
+        <Button label="Set time" onPress={commit} size="lg" style={styles.commit} />
       </Sheet>
     </>
   );
@@ -212,71 +237,50 @@ const styles = StyleSheet.create({
   placeholder: {
     color: colors.textTertiary,
   },
-  preview: {
-    ...t.hero,
-    textAlign: 'center',
-    fontSize: 60,
-    lineHeight: 66,
-    color: colors.goldBright,
-    marginBottom: spacing.lg,
-  },
-  previewMeridiem: {
-    ...font.bold,
-    fontSize: 16,
-    letterSpacing: 2,
-    color: colors.textSecondary,
-  },
-  grid: {
+  wheels: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
-  period: {
-    justifyContent: 'center',
+  wheel: {
+    width: 76,
+    height: ROW * VISIBLE,
   },
-  scroll: {
-    flexGrow: 0,
+  wheelBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: ROW * 2,
+    height: ROW,
+    borderRadius: radius.md,
+    backgroundColor: colors.goldSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.goldLine,
   },
-  minutes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: spacing.lg,
+  wheelContent: {
+    paddingVertical: ROW * 2,
   },
-  minute: {
-    width: '8.4%',
-    minWidth: 28,
-    aspectRatio: 1,
+  wheelRow: {
+    height: ROW,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.glass,
   },
-  minuteMajor: {
-    backgroundColor: colors.glassStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  minuteOn: {
-    backgroundColor: colors.primaryFill,
-    borderColor: colors.primaryFill,
-  },
-  minutePressed: {
-    opacity: 0.7,
-  },
-  minuteText: {
+  wheelText: {
     ...font.medium,
-    fontSize: 12,
-    color: colors.textSecondary,
+    fontSize: 18,
+    color: colors.textTertiary,
   },
-  minuteTextMajor: {
+  wheelTextOn: {
     ...font.bold,
+    fontSize: 22,
     color: colors.text,
   },
-  minuteTextOn: {
+  colon: {
     ...font.bold,
-    color: colors.onPrimary,
+    fontSize: 22,
+    color: colors.textSecondary,
   },
   commit: {
     marginTop: spacing.sm,

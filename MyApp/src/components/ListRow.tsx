@@ -8,6 +8,7 @@ import { Icon, type IconName } from './Icon';
 /** A settings-style row: icon medallion, title/subtitle, and a chevron, value, or custom control. */
 export function ListRow({
   icon,
+  leading,
   iconColor = colors.gold,
   title,
   subtitle,
@@ -18,6 +19,8 @@ export function ListRow({
   last,
 }: {
   icon?: IconName;
+  /** Any picture in place of the icon medallion, e.g. a RealIcon. */
+  leading?: React.ReactNode;
   iconColor?: string;
   title: string;
   subtitle?: string;
@@ -29,7 +32,8 @@ export function ListRow({
 }) {
   const content = (
     <View style={[styles.row, !last && styles.divider]}>
-      {icon ? <Medallion icon={icon} size={38} color={destructive ? colors.danger : iconColor} /> : null}
+      {leading}
+      {!leading && icon ? <Medallion icon={icon} size={38} color={destructive ? colors.danger : iconColor} /> : null}
       <View style={styles.text}>
         <Text style={[t.bodyStrong, destructive && { color: colors.danger }]}>{title}</Text>
         {subtitle ? <Text style={[t.caption, styles.subtitle]}>{subtitle}</Text> : null}
