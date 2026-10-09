@@ -180,7 +180,7 @@ export function ConsistencyScreen() {
                 </Card>
               ))}
 
-          <Text style={styles.footnote}>Tick all of a day’s tasks to keep your streak going.</Text>
+          <Text style={styles.footnote}>Each plan you finish in a day adds 1 to your streak. Each plan you miss takes 1 away.</Text>
         </>
       )}
       {history.isError ? <ErrorState message={getErrorMessage(history.error)} onRetry={history.refetch} /> : null}
@@ -204,7 +204,7 @@ function StreakHero({ s }: { s: StreakSummary }) {
       <Glow color={brand.ember} size={420} intensity={0.16} style={styles.heroGlow} />
       <StreakFlame lit={s.today.secured} />
       <AnimatedNumber value={s.current_streak} style={styles.big} />
-      <Text style={styles.unit}>{s.current_streak === 1 ? 'day streak' : 'days in a row'}</Text>
+      <Text style={styles.unit}>streak</Text>
       <View style={[styles.status, { borderColor: s.today.secured ? brand.jade : colors.heroLine }]}>
         <Icon name={s.today.secured ? 'check-circle' : 'clock'} size={13} color={s.today.secured ? brand.jade : brand.champagneLight} strokeWidth={2} />
         <Text style={[styles.statusText, { color: s.today.secured ? brand.jade : brand.champagneLight }]}>{statusText}</Text>

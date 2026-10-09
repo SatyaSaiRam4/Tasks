@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import config
 from app.core.timeutil import local_today, utc_now
 from app.modules.actions.models import Action
 from app.modules.actions.scheduling import is_due
@@ -103,6 +104,17 @@ def create_track(db: Session, user: User, data: dict) -> TrackOut:
     engine.finalize_user(db, user)
     _ensure_unique_name(db, user.id, data["name"])
     today = local_today(user.timezone)
+    running = db.scalar(
+        select(func.count(Track.id)).where(
+            Track.user_id == user.id,
+            Track.deleted_at.is_(None),
+            (Track.end_date.is_(None)) | (Track.end_date >= today),
+        )
+    )
+    if (running or 0) >= config.MAX_ACTIVE_PLANS:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"You can have up to {config.MAX_ACTIVE_PLANS} plans. Finish or delete one to add another."
+        )
     start = data.get("start_date") or today
     if data.get("end_date") and data["end_date"] < start:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "End date must be on or after the start date.")

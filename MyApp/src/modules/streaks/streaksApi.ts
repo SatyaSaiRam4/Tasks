@@ -10,6 +10,9 @@ export interface TodaySummary {
   optional_due: number;
   optional_completed: number;
   secured: boolean;
+  /** Plans with something due today, and how many of them are finished (+1 streak each). */
+  plans_due: number;
+  plans_done: number;
   remaining: number;
   progress: number;
 }

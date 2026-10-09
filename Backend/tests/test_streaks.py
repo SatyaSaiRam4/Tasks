@@ -119,7 +119,7 @@ def test_totals_count_a_secured_today_like_the_streak_does(client, auth):
 # ---- streak rules ------------------------------------------------------------
 
 
-def test_streak_builds_and_resets_on_a_missed_day(client, auth, clock):
+def test_streak_builds_and_a_missed_day_deducts_a_point(client, auth, clock):
     track = make_track(client, auth)
     action = make_action(client, auth, track["id"])
 
@@ -132,9 +132,31 @@ def test_streak_builds_and_resets_on_a_missed_day(client, auth, clock):
 
     next_day(clock)  # today (day 4) passes with nothing done
     s = streak(client, auth)
-    assert s["current_streak"] == 0
+    assert s["current_streak"] == 2  # one plan missed: -1, not a reset
     assert s["best_streak"] == 3
     assert s["total_failed_days"] == 1
+
+
+def test_each_finished_plan_earns_a_point(client, auth, clock):
+    plans = [make_track(client, auth, name=f"Plan {i}") for i in range(3)]
+    actions = [make_action(client, auth, p["id"]) for p in plans]
+    complete(client, auth, actions[0]["id"])
+    complete(client, auth, actions[1]["id"])
+    s = streak(client, auth)
+    # Finished plans count today already; the unfinished one isn't judged yet.
+    assert s["current_streak"] == 2
+    assert s["today"]["plans_done"] == 2 and s["today"]["plans_due"] == 3
+
+    next_day(clock)  # two finished (+2), one missed (-1)
+    assert streak(client, auth)["current_streak"] == 1
+
+
+def test_points_never_go_below_zero(client, auth, clock):
+    for i in range(2):
+        make_action(client, auth, make_track(client, auth, name=f"Plan {i}")["id"])
+    next_day(clock)  # both missed
+    s = streak(client, auth)
+    assert s["current_streak"] == 0 and s["best_streak"] == 0
 
 
 def test_optional_actions_do_not_affect_the_streak(client, auth, clock):
@@ -287,3 +309,72 @@ def test_category_grid_marks_each_task_per_day(client, auth, clock):
     cells = {row["title"]: row["cells"] for row in grid["rows"]}
     assert cells["Walk"][:2] == ["DONE", "TODO"]
     assert cells["Read"][:2] == ["MISSED", "TODO"]
+
+
+# ---- limits ---------------------------------------------------------------------
+
+
+def test_plan_and_task_limits(client, auth):
+    plans = [make_track(client, auth, name=f"Plan {i}") for i in range(10)]
+    assert client.post(f"{API}/tracks", json={"name": "Eleventh"}, headers=auth).status_code == 409
+    for i in range(15):
+        make_action(client, auth, plans[0]["id"], title=f"Task {i}")
+    res = client.post(f"{API}/tracks/{plans[0]['id']}/actions", json={"title": "Sixteenth", "repeat_type": "DAILY"}, headers=auth)
+    assert res.status_code == 409
+
+
+def test_a_task_cannot_outlast_its_plan(client, auth, clock):
+    today = clock.now.date()
+    plan = make_track(client, auth, start_date=str(today), end_date=str(today + timedelta(days=9)))
+    late = {"title": "Too long", "repeat_type": "DAILY", "end_date": str(today + timedelta(days=20))}
+    assert client.post(f"{API}/tracks/{plan['id']}/actions", json=late, headers=auth).status_code == 422
+    ok = make_action(client, auth, plan["id"], end_date=str(today + timedelta(days=4)))
+    assert ok["end_date"] == str(today + timedelta(days=4))
+
+
+# ---- daily cleanup -----------------------------------------------------------------
+
+
+def test_cleanup_needs_the_secret(client, monkeypatch):
+    from app.core import config
+
+    monkeypatch.setattr(config, "CRON_SECRET", "")
+    assert client.post(f"{API}/maintenance/cleanup", headers={"X-Cron-Secret": "x"}).status_code == 404
+    monkeypatch.setattr(config, "CRON_SECRET", "s3cret")
+    assert client.post(f"{API}/maintenance/cleanup", headers={"X-Cron-Secret": "wrong"}).status_code == 403
+
+
+def test_cleanup_removes_ended_plans_tasks_and_done_reminders_but_keeps_streaks(client, auth, clock, monkeypatch, db):
+    from app.core import config
+
+    monkeypatch.setattr(config, "CRON_SECRET", "s3cret")
+    today = clock.now.date()
+    short = make_track(client, auth, name="Short", start_date=str(today), end_date=str(today))
+    action = make_action(client, auth, short["id"], steps=["Warm up"])
+    complete(client, auth, action["id"])
+    keep = make_track(client, auth, name="Ongoing")
+    brief = make_action(client, auth, keep["id"], title="Brief", end_date=str(today + timedelta(days=1)))
+    lasting = make_action(client, auth, keep["id"], title="Lasting")
+    complete(client, auth, brief["id"])
+    complete(client, auth, lasting["id"])
+    at = (clock.now + timedelta(hours=1)).isoformat()
+    reminder = client.post(f"{API}/reminders", json={"title": "Call", "remind_at": at}, headers=auth).json()
+    client.post(f"{API}/reminders/{reminder['id']}/complete", headers=auth)
+
+    for _ in range(9):
+        next_day(clock)
+    # Reminders stamp completed_at with the real clock; move it into the test's past.
+    db.execute(text("UPDATE reminders SET completed_at = :t"), {"t": clock.now - timedelta(days=8)})
+    db.commit()
+    res = client.post(f"{API}/maintenance/cleanup", headers={"X-Cron-Secret": "s3cret"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["plans_deleted"] == 1 and body["tasks_deleted"] == 1 and body["reminders_deleted"] == 1
+
+    names = [t["name"] for t in client.get(f"{API}/tracks", headers=auth).json()]
+    assert names == ["Ongoing"]
+    tasks = [a["title"] for a in client.get(f"{API}/tracks/{keep['id']}/actions", headers=auth).json()]
+    assert tasks == ["Lasting"] and brief["id"] != lasting["id"]
+    assert client.get(f"{API}/reminders/{reminder['id']}", headers=auth).status_code == 404
+    s = streak(client, auth)
+    assert s["best_streak"] == 2 and s["total_success_days"] == 1

@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core import config
 from app.core.timeutil import local_today, utc_now
 from app.modules.achievements.catalog import BY_CODE
 from app.modules.auth.models import User
@@ -36,6 +37,12 @@ def get_owned_action(db: Session, user_id: UUID, action_id: UUID) -> Action:
     if not action:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Action not found.")
     return action
+
+
+def _validate_dates(action: Action, track: Track) -> None:
+    """A task's own dates must sit inside its plan's period."""
+    if track.end_date is not None and action.end_date is not None and action.end_date > track.end_date:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A task can't end after its plan ends.")
 
 
 def _validate_schedule(action: Action) -> None:
@@ -74,6 +81,15 @@ def create_action(db: Session, user: User, track_id: UUID, data: dict) -> Action
     steps = data.pop("steps", [])
     if data.get("start_date") is None:
         data["start_date"] = max(today, track.start_date)
+    live = db.scalar(
+        select(func.count(Action.id)).where(
+            Action.track_id == track.id,
+            Action.deleted_at.is_(None),
+            (Action.end_date.is_(None)) | (Action.end_date >= today),
+        )
+    )
+    if (live or 0) >= config.MAX_TASKS_PER_PLAN:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"A plan can have up to {config.MAX_TASKS_PER_PLAN} tasks.")
     max_sort = db.scalar(select(func.max(Action.sort_order)).where(Action.track_id == track.id)) or 0
     action = Action(user_id=user.id, track_id=track.id, sort_order=max_sort + 1, **data)
     if action.repeat_type != RepeatType.WEEKLY:
@@ -81,6 +97,7 @@ def create_action(db: Session, user: User, track_id: UUID, data: dict) -> Action
     if action.repeat_type != RepeatType.CUSTOM:
         action.repeat_interval_days = None
     _validate_schedule(action)
+    _validate_dates(action, track)
     _set_steps(action, steps)
     db.add(action)
     db.commit()
@@ -107,6 +124,9 @@ def update_action(db: Session, user: User, action_id: UUID, fields: dict) -> Act
     if action.repeat_type != RepeatType.CUSTOM:
         action.repeat_interval_days = None
     _validate_schedule(action)
+    track = db.get(Track, action.track_id)
+    if track is not None:
+        _validate_dates(action, track)
     if steps is not None:
         _set_steps(action, [s.strip()[:160] for s in steps if s and s.strip()])
     db.commit()
@@ -255,7 +275,7 @@ def complete_action(db: Session, user: User, action_id: UUID, confirmed: bool, m
         db.rollback()
         return _result(db, user, action.id, day, was_secured, [], already=True)
 
-    new_codes = engine.finalize_user(db, user)  # evaluates achievements, commits
+    new_codes = engine.finalize_user(db, user, check_achievements=True)  # commits
     return _result(db, user, action.id, day, was_secured, new_codes, already=False)
 
 

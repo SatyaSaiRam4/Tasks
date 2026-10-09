@@ -251,8 +251,8 @@ export async function syncStreakWarning(opts: { dateKey: string; streak: number;
   await schedule(
     `${STREAK_PREFIX}${opts.dateKey}`,
     CHANNELS.streak.id,
-    `Your ${opts.streak}-day streak is at risk`,
-    `${opts.remaining} ${plural} left today. You've got this.`,
+    `Don’t lose streak points`,
+    `${opts.remaining} ${plural} left today. Each unfinished plan costs 1 point.`,
     at,
   );
 }

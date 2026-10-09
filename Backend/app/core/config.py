@@ -141,3 +141,19 @@ TRACK_BONUS_MIN_COMPLETION = float(os.getenv("TRACK_BONUS_MIN_COMPLETION", "0.9"
 
 # How often the background job finalizes ended days for all users.
 STREAK_FINALIZE_MINUTES = int(os.getenv("STREAK_FINALIZE_MINUTES", "15"))
+
+
+# ---------------------------------------------------------------------------
+# Daily cleanup (POST /api/v1/maintenance/cleanup), called by the GitHub
+# Actions workflow in .github/workflows/daily-cleanup.yml. The caller must send
+# this secret in the X-Cron-Secret header; with it unset the endpoint is off.
+# Plans and tasks are deleted this many days after their end date, completed
+# reminders this many days after they were marked done. The Vault is never
+# touched.
+# ---------------------------------------------------------------------------
+CRON_SECRET = os.getenv("CRON_SECRET", "").strip()
+CLEANUP_AFTER_DAYS = int(os.getenv("CLEANUP_AFTER_DAYS", "7"))
+
+# Limits on what one account can create.
+MAX_ACTIVE_PLANS = 10
+MAX_TASKS_PER_PLAN = 15

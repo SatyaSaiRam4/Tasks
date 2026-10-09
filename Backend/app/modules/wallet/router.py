@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -42,6 +42,7 @@ class WalletOut(BaseModel):
 
 class RedeemIn(BaseModel):
     phone: str
+    amount: int | None = Field(default=None, ge=1)
 
     @field_validator("phone")
     @classmethod
@@ -61,4 +62,4 @@ def get_wallet(current_user: User = Depends(get_current_user), db: Session = Dep
 
 @router.post("/redeem", response_model=RedemptionOut, status_code=status.HTTP_201_CREATED)
 def redeem(payload: RedeemIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return service.redeem(db, current_user, payload.phone)
+    return service.redeem(db, current_user, payload.phone, payload.amount)

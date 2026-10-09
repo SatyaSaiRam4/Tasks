@@ -19,15 +19,50 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { tab: 'HomeTab', title: name => `Hi ${name}, I’m Satya!`, text: 'I’ll show you how Memo works. It takes one minute.', gesture: 'wave' },
-  { tab: 'HomeTab', title: () => 'Your streak', text: 'The flame at the top counts the days in a row you finished all your tasks.', gesture: 'hop' },
-  { tab: 'HomeTab', title: () => 'Plans and reminders', text: 'Under it are your plans and your next reminder. Tap the arrow on a card to open it.', gesture: 'nod' },
-  { tab: 'RoutinesTab', title: () => 'Plans', text: 'A plan is a goal, like “30 days of fitness”. Tap the + button to make one.', gesture: 'lookLeft' },
-  { tab: 'RoutinesTab', title: () => 'Daily tasks', text: 'Inside a plan, add small tasks for each day. Tap the circle when you finish one.', gesture: 'talk' },
-  { tab: 'RoutinesTab', title: () => 'Grow your streak', text: 'Finish all of today’s tasks and your streak grows by one. 🔥', gesture: 'cheer' },
-  { tab: 'RemindersTab', title: () => 'Reminders', text: 'Pick a time and I’ll remind you. Turn on “Ring like an alarm” for important things.', gesture: 'talk' },
-  { tab: 'VaultTab', title: () => 'Private Vault', text: 'Keep private notes locked behind your own PIN. Only you can open them.', gesture: 'lookRight' },
-  { tab: 'ProfileTab', title: () => 'You’re ready!', text: 'You can watch this tour again anytime from Settings.', gesture: 'cheer' },
+  { tab: 'HomeTab', title: name => `Hi ${name}, I’m Satya!`, text: 'I’ll show you how Memo works. It is easy, I promise.', gesture: 'wave' },
+  {
+    tab: 'RoutinesTab',
+    title: () => '1. Make a plan',
+    text: 'A plan is a goal with an end date. For example: “Get fit in 30 days”. You can have up to 10 plans.',
+    gesture: 'lookLeft',
+  },
+  {
+    tab: 'RoutinesTab',
+    title: () => '2. Add tasks to the plan',
+    text: 'Tasks are the small things you do every day for that goal, like “Walk 20 minutes”. Up to 15 in a plan.',
+    gesture: 'think',
+  },
+  {
+    tab: 'RoutinesTab',
+    title: () => '3. Tick when you finish',
+    text: 'Open a plan and tap the circle next to a task when you have done it today.',
+    gesture: 'nod',
+  },
+  {
+    tab: 'HomeTab',
+    title: () => '4. Earn streak points',
+    text: 'Finish every task of a plan today = +1 streak. Finish 3 plans = +3. A plan you miss = −1.',
+    gesture: 'hop',
+  },
+  {
+    tab: 'HomeTab',
+    title: () => '5. Streaks earn money',
+    text: 'At 500 streak points you get ₹10, at 1000 you get ₹20. Tap the wallet at the top to redeem.',
+    gesture: 'cheer',
+  },
+  {
+    tab: 'RemindersTab',
+    title: () => 'Reminders and alarms',
+    text: 'Pick a time and I will remind you. For important things, turn on “Ring like an alarm”.',
+    gesture: 'talk',
+  },
+  {
+    tab: 'VaultTab',
+    title: () => 'Private Vault',
+    text: 'Write private notes here. They are locked with your own PIN, and only you can open them.',
+    gesture: 'lookRight',
+  },
+  { tab: 'HomeTab', title: () => 'You are ready!', text: 'Make your first plan now. You can watch this tour again in Settings.', gesture: 'cheer' },
 ];
 
 /** Reveals text a few letters at a time, like Satya is saying it. Tap to finish. */
@@ -96,7 +131,7 @@ export function SatyaTour({ goToTab }: { goToTab: (tab: keyof MainTabParamList) 
     <View style={styles.overlay} onStartShouldSetResponder={() => true} accessibilityViewIsModal>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.satya}>
-          {satyaOn ? <SatyaModel size={170} intro="long" gesture={step.gesture} gestureKey={index} /> : <SatyaOrb size={84} />}
+          {satyaOn ? <SatyaModel size={170} intro="long" gesture={index === 0 ? [step.gesture, 'talk'] : ['walk', step.gesture, 'talk']} gestureKey={index} /> : <SatyaOrb size={84} />}
         </View>
         <Animated.View style={[styles.bubble, { opacity: fade, transform: [{ translateY: rise }] }]}>
           <Gradient colors={gradients.hero} direction="diagonal" style={StyleSheet.absoluteFill} />

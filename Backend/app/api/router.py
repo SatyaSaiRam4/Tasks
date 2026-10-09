@@ -5,6 +5,7 @@ from app.modules.actions.router import router as actions_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.dashboard.router import router as dashboard_router
+from app.modules.maintenance.router import router as maintenance_router
 from app.modules.reminders.router import router as reminders_router
 from app.modules.streaks.router import router as streaks_router
 from app.modules.tracks.router import router as tracks_router
@@ -25,3 +26,4 @@ api_router.include_router(reminders_router)
 api_router.include_router(vault_router)
 api_router.include_router(wallet_router)
 api_router.include_router(admin_router)
+api_router.include_router(maintenance_router)

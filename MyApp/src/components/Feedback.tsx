@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, motion, radius, spacing, type as t, withAlpha } from '../theme';
+import { colors, motion, radius, spacing, type as t } from '../theme';
 import { useMotion } from '../hooks/useMotion';
 import { easeOut } from '../animations';
 import { Button } from './Button';
 import { Emblem } from './Emblem';
-import { Gradient } from './Gradient';
 import { type IconName } from './Icon';
 
 // ---- FadeIn ------------------------------------------------------------------------
@@ -33,35 +32,46 @@ export function FadeIn({ children, index = 0, style, distance = 16 }: { children
 
 // ---- Skeleton ------------------------------------------------------------------------
 
-/** A loading placeholder with a slow champagne shimmer sweeping across it. */
+/**
+ * A loading placeholder: a quiet surface that breathes softly, so screens
+ * waiting for data look calm rather than busy. All placeholders pulse in
+ * step, because they share one clock.
+ */
 export function Skeleton({ width = '100%', height = 16, rounded = radius.sm, style }: { width?: number | `${number}%`; height?: number; rounded?: number; style?: StyleProp<ViewStyle> }) {
+  const opacity = useBreath();
+  return <Animated.View style={[{ width, height, borderRadius: rounded, opacity }, styles.skeleton, style]} />;
+}
+
+let breath: Animated.Value | null = null;
+let breathers = 0;
+let breathLoop: Animated.CompositeAnimation | null = null;
+
+/** One shared 0.45 → 1 → 0.45 pulse for every skeleton on screen. */
+function useBreath() {
   const { reduced } = useMotion();
-  const sweep = useRef(new Animated.Value(0)).current;
-  const [w, setW] = useState(0);
+  if (!breath) breath = new Animated.Value(0.7);
+  const value = breath;
   useEffect(() => {
-    if (reduced || !w) return;
-    const loop = Animated.loop(
-      Animated.timing(sweep, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [sweep, reduced, w]);
-  const translateX = sweep.interpolate({ inputRange: [0, 1], outputRange: [-w, w] });
-  return (
-    <View
-      onLayout={e => setW(e.nativeEvent.layout.width)}
-      style={[{ width, height, borderRadius: rounded }, styles.skeleton, style]}
-    >
-      {w && !reduced ? (
-        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
-          <View style={styles.shimmerRow}>
-            <Gradient colors={[withAlpha(colors.gold, 0), withAlpha(colors.gold, 0.1)]} direction="horizontal" style={styles.flex} />
-            <Gradient colors={[withAlpha(colors.gold, 0.1), withAlpha(colors.gold, 0)]} direction="horizontal" style={styles.flex} />
-          </View>
-        </Animated.View>
-      ) : null}
-    </View>
-  );
+    if (reduced) {
+      value.setValue(0.7);
+      return;
+    }
+    breathers += 1;
+    if (breathers === 1) {
+      breathLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(value, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(value, { toValue: 0.45, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+      );
+      breathLoop.start();
+    }
+    return () => {
+      breathers -= 1;
+      if (breathers === 0) breathLoop?.stop();
+    };
+  }, [reduced, value]);
+  return value;
 }
 
 /** A ready-made skeleton for a list of cards. */
@@ -123,14 +133,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   skeleton: {
-    backgroundColor: colors.glassStrong,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  shimmerRow: {
-    flex: 1,
-    flexDirection: 'row',
   },
   empty: {
     alignItems: 'center',

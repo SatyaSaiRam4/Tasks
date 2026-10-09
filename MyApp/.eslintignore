@@ -1,0 +1,2 @@
+# Built or vendored files: the story bundle (from web/story) and model-viewer.
+assets/web/**/*.js

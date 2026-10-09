@@ -41,3 +41,13 @@ def test_milestones_pay_once(client, auth, db):
 def test_redeem_rejects_bad_numbers(client, auth, db):
     set_best_streak(client, auth, db, 500)
     assert client.post(f"{API}/wallet/redeem", json={"phone": "12"}, headers=auth).status_code == 422
+
+
+def test_redeem_part_of_the_balance(client, auth, db):
+    set_best_streak(client, auth, db, 1000)
+    res = client.post(f"{API}/wallet/redeem", json={"phone": "9876543210", "amount": 12}, headers=auth)
+    assert res.status_code == 201, res.text
+    assert res.json()["amount"] == 12
+    assert wallet(client, auth)["balance"] == 18
+    too_much = client.post(f"{API}/wallet/redeem", json={"phone": "9876543210", "amount": 19}, headers=auth)
+    assert too_much.status_code == 409

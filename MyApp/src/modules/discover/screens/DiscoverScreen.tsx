@@ -104,7 +104,7 @@ export function DiscoverScreen() {
                   <Icon name="flame" size={28} color={brand.ember} strokeWidth={1.6} />
                   {data.current_streak !== null ? (
                     <Text style={styles.streakNum}>
-                      {data.current_streak} <Text style={styles.streakUnit}>day streak</Text>
+                      {data.current_streak} <Text style={styles.streakUnit}>streak</Text>
                     </Text>
                   ) : null}
                   {data.best_streak !== null ? <Text style={[t.caption, styles.best]}>Best {data.best_streak}</Text> : null}

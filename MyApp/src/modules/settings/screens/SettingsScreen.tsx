@@ -290,7 +290,7 @@ export function SettingsScreen() {
             ))}
           </View>
         </View>
-        <ListRow icon="info" title="Streak rules" subtitle="Tick all of a day’s tasks to keep it going" onPress={() => navigation.navigate('Consistency')} last />
+        <ListRow icon="info" title="Streak rules" subtitle="+1 for each plan finished in a day, −1 for each missed" onPress={() => navigation.navigate('Consistency')} last />
       </ListGroup>
 
       <SectionHeader title="Privacy" />
