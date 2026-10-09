@@ -1,66 +1,155 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../../components/Screen';
 import { LargeTitle } from '../../../components/ScreenHeader';
-import { Fab } from '../../../components/Controls';
-import { EmptyState, ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
+import { Card } from '../../../components/Card';
+import { Button } from '../../../components/Button';
+import { Fab, SectionHeader } from '../../../components/Controls';
+import { ProgressRing } from '../../../components/Progress';
+import { ErrorState, FadeIn, SkeletonList } from '../../../components/Feedback';
 import { getErrorMessage } from '../../../utils/apiError';
 import { useLayout } from '../../../hooks/useLayout';
-import { spacing } from '../../../theme';
-import { useListTracksQuery } from '../routinesApi';
-import { CategoryCard } from '../components';
+import { colors, font, gradients, spacing, type as t } from '../../../theme';
+import { useListTracksQuery, type Track } from '../routinesApi';
+import { CategoryCard, HowItWorks } from '../components';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** The Categories tab: every category, with today's progress. */
+const SECTIONS: { title: string; match: (tr: Track) => boolean }[] = [
+  { title: 'Active plans', match: tr => tr.status === 'ACTIVE' },
+  { title: 'Starting soon', match: tr => tr.status === 'UPCOMING' },
+  { title: 'Finished', match: tr => tr.status === 'ENDED' || tr.status === 'ARCHIVED' },
+];
+
+/**
+ * The Plans tab: today's progress across every plan, then the plans grouped
+ * as active, starting soon and finished. New users see how plans work first.
+ */
 export function RoutinesScreen() {
   const navigation = useNavigation<Nav>();
   const tracks = useListTracksQuery();
-  const newCategory = () => navigation.navigate('TrackEditor');
+  const newPlan = () => navigation.navigate('TrackEditor');
   const { columns, wideWidth } = useLayout();
   const cell = columns > 1 ? { width: (wideWidth - (columns - 1) * spacing.lg) / columns } : null;
+  const plans = tracks.data ?? [];
 
   return (
     <Screen
       wide
       onRefresh={tracks.refetch}
       refreshing={tracks.isFetching}
-      footer={tracks.data?.length ? <Fab accessibilityLabel="New category" onPress={newCategory} /> : null}
+      footer={plans.length ? <Fab accessibilityLabel="New plan" onPress={newPlan} /> : null}
     >
-      <LargeTitle title="Categories" />
+      <LargeTitle title="Plans" subtitle="Your goals, and the small tasks you do for them each day." />
       {tracks.isLoading ? (
-        <SkeletonList count={3} height={170} />
+        <SkeletonList count={3} height={96} />
       ) : tracks.isError ? (
-        <ErrorState message={getErrorMessage(tracks.error, 'Could not load your categories.')} onRetry={tracks.refetch} />
-      ) : !tracks.data?.length ? (
-        <EmptyState
-          icon="target"
-          title="No categories yet"
-          message="A category is a goal like Gym or Study. Add tasks to it and tick them off every day."
-          actionLabel="New category"
-          onAction={newCategory}
-        />
+        <ErrorState message={getErrorMessage(tracks.error, 'Could not load your plans.')} onRetry={tracks.refetch} />
+      ) : !plans.length ? (
+        <FadeIn>
+          <HowItWorks />
+          <Button label="Create your first plan" icon="plus" size="lg" onPress={newPlan} style={styles.start} />
+        </FadeIn>
       ) : (
-        <View style={columns > 1 ? styles.grid : null}>
-          {tracks.data.map((track, i) => (
-            <FadeIn key={track.id} index={i} style={cell}>
-              <CategoryCard track={track} onPress={() => navigation.navigate('TrackDetail', { trackId: track.id })} />
-            </FadeIn>
-          ))}
-        </View>
+        <>
+          <FadeIn>
+            <TodaySummary plans={plans} />
+          </FadeIn>
+          {SECTIONS.map(section => {
+            const list = plans.filter(section.match);
+            if (!list.length) return null;
+            return (
+              <View key={section.title}>
+                <SectionHeader title={`${section.title} · ${list.length}`} style={styles.section} />
+                <View style={columns > 1 ? styles.grid : null}>
+                  {list.map((track, i) => (
+                    <FadeIn key={track.id} index={i + 1} style={cell}>
+                      <CategoryCard track={track} onPress={() => navigation.navigate('TrackDetail', { trackId: track.id })} />
+                    </FadeIn>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+        </>
       )}
     </Screen>
   );
 }
 
+/** One glance at today: how many of today's tasks are done across all plans. */
+function TodaySummary({ plans }: { plans: Track[] }) {
+  const active = plans.filter(tr => tr.status === 'ACTIVE');
+  const required = active.reduce((n, tr) => n + tr.today_required, 0);
+  const done = active.reduce((n, tr) => n + Math.min(tr.today_completed, tr.today_required), 0);
+  const allDone = required > 0 && done >= required;
+  const headline = !active.length
+    ? 'No plan is running today'
+    : required === 0
+      ? 'Nothing due today'
+      : allDone
+        ? 'Today is complete'
+        : `${required - done} ${required - done === 1 ? 'task' : 'tasks'} left today`;
+  return (
+    <Card tone="hero" contentStyle={styles.summary} accessibilityLabel={`${headline}. ${done} of ${required} done.`}>
+      <ProgressRing progress={required ? done / required : 0} size={72} stroke={6} colorsPair={allDone ? gradients.success : gradients.primary}>
+        <Text style={styles.ringText}>{required ? `${Math.round((100 * done) / required)}%` : '–'}</Text>
+      </ProgressRing>
+      <View style={styles.flex}>
+        <Text style={styles.summaryEyebrow}>Today</Text>
+        <Text style={styles.summaryTitle}>{headline}</Text>
+        <Text style={styles.summaryMeta}>
+          {done} of {required} done · {active.length} active {active.length === 1 ? 'plan' : 'plans'}
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  start: {
+    marginTop: spacing.xl,
+  },
+  section: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     columnGap: spacing.lg,
     rowGap: spacing.xs,
+  },
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  ringText: {
+    ...font.bold,
+    fontSize: 15,
+    color: colors.heroText,
+  },
+  summaryEyebrow: {
+    ...t.micro,
+  },
+  summaryTitle: {
+    ...font.serif,
+    fontSize: 22,
+    lineHeight: 26,
+    color: colors.heroText,
+    marginTop: 2,
+  },
+  summaryMeta: {
+    ...t.caption,
+    color: colors.heroTextSecondary,
+    marginTop: 2,
   },
 });

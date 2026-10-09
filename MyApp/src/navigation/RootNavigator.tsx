@@ -6,7 +6,7 @@
  * top to bottom:
  *
  *   Signed out → Login / Register / ForgotPassword / ResetPassword
- *   Signed in → Main tabs (Home · Categories · Reminders · Vault · Profile)
+ *   Signed in → Main tabs (Home · Plans · Reminders · Vault · Profile)
  *               + stack screens pushed on top of the tabs. The tab bar (or
  *               the desktop rail) is drawn over every signed-in screen, so
  *               the five destinations are always one tap away.
@@ -94,7 +94,7 @@ export type RootStackParamList = {
 
 const TABS: Record<keyof MainTabParamList, { label: string; icon: RealIconName }> = {
   HomeTab: { label: 'Home', icon: 'home' },
-  RoutinesTab: { label: 'Categories', icon: 'target' },
+  RoutinesTab: { label: 'Plans', icon: 'target' },
   RemindersTab: { label: 'Reminders', icon: 'bell' },
   VaultTab: { label: 'Vault', icon: 'lock' },
   ProfileTab: { label: 'Profile', icon: 'user' },

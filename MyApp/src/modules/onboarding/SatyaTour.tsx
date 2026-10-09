@@ -19,7 +19,7 @@ interface Step {
 const STEPS: Step[] = [
   { tab: 'HomeTab', text: name => `Hi ${name}, I'm Satya! Let me show you around. It's quick.` },
   { tab: 'HomeTab', text: () => 'This is Home. Your streak and today’s progress are right here.' },
-  { tab: 'RoutinesTab', text: () => 'Categories are your goals, like Gym or Study. Add tasks and tick them off every day.' },
+  { tab: 'RoutinesTab', text: () => 'Plans are your goals, like 30 days of fitness. Add daily tasks and tick them off every day.' },
   { tab: 'RoutinesTab', text: () => 'Finish all of today’s tasks to grow your streak 🔥' },
   { tab: 'RemindersTab', text: () => 'Reminders ping you at the right time. Pick a day and add what to remember.' },
   { tab: 'VaultTab', text: () => 'The Vault keeps your private notes safe behind a PIN.' },

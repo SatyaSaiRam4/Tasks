@@ -11,7 +11,7 @@ export function satyaMessage(d: Dashboard): string {
   const left = today.remaining;
   const tasks = (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'}`;
 
-  if (total_tracks === 0) return 'Create your first category to get started.';
+  if (total_tracks === 0) return 'Create your first plan to get started.';
   if (today.required === 0) return 'Nothing to tick today. Enjoy your day.';
   if (today.secured) {
     return streak.current_streak > 1 ? `All done today. ${streak.current_streak} days in a row!` : 'All done today. Great start!';

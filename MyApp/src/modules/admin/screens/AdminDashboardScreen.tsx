@@ -41,7 +41,7 @@ export function AdminDashboardScreen() {
 
           <SectionHeader title="Consistency" />
           <View style={styles.grid}>
-            <Tile icon="target" label="Categories" value={data.total_tracks} color={colors.info} />
+            <Tile icon="target" label="Plans" value={data.total_tracks} color={colors.info} />
             <Tile icon="list" label="Tasks" value={data.total_actions} color={colors.primary} />
             <Tile icon="zap" label="Completions (24h)" value={data.completions_today} color={colors.success} />
             <Tile icon="check" label="All completions" value={data.total_completions} color={colors.success} />
