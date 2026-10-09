@@ -115,7 +115,8 @@ models call these **Track** and **Action**, respectively.
 - `Backend/app/workers/reminder_worker.py` runs an in-process scheduler for
   WhatsApp delivery and streak finalization. Local push notifications are not
   sent by this worker.
-- Health endpoints: `/health/live` and `/health/ready`.
+- Health endpoints: `/health` and `/health/live` (process is up, no auth,
+  no database) and `/health/ready` (also checks the database).
 
 ### Mobile app
 
@@ -129,7 +130,9 @@ models call these **Track** and **Action**, respectively.
   users, and Satya.
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
-  `MyApp/src/config/env.ts`.
+  `MyApp/src/config/env.ts`. Release builds use the production backend
+  (https://tasks-xxbg.onrender.com); debug builds use the local origin there
+  while `USE_LOCAL_API` is true.
 - The "Midnight & Champagne" design system lives in `MyApp/src/theme/`:
   `palette.ts` (brand colors, dark and light themes, accents),
   `typography.ts` (Cormorant Garamond display and Manrope UI type),
