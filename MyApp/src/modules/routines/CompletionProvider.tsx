@@ -51,7 +51,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           icon: 'flame',
           tone: 'streak',
           eyebrow: 'Day complete',
-          title: result.current_streak > 1 ? `${result.current_streak} day streak` : 'Your streak has started',
+          title: result.current_streak > 1 ? `Streak ${result.current_streak}` : 'Your streak has started',
           subtitle:
             result.current_streak > 1
               ? 'All of today’s tasks are done.'

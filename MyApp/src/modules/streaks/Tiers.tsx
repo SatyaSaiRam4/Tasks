@@ -107,7 +107,7 @@ export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
                 setOpen(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${tier.name} badge, ${earned ? 'earned' : `${tier.days}-day streak needed`}. Show steps.`}
+              accessibilityLabel={`${tier.name} badge, ${earned ? 'earned' : `streak ${tier.days} needed`}. Show steps.`}
               style={({ pressed }) => [styles.cell, pressed && styles.pressed]}
             >
               <TierBadge tier={tier} earned={earned} size={size} />
@@ -130,7 +130,7 @@ function TierSheet({ tier, visible, best, onClose }: { tier: Tier; visible: bool
         <TierBadge tier={tier} earned={earned} size={112} />
         <Text style={[t.heading, styles.center]}>{tier.name}</Text>
         <Text style={[t.caption, styles.center]}>
-          {earned ? 'Earned. Well kept!' : `Keep a ${tier.days}-day streak to earn it.`}
+          {earned ? 'Earned. Well kept!' : `Reach a streak of ${tier.days} to earn it.`}
           {tier.reward ? ` Adds ${tier.reward} to your wallet.` : ''}
         </Text>
         <View style={styles.progress}>
@@ -149,7 +149,7 @@ function TierSheet({ tier, visible, best, onClose }: { tier: Tier; visible: bool
               {done ? <RealIcon name="check" size={24} /> : <Text style={styles.stepNum}>{i + 1}</Text>}
             </View>
             <Text style={[t.body, styles.flex, step.key === tier.key && styles.stepCurrent]}>
-              {step.name} · {step.days}-day streak
+              {step.name} · streak {step.days}
             </Text>
             {step.reward ? <Text style={styles.reward}>{step.reward}</Text> : null}
           </View>

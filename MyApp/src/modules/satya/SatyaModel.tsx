@@ -13,7 +13,7 @@ const LOAD_TIMEOUT_MS = 8000;
 type Phase = 'loading' | 'ready' | 'fallback';
 
 /** Whole-puppet moves Satya can make (see assets/web/satya/index.html). */
-export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft' | 'lookRight' | 'cheer';
+export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft' | 'lookRight' | 'cheer' | 'walk' | 'think';
 
 /**
  * Satya, rendered from the bundled GLB through <model-viewer> in a WebView.
@@ -22,7 +22,8 @@ export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft'
  * loading takes too long.
  *
  * `intro="long"` plays the fuller entrance (first visit); "short" otherwise.
- * `gesture` makes Satya move; change `gestureKey` to replay the same move.
+ * `gesture` makes Satya move (a list plays in order); change `gestureKey`
+ * to replay the same move.
  */
 export function SatyaModel({
   size = 220,
@@ -32,7 +33,7 @@ export function SatyaModel({
 }: {
   size?: number;
   intro?: 'long' | 'short';
-  gesture?: SatyaGesture;
+  gesture?: SatyaGesture | SatyaGesture[];
   gestureKey?: number;
 }) {
   const { reduced } = useMotion();
@@ -42,8 +43,11 @@ export function SatyaModel({
 
   useEffect(() => {
     if (phase !== 'ready' || !gesture) return;
-    web.current?.injectJavaScript(`window.satya && window.satya.now(${JSON.stringify(gesture)}); true;`);
-  }, [phase, gesture, gestureKey]);
+    const moves = Array.isArray(gesture) ? gesture.join(',') : gesture;
+    web.current?.injectJavaScript(`window.satya && window.satya.now(${JSON.stringify(moves)}); true;`);
+    // A list's identity changes every render; its contents are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, Array.isArray(gesture) ? gesture.join(',') : gesture, gestureKey]);
 
   useEffect(() => {
     timer.current = setTimeout(() => setPhase(p => (p === 'loading' ? 'fallback' : p)), LOAD_TIMEOUT_MS);

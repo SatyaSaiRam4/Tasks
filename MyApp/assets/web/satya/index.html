@@ -45,7 +45,8 @@
       The current model is a glove puppet with no skeleton, so Satya is
       animated as a whole puppet here: an idle sway and breath, plus gestures
       the app triggers with window.satya.play(name): talk, wave, hop, nod,
-      spin, lookLeft, lookRight, cheer.
+      spin, lookLeft, lookRight, cheer, walk, think;
+      several at once play in order, e.g. play('walk,wave').
     -->
     <div id="puppet">
     <model-viewer
@@ -96,7 +97,7 @@
         var puppet = document.getElementById('puppet');
 
         // ---- Puppet motion ----------------------------------------------------
-        var DURATION = { talk: 1800, wave: 1400, hop: 900, nod: 1000, spin: 1400, lookLeft: 1300, lookRight: 1300, cheer: 1700 };
+        var DURATION = { talk: 1800, wave: 1400, hop: 900, nod: 1000, spin: 1400, lookLeft: 1300, lookRight: 1300, cheer: 1700, walk: 1500, think: 1800 };
         var gesture = null;
         var started = 0;
         var queue = [];
@@ -123,7 +124,11 @@
           now: function (name) {
             queue = [];
             gesture = null;
-            play(name);
+            String(name)
+              .split(',')
+              .forEach(function (n) {
+                play(n.trim());
+              });
           },
         };
 
@@ -164,6 +169,17 @@
             } else if (gesture === 'spin') {
               yaw += 360 * ease(p);
               y -= 6 * bump(p);
+            } else if (gesture === 'walk') {
+              // A puppet's waddle: rock side to side with a little hop each step.
+              var step = Math.sin(p * Math.PI * 6);
+              roll += 9 * step;
+              y -= 5 * Math.abs(step);
+              sy += 0.03 * Math.abs(step);
+              yaw += 20 * Math.sin(p * Math.PI * 2);
+            } else if (gesture === 'think') {
+              pitch -= 8 * bump(p);
+              roll -= 7 * bump(p);
+              yaw += 22 * bump(p);
             } else if (gesture === 'lookLeft' || gesture === 'lookRight') {
               yaw += (gesture === 'lookLeft' ? -42 : 42) * bump(p);
               roll += (gesture === 'lookLeft' ? -6 : 6) * bump(p);

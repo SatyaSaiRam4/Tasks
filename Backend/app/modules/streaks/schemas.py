@@ -12,6 +12,8 @@ class TodayOut(BaseModel):
     optional_due: int
     optional_completed: int
     secured: bool
+    plans_due: int  # plans with something due today
+    plans_done: int  # plans finished today (each is +1 streak point)
     remaining: int
     progress: float  # 0..1 over required actions
 

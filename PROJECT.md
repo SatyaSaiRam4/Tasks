@@ -36,6 +36,15 @@ component names still say "category", e.g. `CategoryCard`).
 
 ### Streaks and achievements
 
+- **Streak points (current rule):** each finished day, every plan whose due
+  tasks were all done adds 1; every plan with something due but not finished
+  takes 1 away; the score never goes below 0. Today's finished plans count
+  straight away, missed ones only when the day ends. `best_streak` is the
+  highest score reached; the wallet and badges use it, so a deduction never
+  takes money back. Implemented in `Backend/app/modules/streaks/engine.py`.
+- Limits: 10 running plans per account, 15 tasks per plan (enforced by the
+  API). A task may have its own end date inside its plan's period.
+
 - The backend calculates streaks using the user's saved timezone. A day is
   secured when all required tasks due that day are complete; days with no
   required tasks do not extend or break a streak.
@@ -292,3 +301,16 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   scheduled WhatsApp sends.
 - On Android 12 and later, exact local reminder delivery may require granting
   the app the system-level Alarms & reminders permission.
+
+## Daily cleanup and keep-awake
+
+- `POST /api/v1/maintenance/cleanup` (header `X-Cron-Secret`) settles every
+  user's streak points, then deletes plans and tasks 7 days after their end
+  date (or after deletion) and reminders 7 days after they were marked done.
+  The Vault is never touched. Off unless `CRON_SECRET` is set on the server.
+- `.github/workflows/daily-cleanup.yml` calls it every day at 02:00 IST;
+  `.github/workflows/keep-awake.yml` pings `/health/ready` every 10 minutes so
+  Render and the database stay awake. Both need the repository secrets
+  `API_URL` and (cleanup only) `CRON_SECRET`.
+- The welcome story's 3D stage is built from `MyApp/web/story/story.js` with
+  `npm run build:story` (three.js, bundled to `assets/web/story`).

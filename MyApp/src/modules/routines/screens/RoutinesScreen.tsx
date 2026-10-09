@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Toast from '@ant-design/react-native/lib/toast';
 import { Screen } from '../../../components/Screen';
 import { TopBar } from '../../../components/ScreenHeader';
 import { Card } from '../../../components/Card';
@@ -18,6 +19,8 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+const MAX_PLANS = 10;
+
 /** Active plans first, then upcoming, then finished. */
 const ORDER: Record<Track['status'], number> = { ACTIVE: 0, UPCOMING: 1, ENDED: 2, ARCHIVED: 3 };
 
@@ -29,7 +32,11 @@ const ORDER: Record<Track['status'], number> = { ACTIVE: 0, UPCOMING: 1, ENDED: 
 export function RoutinesScreen() {
   const navigation = useNavigation<Nav>();
   const tracks = useListTracksQuery();
-  const newPlan = () => navigation.navigate('TrackEditor');
+  const running = (tracks.data ?? []).filter(tr => tr.status === 'ACTIVE' || tr.status === 'UPCOMING').length;
+  const newPlan = () => {
+    if (running >= MAX_PLANS) Toast.info(`You can have up to ${MAX_PLANS} plans. Finish or delete one to add another.`, 2.5);
+    else navigation.navigate('TrackEditor');
+  };
   const { columns, wideWidth } = useLayout();
   const cell = columns > 1 ? { width: (wideWidth - (columns - 1) * spacing.lg) / columns } : null;
   const plans = [...(tracks.data ?? [])].sort((a, b) => ORDER[a.status] - ORDER[b.status]);

@@ -36,6 +36,8 @@ def summary(db: Session, user: User) -> StreakSummaryOut:
             optional_due=today.optional_due,
             optional_completed=today.optional_completed,
             secured=today.secured,
+            plans_due=today.plans_due,
+            plans_done=today.plans_done,
             remaining=max(today.required - today.completed, 0),
             progress=round(today.completed / today.required, 3) if today.required else 0.0,
         ),

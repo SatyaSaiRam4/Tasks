@@ -7,7 +7,7 @@ from app.modules.streaks import engine
 
 from .models import WalletRedemption
 
-# (streak days reached, rupees earned). Each milestone pays once, ever.
+# (best streak points reached, rupees earned). Each milestone pays once, ever.
 MILESTONES: list[tuple[int, int]] = [(500, 10), (1000, 20)]
 
 
@@ -38,14 +38,18 @@ def summary(db: Session, user: User) -> dict:
     }
 
 
-def redeem(db: Session, user: User, phone: str) -> WalletRedemption:
+def redeem(db: Session, user: User, phone: str, amount: int | None = None) -> WalletRedemption:
     # Lock the user row so two taps at once can't both pay out the balance.
     db.execute(select(User.id).where(User.id == user.id).with_for_update())
     best = _best_streak(db, user)
     balance = sum(amount for days, amount in MILESTONES if best >= days) - _redeemed(db, user)
     if balance <= 0:
         raise HTTPException(status.HTTP_409_CONFLICT, "There's nothing to redeem yet.")
-    redemption = WalletRedemption(user_id=user.id, amount=balance, phone=phone)
+    # No amount means the whole balance (older app versions send none).
+    amount = balance if amount is None else amount
+    if amount > balance:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"You can redeem up to ₹{balance}.")
+    redemption = WalletRedemption(user_id=user.id, amount=amount, phone=phone)
     db.add(redemption)
     db.commit()
     db.refresh(redemption)

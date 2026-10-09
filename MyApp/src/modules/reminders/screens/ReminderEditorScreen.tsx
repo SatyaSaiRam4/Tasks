@@ -60,6 +60,7 @@ export function ReminderEditorScreen() {
 
   const todayKey = toDateKey(new Date());
   const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
   const [day, setDay] = useState(params?.date && params.date >= todayKey ? params.date : todayKey);
   const [time, setTime] = useState<string | null>(params?.date && params.date > todayKey ? '09:00:00' : defaultTime());
   const [whatsapp, setWhatsapp] = useState(false);
@@ -74,6 +75,7 @@ export function ReminderEditorScreen() {
     if (!r) return;
     const when = new Date(r.remind_at);
     setTitle(r.title);
+    setNote(r.note ?? '');
     setDay(toDateKey(when));
     setTime(`${pad(when.getHours())}:${pad(when.getMinutes())}:00`);
     setWhatsapp(Boolean(r.whatsapp_number));
@@ -88,16 +90,20 @@ export function ReminderEditorScreen() {
     const [hh, mm] = time.split(':').map(Number);
     const at = fromDateKey(day);
     at.setHours(hh, mm, 0, 0);
-    if (at.getTime() <= Date.now()) return setError('That time has already passed. Pick a later time.');
+    // An already-sent reminder can be edited without moving its time.
+    const sameTime = Boolean(existing.data && new Date(existing.data.remind_at).getTime() === at.getTime());
+    if (at.getTime() <= Date.now() && !sameTime) return setError('That time has already passed. Pick a later time.');
     const phone = whatsapp ? normalizeWhatsapp(number) : '';
     if (whatsapp && !/^\+\d{8,15}$/.test(phone)) return setError('Enter a WhatsApp number, e.g. 9876543210.');
 
-    const payload = { title: title.trim(), remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined, alarm_enabled: alarm };
+    const payload = { title: title.trim(), note: note.trim() || null, remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined, alarm_enabled: alarm };
     try {
       const saved = editing
         ? await update({ id: reminderId!, ...payload, clear_whatsapp_number: !whatsapp }).unwrap()
         : await create(payload).unwrap();
-      await scheduleReminderNotification(saved.id, saved.title, saved.note, new Date(saved.remind_at), saved.alarm_enabled);
+      if (new Date(saved.remind_at).getTime() > Date.now()) {
+        await scheduleReminderNotification(saved.id, saved.title, saved.note, new Date(saved.remind_at), saved.alarm_enabled);
+      }
       Toast.success(editing ? 'Saved.' : 'Reminder set.', 1.2);
       if (!(await hasExactAlarmPermission())) setAlarmPrompt(true);
       else navigation.goBack();
@@ -133,6 +139,7 @@ export function ReminderEditorScreen() {
       <View style={padStyle}>
         <ScreenHeader title={editing ? 'Edit reminder' : 'New reminder'} subtitle="Reminder" close />
         <TextField label="Remind me to" value={title} onChangeText={setTitle} placeholder="e.g. Call mom" maxLength={200} autoFocus={!editing} />
+        <TextField label="Note (optional)" value={note} onChangeText={setNote} placeholder="Any details" maxLength={2000} multiline />
 
         <View style={styles.dayHead}>
           <Text style={styles.label}>Day · {formatFullDate(day)}</Text>

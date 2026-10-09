@@ -1,9 +1,15 @@
 """Server-authoritative streak engine.
 
 Rules (see PROJECT.md for the product description):
-  * A day is SUCCESS when every *required* Action due that day has a live
-    completion, FAILED when at least one is missing, NO_ACTIONS when nothing
-    required was due. NO_ACTIONS days neither extend nor break a streak.
+  * The streak is a points score. Each finished day adds 1 point for every
+    plan (Track) whose required Actions due that day were all completed, and
+    takes 1 point away for every plan that had something due but wasn't
+    finished. It never goes below 0, and best_streak keeps the highest score
+    reached (the wallet pays on that, so a deduction never takes money back).
+    A day with nothing due changes nothing.
+  * A day's status is still recorded: SUCCESS when every required Action
+    due that day was completed, FAILED when one was missed, NO_ACTIONS when
+    nothing was due.
   * Days are judged in the user's timezone, using the server clock.
   * A day is finalized (written to DailyRecord, immutably) only after it has
     ended. Today is always provisional.
@@ -82,6 +88,17 @@ def day_counts(
         if (action.id, day) in completions:
             completed += 1
     return required, completed
+
+
+def plan_points(schedule: Schedule, completions: set[tuple[UUID, date]], day: date) -> tuple[int, int]:
+    """(plans finished, plans missed) on `day`, counting only plans with something required due."""
+    per_track: dict[UUID, list[int]] = {}
+    for action, track in schedule.due_on(day, required_only=True):
+        counts = per_track.setdefault(track.id, [0, 0])
+        counts[0] += 1
+        counts[1] += int((action.id, day) in completions)
+    finished = sum(1 for required, done in per_track.values() if done >= required)
+    return finished, len(per_track) - finished
 
 
 def classify(required: int, completed: int) -> str:
@@ -168,11 +185,13 @@ def _evaluate_track_completions(
     return created
 
 
-def finalize_user(db: Session, user: User) -> list[str]:
+def finalize_user(db: Session, user: User, check_achievements: bool = False) -> list[str]:
     """Finalizes every ended, unjudged day for `user` and scores ended Tracks.
 
-    Idempotent and safe to call on every request. Returns codes of any newly
-    earned achievements. Commits.
+    Idempotent and safe to call on every request. Achievements are checked
+    only when a day was finalized here or `check_achievements` is set (after a
+    completion), since the check costs several queries. Returns codes of any
+    newly earned achievements. Commits.
     """
     from app.modules.achievements.service import evaluate_achievements
 
@@ -180,7 +199,8 @@ def finalize_user(db: Session, user: User) -> list[str]:
     today = local_today(user.timezone)
     yesterday = today - timedelta(days=1)
 
-    if state.last_finalized_date < yesterday:
+    finalized_any = state.last_finalized_date < yesterday
+    if finalized_any:
         schedule = load_schedule(db, user.id)
         start = state.last_finalized_date + timedelta(days=1)
         completions = load_completions(db, user.id, start, yesterday)
@@ -188,13 +208,13 @@ def finalize_user(db: Session, user: User) -> list[str]:
         while day <= yesterday:
             required, completed = day_counts(schedule, completions, day)
             status = classify(required, completed)
+            finished, missed = plan_points(schedule, completions, day)
+            state.current_streak = max(state.current_streak + finished - missed, 0)
+            state.best_streak = max(state.best_streak, state.current_streak)
             if status == DayStatus.SUCCESS:
-                state.current_streak += 1
                 state.total_success_days += 1
                 state.last_success_date = day
-                state.best_streak = max(state.best_streak, state.current_streak)
             elif status == DayStatus.FAILED:
-                state.current_streak = 0
                 state.total_failed_days += 1
             db.add(
                 DailyRecord(
@@ -210,6 +230,9 @@ def finalize_user(db: Session, user: User) -> list[str]:
             day += timedelta(days=1)
         _evaluate_track_completions(db, user, state, schedule, through=yesterday)
 
+    if not (finalized_any or check_achievements):
+        db.commit()  # keeps a newly created StreakState
+        return []
     # The session doesn't autoflush; achievements query the rows written above.
     db.flush()
     new_codes = evaluate_achievements(db, user, state)
@@ -225,7 +248,9 @@ class TodayStatus:
     optional_due: int
     optional_completed: int
     secured: bool  # every required Action for today is done
-    current_streak: int  # includes today once secured (provisional)
+    plans_due: int  # plans with something required due today
+    plans_done: int  # of those, plans already finished today
+    current_streak: int  # includes today's finished plans (provisional)
     best_streak: int
     at_risk: bool
 
@@ -248,7 +273,10 @@ def today_status(db: Session, user: User) -> TodayStatus:
             optional_completed += int(done)
 
     secured = required > 0 and completed >= required
-    current = state.current_streak + (1 if secured else 0)
+    # Today's finished plans count straight away; missed ones are only
+    # deducted once the day has ended.
+    plans_done, plans_missed = plan_points(schedule, completions, today)
+    current = state.current_streak + plans_done
     best = max(state.best_streak, current)
     at_risk = (
         required > 0
@@ -263,6 +291,8 @@ def today_status(db: Session, user: User) -> TodayStatus:
         optional_due=optional_due,
         optional_completed=optional_completed,
         secured=secured,
+        plans_due=plans_done + plans_missed,
+        plans_done=plans_done,
         current_streak=current,
         best_streak=best,
         at_risk=at_risk,

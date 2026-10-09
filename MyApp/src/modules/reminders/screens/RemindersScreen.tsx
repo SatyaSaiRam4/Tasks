@@ -1,24 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
-import DatePicker from '@ant-design/react-native/lib/date-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, font, radius, spacing, type as t, withAlpha } from '../../../theme';
 import { useLayout } from '../../../hooks/useLayout';
 import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
-import { LargeTitle } from '../../../components/ScreenHeader';
-import { Fab, IconButton, SectionHeader } from '../../../components/Controls';
-import { Card } from '../../../components/Card';
+import { TopBar } from '../../../components/ScreenHeader';
+import { Fab, IconButton, Segmented } from '../../../components/Controls';
 import { Checkbox } from '../../../components/Checkbox';
-import { DateStrip, type DayMark } from '../../../components/DateStrip';
 import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
 import { ConfirmSheet, Sheet } from '../../../components/Sheet';
 import { Button } from '../../../components/Button';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
-import { formatClock, formatDateTime, formatFullDate, fromDateKey, relativeDayLabel, toDateKey } from '../../../utils/date';
+import { formatClock, formatFullDate, relativeDayLabel, toDateKey, diffDays } from '../../../utils/date';
 import { cancelReminderNotification, scheduleReminderNotification } from '../../../notifications';
 import {
   useDeleteReminderMutation,
@@ -32,58 +29,78 @@ import { categoryColor } from '../../routines/components';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Tab = 'all' | 'sent' | 'failed' | 'done';
 
 const dayOf = (r: Reminder) => toDateKey(new Date(r.remind_at));
+const isPast = (r: Reminder) => new Date(r.remind_at).getTime() <= Date.now();
 
-/** Reminders: pick a day (strip or calendar), see that day's reminders. */
+/** Which reminders each tab shows. Done ones live only in "Done" (the bin). */
+const TABS: { value: Tab; label: string; match: (r: Reminder) => boolean }[] = [
+  { value: 'all', label: 'All', match: r => !r.completed_at },
+  { value: 'sent', label: 'Sent', match: r => !r.completed_at && isPast(r) && r.whatsapp_status !== 'FAILED' },
+  { value: 'failed', label: 'Failed', match: r => !r.completed_at && r.whatsapp_status === 'FAILED' },
+  { value: 'done', label: 'Done', match: r => Boolean(r.completed_at) },
+];
+
+const EMPTY: Record<Tab, { title: string; message: string }> = {
+  all: { title: 'No reminders yet', message: 'Tap + to add one. Pick a time, and Memo reminds you.' },
+  sent: { title: 'Nothing sent yet', message: 'Reminders move here once their time has come.' },
+  failed: { title: 'Nothing failed', message: 'If a WhatsApp message can’t be sent, it shows here.' },
+  done: { title: 'Nothing done yet', message: 'Tick a reminder when it’s done. It stays here for 7 days.' },
+};
+
+function dayHeading(key: string, todayKey: string) {
+  return Math.abs(diffDays(key, todayKey)) <= 1 ? relativeDayLabel(key, todayKey) : formatFullDate(key);
+}
+
+/**
+ * Reminders in four tabs: All (not done yet), Sent (their time has come),
+ * Failed (WhatsApp couldn't send) and Done, the bin, where finished reminders
+ * wait 7 days before the daily cleanup deletes them. Each tab is grouped by day.
+ */
 export function RemindersScreen() {
   const navigation = useNavigation<Nav>();
   const { gutter } = useLayout();
   const { data, isLoading, isError, error, refetch, isFetching } = useListRemindersQuery();
   const todayKey = toDateKey(new Date());
-  const [day, setDay] = useState(todayKey);
+  const [tab, setTab] = useState<Tab>('all');
   const [menuFor, setMenuFor] = useState<Reminder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Reminder | null>(null);
   const [setCompleted] = useSetReminderCompletedMutation();
   const [snooze] = useSnoozeReminderMutation();
   const [remove, { isLoading: deleting }] = useDeleteReminderMutation();
 
-  // A dot under every day that has a reminder (green once they're all done).
-  const marks = useMemo(() => {
-    const out: Record<string, DayMark> = {};
-    for (const r of data ?? []) {
-      const key = dayOf(r);
-      const m = out[key] ?? { required: 0, completed: 0, status: 'PENDING' };
-      m.required += 1;
-      if (r.completed_at) m.completed += 1;
-      m.status = m.completed === m.required ? 'SUCCESS' : 'PENDING';
-      out[key] = m;
-    }
-    return out;
-  }, [data]);
-
   const tracks = useListTracksQuery();
   const trackNames = useMemo(() => new Map((tracks.data ?? []).map(tr => [tr.id, tr.name])), [tracks.data]);
 
-  const upcoming = useMemo(
-    () =>
-      (data ?? [])
-        .filter(r => !r.completed_at && dayOf(r) > day && new Date(r.remind_at).getTime() > Date.now())
-        .sort((a, b) => a.remind_at.localeCompare(b.remind_at))
-        .slice(0, 5),
-    [data, day],
-  );
+  const counts = useMemo(() => {
+    const out = {} as Record<Tab, number>;
+    for (const x of TABS) out[x.value] = (data ?? []).filter(x.match).length;
+    return out;
+  }, [data]);
 
-  const items = useMemo(
-    () => (data ?? []).filter(r => dayOf(r) === day).sort((a, b) => a.remind_at.localeCompare(b.remind_at)),
-    [data, day],
-  );
+  // The tab's reminders grouped by day: oldest first, except Done (newest first).
+  const groups = useMemo(() => {
+    const match = TABS.find(x => x.value === tab)!.match;
+    const list = (data ?? []).filter(match).sort((a, b) => a.remind_at.localeCompare(b.remind_at));
+    if (tab === 'done' || tab === 'sent') list.reverse();
+    const out: { day: string; items: Reminder[] }[] = [];
+    for (const r of list) {
+      const day = dayOf(r);
+      const last = out[out.length - 1];
+      if (last && last.day === day) last.items.push(r);
+      else out.push({ day, items: [r] });
+    }
+    return out;
+  }, [data, tab]);
 
   const toggleDone = async (r: Reminder) => {
     try {
       const updated = await setCompleted({ id: r.id, completed: !r.completed_at }).unwrap();
-      if (updated.completed_at) cancelReminderNotification(r.id).catch(() => undefined);
-      else if (new Date(updated.remind_at).getTime() > Date.now()) {
+      if (updated.completed_at) {
+        cancelReminderNotification(r.id).catch(() => undefined);
+        Toast.info('Moved to Done.', 1.2);
+      } else if (new Date(updated.remind_at).getTime() > Date.now()) {
         scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at), r.alarm_enabled).catch(() => undefined);
       }
     } catch (err) {
@@ -113,108 +130,73 @@ export function RemindersScreen() {
     }
   };
 
-  const dayTitle = Math.abs(fromDateKey(day).getTime() - fromDateKey(todayKey).getTime()) <= 6 * 86400000
-    ? relativeDayLabel(day, todayKey)
-    : formatFullDate(day);
-
   return (
     <Screen
       padded={false}
       onRefresh={refetch}
       refreshing={isFetching && !isLoading}
-      footer={<Fab accessibilityLabel="Add reminder" onPress={() => navigation.navigate('ReminderEditor', { date: day })} />}
+      footer={<Fab accessibilityLabel="Add reminder" onPress={() => navigation.navigate('ReminderEditor')} />}
     >
-      <View style={[styles.pad, { paddingHorizontal: gutter }]}>
-        <LargeTitle
-          title="Reminders"
-          right={
-            <DatePicker
-              value={fromDateKey(day)}
-              precision="day"
-              minDate={new Date(2020, 0, 1)}
-              maxDate={new Date(2035, 11, 31)}
-              onChange={(d: Date) => setDay(toDateKey(d))}
-              title="Pick a day"
-            >
-              <CalendarButton />
-            </DatePicker>
-          }
+      <View style={{ paddingHorizontal: gutter }}>
+        <TopBar />
+        <Segmented
+          options={TABS.map(x => ({ value: x.value, label: x.label, count: counts[x.value] || undefined }))}
+          value={tab}
+          onChange={setTab}
+          style={styles.tabs}
         />
-      </View>
-
-      <DateStrip selected={day} today={todayKey} onSelect={setDay} marks={marks} daysBack={3} daysForward={30} />
-
-      <View style={[styles.pad, { paddingHorizontal: gutter }]}>
-        <View style={styles.dayHead}>
-          <Text style={styles.dayTitle}>{dayTitle}</Text>
-          {day !== todayKey ? (
-            <Pressable onPress={() => setDay(todayKey)} hitSlop={8} accessibilityRole="button">
-              <Text style={styles.link}>Today</Text>
-            </Pressable>
-          ) : null}
-        </View>
 
         {isLoading ? (
-          <SkeletonList count={3} height={64} />
+          <SkeletonList count={3} height={72} />
         ) : isError ? (
           <ErrorState message={getErrorMessage(error, 'Could not load reminders.')} onRetry={refetch} />
-        ) : items.length === 0 ? (
+        ) : !groups.length ? (
           <EmptyState
             compact
             icon="bell"
-            title="No reminders this day"
-            actionLabel="Add reminder"
-            onAction={() => navigation.navigate('ReminderEditor', { date: day })}
+            title={EMPTY[tab].title}
+            message={EMPTY[tab].message}
+            actionLabel={tab === 'all' ? 'Add reminder' : undefined}
+            onAction={tab === 'all' ? () => navigation.navigate('ReminderEditor') : undefined}
           />
         ) : (
-          items.map((r, i) => (
-            <FadeIn key={r.id} index={i}>
-              <ReminderRow
-                reminder={r}
-                category={r.track_id ? trackNames.get(r.track_id) : undefined}
-                last={i === items.length - 1}
-                onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
-                onToggle={() => toggleDone(r)}
-                onMore={() => setMenuFor(r)}
-              />
-            </FadeIn>
-          ))
-        )}
-
-        {!isLoading && !isError && upcoming.length ? (
           <>
-            <SectionHeader title="Coming up" />
-            <Card padded={false}>
-              {upcoming.map((r, i) => (
-                <Pressable
-                  key={r.id}
-                  onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${r.title}, ${formatDateTime(r.remind_at)}`}
-                  style={({ pressed }) => [styles.upRow, i < upcoming.length - 1 && styles.upDivider, pressed && styles.pressed]}
-                >
-                  <View style={styles.upDate}>
-                    <Text style={styles.upDay}>{fromDateKey(dayOf(r)).getDate()}</Text>
-                    <Text style={styles.upMonth}>{relativeDayLabel(dayOf(r), todayKey).split(',')[0]}</Text>
-                  </View>
-                  <View style={styles.flex}>
-                    <Text style={t.bodyStrong} numberOfLines={1}>
-                      {r.title}
-                    </Text>
-                    <Text style={t.caption}>{formatClock(r.remind_at)}</Text>
-                  </View>
-                  <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                </Pressable>
-              ))}
-            </Card>
+            {tab === 'done' ? (
+              <View style={styles.binNote}>
+                <Icon name="trash" size={14} color={colors.textTertiary} />
+                <Text style={t.caption}>Done reminders are deleted automatically after 7 days.</Text>
+              </View>
+            ) : null}
+            {groups.map((g, gi) => (
+              <View key={g.day}>
+                <Text style={styles.dayTitle}>{dayHeading(g.day, todayKey)}</Text>
+                {g.items.map((r, i) => (
+                  <FadeIn key={r.id} index={gi + i}>
+                    <ReminderRow
+                      reminder={r}
+                      category={r.track_id ? trackNames.get(r.track_id) : undefined}
+                      last={i === g.items.length - 1}
+                      onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
+                      onToggle={() => toggleDone(r)}
+                      onMore={() => setMenuFor(r)}
+                    />
+                  </FadeIn>
+                ))}
+              </View>
+            ))}
           </>
-        ) : null}
+        )}
       </View>
 
       <Sheet visible={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.title}>
         {menuFor && !menuFor.completed_at ? (
           <>
-            <Button label="Remind me in 1 hour" icon="snooze" variant="secondary" onPress={() => doSnooze(menuFor, 60)} />
+            <Button label="Edit" icon="edit" variant="secondary" onPress={() => {
+              const id = menuFor.id;
+              setMenuFor(null);
+              navigation.navigate('ReminderEditor', { reminderId: id });
+            }} />
+            <Button label="Remind me in 1 hour" icon="snooze" variant="secondary" onPress={() => doSnooze(menuFor, 60)} style={styles.mtSm} />
             <Button label="Remind me tomorrow" icon="snooze" variant="secondary" onPress={() => doSnooze(menuFor, 24 * 60)} style={styles.mtSm} />
           </>
         ) : null}
@@ -243,11 +225,6 @@ export function RemindersScreen() {
       />
     </Screen>
   );
-}
-
-/** The calendar button that opens the date picker (it injects onPress). */
-function CalendarButton({ onPress }: { onPress?: () => void }) {
-  return <IconButton icon="calendar" accessibilityLabel="Pick a day from the calendar" onPress={() => onPress?.()} />;
 }
 
 /** One reminder on the day's timeline: serif time, a gold thread, then the card. */
@@ -295,9 +272,10 @@ function ReminderRow({
               {r.note}
             </Text>
           ) : null}
-          {category || r.whatsapp_number || r.priority === 'HIGH' || late ? (
+          {category || r.whatsapp_number || r.alarm_enabled || r.priority === 'HIGH' || late ? (
             <View style={styles.tags}>
-              {late ? <Tag label="Overdue" color={colors.danger} /> : null}
+              {late ? <Tag label="Time passed" color={colors.warning} /> : null}
+              {r.alarm_enabled ? <Tag label="Alarm" color={colors.danger} /> : null}
               {r.priority === 'HIGH' ? <Tag label="Priority" color={colors.streak} /> : null}
               {category ? <Tag label={category} color={categoryColor(category)} dot /> : null}
               {r.whatsapp_number ? <Tag label={WHATSAPP_LABEL[r.whatsapp_status]} color={r.whatsapp_status === 'FAILED' ? colors.danger : colors.success} icon /> : null}
@@ -334,29 +312,27 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  pad: {
-    paddingHorizontal: 20,
-  },
   pressed: {
     opacity: 0.75,
   },
   mtSm: {
     marginTop: spacing.sm,
   },
-  dayHead: {
+  tabs: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  binNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   dayTitle: {
-    ...t.title,
-  },
-  link: {
-    ...font.bold,
-    color: colors.primary,
-    letterSpacing: 0.4,
+    ...t.micro,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    marginLeft: 2,
   },
   line: {
     flexDirection: 'row',
@@ -457,33 +433,5 @@ const styles = StyleSheet.create({
     ...font.bold,
     fontSize: 10,
     letterSpacing: 0.6,
-  },
-  upRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing.lg + 2,
-    paddingVertical: spacing.md + 2,
-  },
-  upDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  upDate: {
-    width: 64,
-    alignItems: 'center',
-  },
-  upDay: {
-    ...font.serif,
-    fontSize: 26,
-    lineHeight: 28,
-    color: colors.goldBright,
-  },
-  upMonth: {
-    ...font.bold,
-    fontSize: 9,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.textTertiary,
   },
 });

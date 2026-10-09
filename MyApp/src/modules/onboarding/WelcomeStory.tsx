@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { brand, colors, font, gradients, radius, spacing } from '../../theme';
 import { Gradient } from '../../components/Gradient';
@@ -12,36 +13,58 @@ import { Kid, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): a boy asks his mom to remind him about his school
- * project, she forgets, and Memo is what remembers for him. Ends on what the
- * app does. Plays like a phone "story": it moves on by itself, tap the right
+ * again from Settings): Aarav asks his mom to remind him to call Grandma on
+ * her birthday, she has a busy day and forgets, Grandma waits all day — and
+ * a year later Memo rings in the morning so he remembers. Ends on what the
+ * app does. Plays like a phone "story": it moves on by itself; tap the right
  * side for next and the left side for back.
+ *
+ * The scenes play in 3D (assets/web/story, built from web/story/story.js)
+ * in a WebView behind the captions. If the phone can't run it, the same
+ * story plays with the flat SVG characters instead.
  */
 
 interface Scene {
   caption: string;
   /** How long the scene plays before moving on, in ms. */
   duration: number;
+  /** The flat version, used when 3D isn't available. */
   Body: React.ComponentType;
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Aarav.', duration: 6500, Body: AskScene },
-  { caption: 'But Mom had a very busy day…', duration: 6000, Body: BusyScene },
-  { caption: 'The next morning…', duration: 6000, Body: ForgotScene },
-  { caption: 'That’s why Memo is here.', duration: 6000, Body: SatyaScene },
-  { caption: 'This time, Aarav sets a reminder.', duration: 6500, Body: RemindScene },
+  { caption: 'Meet Aarav.', duration: 7500, Body: AskScene },
+  { caption: 'But Mom had a very busy day…', duration: 7000, Body: BusyScene },
+  { caption: 'The next evening…', duration: 7000, Body: ForgotScene },
+  { caption: 'That’s why Memo is here.', duration: 6500, Body: SatyaScene },
+  { caption: 'A year later, on Grandma’s birthday…', duration: 7500, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
+
+const STORY_PAGE = 'file:///android_asset/web/story/index.html';
+const LOAD_TIMEOUT_MS = 9000;
+type Mode = 'loading' | '3d' | 'flat';
 
 export function WelcomeStory({ onDone }: { onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
   const [index, setIndex] = useState(0);
+  const [mode, setMode] = useState<Mode>(Platform.OS === 'android' ? 'loading' : 'flat');
+  const web = useRef<React.ComponentRef<typeof WebView>>(null);
   const progress = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(1)).current;
   const scene = SCENES[index];
   const last = index === SCENES.length - 1;
+
+  // Give the 3D stage a few seconds to start; otherwise play the flat story.
+  useEffect(() => {
+    const timer = setTimeout(() => setMode(m => (m === 'loading' ? 'flat' : m)), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (mode === '3d') web.current?.injectJavaScript(`window.story && window.story.show(${index}); true;`);
+  }, [index, mode]);
 
   const go = useCallback(
     (to: number) => {
@@ -59,8 +82,10 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
   );
 
   // Each scene fills its bar, then moves on by itself (not the last one).
+  // Nothing runs until the stage is ready.
   useEffect(() => {
     progress.setValue(0);
+    if (mode === 'loading') return;
     if (reduced || !scene.duration) {
       progress.setValue(1);
       return;
@@ -70,13 +95,42 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
       if (finished) go(index + 1);
     });
     return () => run.stop();
-  }, [index, scene.duration, reduced, progress, go]);
+  }, [index, scene.duration, reduced, progress, go, mode]);
 
   const Body = scene.Body;
 
   return (
     <View style={styles.root} accessibilityViewIsModal>
       <Gradient colors={gradients.hero} direction="diagonal" style={StyleSheet.absoluteFill} />
+
+      {mode !== 'flat' ? (
+        <WebView
+          ref={web}
+          source={{ uri: `${STORY_PAGE}?motion=${reduced ? 'reduced' : 'full'}&scene=0` }}
+          style={[StyleSheet.absoluteFill, styles.web, mode !== '3d' && styles.hidden]}
+          containerStyle={[StyleSheet.absoluteFill, styles.web]}
+          originWhitelist={['file://*']}
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          javaScriptEnabled
+          scrollEnabled={false}
+          overScrollMode="never"
+          androidLayerType="hardware"
+          setSupportMultipleWindows={false}
+          onShouldStartLoadWithRequest={req => req.url.startsWith('file:///android_asset/')}
+          onMessage={e => {
+            if (e.nativeEvent.data === 'loaded') setMode(m => (m === 'loading' ? '3d' : m));
+            else setMode('flat');
+          }}
+          onError={() => setMode('flat')}
+          onRenderProcessGone={() => setMode('flat')}
+          pointerEvents="none"
+        />
+      ) : null}
+      {/* Keeps the caption readable over the 3D scene. */}
+      {mode === '3d' ? (
+        <Gradient colors={[brand.midnight, 'rgba(11,17,34,0)']} direction="vertical" style={[styles.scrim, { height: insets.top + 170 }]} />
+      ) : null}
 
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.bars}>
@@ -99,15 +153,15 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <Animated.View style={[styles.stage, { opacity: fade }]}>
         <Text style={styles.caption} accessibilityRole="header" accessibilityLiveRegion="polite">
-          {scene.caption}
+          {mode === 'loading' ? ' ' : scene.caption}
         </Text>
         <View style={styles.flex}>
-          <Body key={index} />
+          {mode === 'flat' ? <Body key={index} /> : mode === '3d' && last ? <FeaturesScene compact /> : null}
         </View>
       </Animated.View>
 
       {/* Tap zones: left half goes back, right half goes forward. */}
-      {!last ? (
+      {!last && mode !== 'loading' ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <View style={[styles.zones, { top: insets.top + 56 }]}>
             <Pressable style={styles.flex} onPress={() => go(index - 1)} accessibilityLabel="Previous" accessibilityRole="button" />
@@ -120,7 +174,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
         {last ? (
           <Button label="Let’s begin" size="lg" onPress={onDone} />
         ) : (
-          <Text style={styles.hint}>Tap to continue</Text>
+          <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}
       </View>
     </View>
@@ -205,8 +259,8 @@ function AskScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Mom, please remind me! My science project is due tomorrow." delay={500} side="left" />
-        <Speech text="Of course! I’ll remember." delay={2600} side="right" tone="gold" />
+        <Speech text="Mom, tomorrow is Grandma’s birthday! Please remind me to call her in the morning." delay={500} side="left" />
+        <Speech text="Of course, beta. I won’t forget!" delay={2600} side="right" tone="gold" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
@@ -230,9 +284,9 @@ function BusyScene() {
       <View style={styles.speechArea}>
         <View style={styles.thought}>
           <Animated.Text style={[styles.thoughtText, { opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-            Aarav’s project… 📚
+            Call Grandma… 🎂
           </Animated.Text>
-          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…what was it again? 🤔</Animated.Text>
+          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…what was I supposed to remember? 🤔</Animated.Text>
         </View>
         <View style={styles.thoughtDots}>
           <View style={[styles.thoughtDot, styles.thoughtDotBig]} />
@@ -272,8 +326,8 @@ function ForgotScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Mom, you forgot! The project was due today. 😢" delay={400} side="left" />
-        <Speech text="Oh no… I’m so sorry, beta." delay={2600} side="right" tone="gold" />
+        <Speech text="Mom… Grandma waited all day for my call. 😢" delay={400} side="left" />
+        <Speech text="Oh no… I forgot. I’m so sorry, beta." delay={2600} side="right" tone="gold" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
@@ -307,7 +361,7 @@ function RemindScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Memo remembered! 🎉" delay={3200} side="left" />
+        <Speech text="Memo remembered! Happy birthday, Grandma! 🎉" delay={3200} side="left" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
@@ -320,7 +374,7 @@ function RemindScene() {
               <Text style={styles.phoneTime}>7:00</Text>
               <View style={styles.alarmCard}>
                 <RealIcon name="bell" size={30} />
-                <Text style={styles.alarmTitle}>Science project</Text>
+                <Text style={styles.alarmTitle}>Call Grandma 🎂</Text>
                 <Text style={styles.alarmMeta}>Today · 7:00 AM</Text>
                 <View style={styles.alarmPill}>
                   <Text style={styles.alarmPillText}>Alarm</Text>
@@ -344,9 +398,10 @@ const FEATURES: { icon: RealIconName; title: string; text: string }[] = [
   { icon: 'lock', title: 'Private Vault', text: 'Notes only you can open' },
 ];
 
-function FeaturesScene() {
+/** What Memo does. `compact` sits under the 3D cast at the bottom of the screen. */
+function FeaturesScene({ compact = false }: { compact?: boolean }) {
   return (
-    <View style={styles.features}>
+    <View style={[styles.features, compact && styles.featuresCompact]}>
       {FEATURES.map((f, i) => (
         <FeatureRow key={f.title} index={i} {...f} />
       ))}
@@ -600,13 +655,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.md,
   },
+  featuresCompact: {
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  web: {
+    backgroundColor: 'transparent',
+  },
+  hidden: {
+    opacity: 0,
+  },
+  scrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
   feature: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(239,233,220,0.07)',
+    backgroundColor: 'rgba(11,17,34,0.82)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.heroLine,
   },

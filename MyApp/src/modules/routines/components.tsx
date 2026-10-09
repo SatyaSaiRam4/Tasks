@@ -138,10 +138,13 @@ export function TodayChecklist({
   grid,
   onToggle,
   onTaskPress,
+  subtitle,
 }: {
   grid: TrackGrid;
   onToggle: (row: TrackGrid['rows'][number], isDone: boolean) => void;
   onTaskPress: (row: TrackGrid['rows'][number]) => void;
+  /** The line under a task's name when it is due and not done, e.g. "Every day". */
+  subtitle?: (row: TrackGrid['rows'][number]) => string;
 }) {
   const todayIndex = grid.days.indexOf(grid.today);
   return (
@@ -166,7 +169,7 @@ export function TodayChecklist({
               <Text style={[t.bodyStrong, done && styles.doneText]} numberOfLines={2}>
                 {row.title}
               </Text>
-              <Text style={[t.caption, styles.cardMeta]}>{done ? 'Done today' : canTick ? 'Every day' : 'Not due today'}</Text>
+              <Text style={[t.caption, styles.cardMeta]}>{done ? 'Done today ✓' : canTick ? subtitle?.(row) ?? 'Every day' : 'Not due today'}</Text>
             </Pressable>
             <Icon name="edit" size={15} color={colors.textTertiary} />
           </View>

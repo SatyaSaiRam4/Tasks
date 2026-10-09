@@ -29,7 +29,7 @@ export const walletApi = baseApi.injectEndpoints({
       query: () => '/wallet',
       providesTags: ['Wallet'],
     }),
-    redeem: builder.mutation<WalletRedemption, { phone: string }>({
+    redeem: builder.mutation<WalletRedemption, { phone: string; amount: number }>({
       query: body => ({ url: '/wallet/redeem', method: 'POST', body }),
       invalidatesTags: ['Wallet'],
     }),
