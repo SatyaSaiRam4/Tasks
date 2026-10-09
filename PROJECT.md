@@ -1,7 +1,7 @@
 # Memo
 
 Memo is a personal routines and wellbeing app for organizing goals into
-categories, completing scheduled tasks, building streaks, setting reminders,
+plans, completing scheduled tasks, building streaks, setting reminders,
 and keeping private notes in an encrypted Vault. Satya is the in-app guide.
 
 The workspace contains two separately run applications:
@@ -9,23 +9,29 @@ The workspace contains two separately run applications:
 - `Backend/`: FastAPI service backed by PostgreSQL.
 - `MyApp/`: React Native mobile client with Android and iOS native projects.
 
-The app uses **Category** and **Task** in its interface. Backend code and API
-models call these **Track** and **Action**, respectively.
+The app uses **Plan** and **Task** in its interface. Backend code and API
+models call these **Track** and **Action**, respectively (older code and
+component names still say "category", e.g. `CategoryCard`).
 
 ## Features
 
-### Categories and tasks
+### Plans and tasks
 
-- Categories have a name and a start/end date. They group tasks around a goal.
-- A new category's tasks are added on the same screen it is created on; more
-  can be added later from the category. Tasks use daily recurrence.
+- Plans have a name and a start/end date. They group daily tasks around a goal.
+- The Plans tab shows today's progress across all plans, then plans grouped as
+  Active, Starting soon and Finished. With no plans it shows a three-step
+  "How it works" guide.
+- A new plan is created in three numbered steps: name (with quick ideas),
+  length (7/21/30/90-day presets or dates) and daily tasks. More tasks can be
+  added later from the plan. Tasks use daily recurrence.
   Backend task records and API schemas also support recurrence rules, optional
   times, priorities, descriptions, steps, and reminder settings.
-- A category detail shows a task-by-day completion grid. Completions are
-  editable for today; past days are retained as history.
+- A plan's screen shows an overview (today's ring, day X of Y, dates), then
+  today's tasks as a checklist, then a History grid of tasks by day with a
+  legend. Completions are editable for today; past days are retained.
 - Completing a task requires confirmation. Settings offers Standard and Quick
   confirmation modes.
-- Categories and tasks can be edited or deleted. Category date changes preserve
+- Plans and tasks can be edited or deleted. Plan date changes preserve
   already-finished days.
 
 ### Streaks and achievements
@@ -34,12 +40,12 @@ models call these **Track** and **Action**, respectively.
   secured when all required tasks due that day are complete; days with no
   required tasks do not extend or break a streak.
 - Today's progress is provisional until the day is finalized. A background
-  worker finalizes ended days and awards eligible achievements and category
+  worker finalizes ended days and awards eligible achievements and plan
   completion bonuses.
 - The app includes streak history, achievement badges, and an optional local
   evening streak warning.
 - Home shows the current streak beside a flame, the streak badges, and plain
-  rows into today's categories and the next reminder.
+  rows into today's plans and the next reminder.
 - Streak badges are premium tiers earned by the best streak: Bronze (7
   days), Silver (30), Gold (100), Platinum (250), Diamond (500) and Master
   (1000). Tapping a badge shows its steps and progress. They are computed in
@@ -57,7 +63,7 @@ models call these **Track** and **Action**, respectively.
 ### Reminders and notifications
 
 - Reminders have a title, optional note, date/time, priority, and optional link
-  to a category. The Reminders tab supports date selection, completion,
+  to a plan. The Reminders tab supports date selection, completion,
   snoozing, editing, and deletion.
 - Reminder, task, and streak-warning notifications are scheduled locally on
   the device. Android exact-time delivery may require the system's Alarms &
@@ -123,7 +129,7 @@ models call these **Track** and **Action**, respectively.
 - React Native 0.87, React 19, TypeScript, and the React Native New
   Architecture. Android and iOS native project files are present. Node.js
   22.11 or newer is required by `package.json`.
-- Navigation and the five main tabs (Home, Categories, Reminders, Vault,
+- Navigation and the five main tabs (Home, Plans, Reminders, Vault,
   Profile) are defined in `MyApp/src/navigation/RootNavigator.tsx`.
 - Feature modules in `MyApp/src/modules/` include auth, home, routines,
   reminders, streaks, vault, profile, discover, settings, admin, onboarding,
@@ -157,6 +163,25 @@ models call these **Track** and **Action**, respectively.
 - Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
   reminder/task alarms and the streak warning while signed in.
 - Satya's model is rendered in a WebView from the mobile app's bundled assets.
+- Loading speed: RTK Query keeps data for 5 minutes after a screen closes
+  (`keepUnusedDataFor` in `baseApi.ts`), so revisited screens open from cache
+  while refetching. Plan cards prefetch the plan on press-in, and the plan
+  screen shows its header from the list cache before its own request lands.
+
+### Nginx
+
+- `deploy/nginx/nginx.conf` puts Nginx in front of uvicorn: keep-alive
+  upstream connections, gzip, timeouts and a 2 MB body limit. API responses
+  are per-user and are never cached (`Cache-Control: no-store`).
+- `deploy/docker-compose.yml` runs `api` (built from `Backend/Dockerfile`,
+  reading `Backend/.env`, running `alembic upgrade head` on start) and `nginx`
+  on port 80: `cd deploy && docker compose up -d --build`. Add TLS with the
+  commented 443 block. Keep a single `api` container (see operational notes).
+- On Render, Render's own proxy already sits in front of the app, so this
+  setup is for a VPS. The FastAPI app also gzips responses over 1 KB itself.
+  Render's free plan sleeps after inactivity and the first request then takes
+  up to about a minute; an uptime monitor on `/health` or a paid plan avoids
+  that, Nginx cannot.
 
 ## Setup
 

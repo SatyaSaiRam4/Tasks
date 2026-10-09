@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
@@ -26,6 +27,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Memo API", version="2.0.0", lifespan=lifespan)
+
+# Compress JSON bodies over 1 KB (plan grids, dashboards); small replies skip it.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
