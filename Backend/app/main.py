@@ -60,8 +60,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+@app.get("/health")
 @app.get("/health/live")
 def health_live():
+    """Liveness for uptime monitors: the process is up. No auth, no database."""
     return {"status": "ok"}
 
 
