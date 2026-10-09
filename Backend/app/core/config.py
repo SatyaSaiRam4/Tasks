@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 # override=True ensures .env values take precedence over existing system
 # env vars (e.g. the system-defined USER variable on Linux)
-load_dotenv(override=True)
+load_dotenv()
 
 
 # ---------------------------------------------------------------------------
@@ -14,13 +14,13 @@ load_dotenv(override=True)
 DB_USER = os.getenv("USER")
 DB_PASSWORD = os.getenv("PASSWORD")
 DB_HOST = os.getenv("HOST")
-DB_PORT = os.getenv("PORT")
+DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DATABASE")
 
 
 def validate_env_vars() -> None:
     missing = []
-    for var in ["USER", "PASSWORD", "HOST", "PORT", "DATABASE"]:
+    for var in ["USER", "PASSWORD", "HOST", "DB_PORT", "DATABASE"]:
         if not os.getenv(var):
             missing.append(var)
     if missing:
