@@ -119,6 +119,10 @@ export const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, Fetch
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  // Keep data for 5 minutes after a screen closes (default 60s), so going
+  // back to a screen shows it at once instead of a skeleton. Mutations still
+  // invalidate by tag, so nothing stale lingers after a change.
+  keepUnusedDataFor: 300,
   tagTypes: [
     'Me',
     'Profile',

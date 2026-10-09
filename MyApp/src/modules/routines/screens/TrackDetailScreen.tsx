@@ -3,10 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, spacing, type as t } from '../../../theme';
+import { colors, font, gradients, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
-import { IconButton } from '../../../components/Controls';
+import { IconButton, SectionHeader } from '../../../components/Controls';
+import { Card } from '../../../components/Card';
+import { ProgressRing } from '../../../components/Progress';
 import { Button } from '../../../components/Button';
 import { TextField } from '../../../components/TextField';
 import { ErrorState, Skeleton } from '../../../components/Feedback';
@@ -23,13 +25,18 @@ import {
   type TrackGrid,
 } from '../routinesApi';
 import { useCompletion } from '../CompletionProvider';
-import { CategoryTable, periodLabel } from '../components';
+import { CategoryTable, TableLegend, TodayChecklist, stageLabel } from '../components';
+import { formatDayMonth } from '../../../utils/date';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Row = TrackGrid['rows'][number];
 
-/** One category: its table of tasks × days, and a box to add tasks. */
+/**
+ * One plan, top to bottom in the order a user needs it: where the plan is
+ * and today's progress, today's tasks to tick, a box to add tasks, then the
+ * day-by-day history.
+ */
 export function TrackDetailScreen() {
   const navigation = useNavigation<Nav>();
   const { trackId } = useRoute<RouteProp<RootStackParamList, 'TrackDetail'>>().params;
@@ -51,7 +58,7 @@ export function TrackDetailScreen() {
     return (
       <Screen>
         <ScreenHeader />
-        <ErrorState message={getErrorMessage(track.error, 'Could not load this category.')} onRetry={track.refetch} />
+        <ErrorState message={getErrorMessage(track.error, 'Could not load this plan.')} onRetry={track.refetch} />
       </Screen>
     );
   }
@@ -97,9 +104,16 @@ export function TrackDetailScreen() {
     }
   };
 
-  const tr = track.data;
+  const toggle = (row: Row, isDone: boolean) => request({ actionId: row.action_id, title: row.title, isCompleted: isDone });
+  const openTask = (row: Row) => {
+    setEditing(row);
+    setEditName(row.title);
+  };
+
+  // The plans list already holds this plan, so the header shows at once.
+  const tr = track.data ?? tracks.data?.find(item => item.id === trackId);
   const rows = grid.data?.rows ?? [];
-  const accountTaskCount = tracks.data?.reduce((total, category) => total + category.action_count, 0) ?? 0;
+  const accountTaskCount = tracks.data?.reduce((total, plan) => total + plan.action_count, 0) ?? 0;
   const taskLimitReached = (tr?.action_count ?? 0) >= 15 || accountTaskCount >= 150;
 
   return (
@@ -112,23 +126,27 @@ export function TrackDetailScreen() {
     >
       <ScreenHeader
         title={tr?.name}
-        subtitle="Category"
-        right={<IconButton icon="edit" accessibilityLabel="Edit category" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
+        subtitle="Plan"
+        right={<IconButton icon="edit" accessibilityLabel="Edit plan" onPress={() => navigation.navigate('TrackEditor', { trackId })} />}
       />
-      {tr ? (
-        <Text style={styles.meta}>
-          {periodLabel(tr)}
-          {tr.today_required > 0 ? ` · ${Math.min(tr.today_completed, tr.today_required)}/${tr.today_required} today` : ''}
-        </Text>
-      ) : null}
+      {tr ? <Overview required={tr.today_required} completed={tr.today_completed} stage={stageLabel(tr)} dates={dateRange(tr.start_date, tr.end_date)} daysLeft={tr.days_remaining} /> : <Skeleton height={112} />}
 
-      {/* The add box stays at the top, so it never moves as tasks are added. */}
+      <SectionHeader title="Today’s tasks" style={styles.section} />
+      {!grid.data ? (
+        <Skeleton height={140} />
+      ) : rows.length ? (
+        <TodayChecklist grid={grid.data} onToggle={toggle} onTaskPress={openTask} />
+      ) : (
+        <Text style={styles.empty}>No tasks yet. Add something small you will do every day, like “Read 10 pages”.</Text>
+      )}
+
+      {/* The add box sits under the list, so new tasks appear right above it. */}
       <View style={styles.addRow}>
         <View style={styles.flex}>
           <TextField
             value={newTask}
             onChangeText={setNewTask}
-            placeholder={taskLimitReached ? 'Task limit reached' : rows.length ? 'Add another task' : 'Add a task, e.g. Workout'}
+            placeholder={taskLimitReached ? 'Task limit reached' : rows.length ? 'Add another daily task' : 'Add a daily task, e.g. Workout'}
             onSubmitEditing={() => {
               if (!adding && !taskLimitReached) add();
             }}
@@ -153,27 +171,17 @@ export function TrackDetailScreen() {
           }}
         />
       </View>
-      {taskLimitReached ? <Text style={styles.limit}>A category can have up to 15 tasks, with 150 across your account.</Text> : null}
+      {taskLimitReached ? <Text style={styles.limit}>A plan can have up to 15 tasks, with 150 across your account.</Text> : null}
 
-      {!grid.data ? (
-        <Skeleton height={160} />
-      ) : rows.length ? (
+      {grid.data && rows.length ? (
         <>
-          <CategoryTable
-            grid={grid.data}
-            onToggle={(row, isDone) => request({ actionId: row.action_id, title: row.title, isCompleted: isDone })}
-            onTaskPress={row => {
-              setEditing(row);
-              setEditName(row.title);
-            }}
-          />
-          <Text style={styles.hint}>Tick today’s box when you finish a task.</Text>
+          <SectionHeader title="History" style={styles.section} />
+          <CategoryTable grid={grid.data} onToggle={toggle} onTaskPress={openTask} />
+          <TableLegend />
         </>
-      ) : (
-        <Text style={styles.empty}>No tasks yet. Each task you add gets a box to tick every day.</Text>
-      )}
+      ) : null}
 
-      <Button label="Delete category" icon="trash" variant="dangerGhost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
+      <Button label="Delete plan" icon="trash" variant="dangerGhost" onPress={() => setConfirmDelete(true)} style={styles.delete} />
 
       <Sheet visible={Boolean(editing)} onClose={() => setEditing(null)} title="Edit task">
         <TextField value={editName} onChangeText={setEditName} placeholder="Task name" maxLength={200} />
@@ -196,13 +204,70 @@ export function TrackDetailScreen() {
   );
 }
 
+function dateRange(start: string, end: string | null) {
+  return `${formatDayMonth(start)} – ${end ? formatDayMonth(end) : 'ongoing'}`;
+}
+
+/** The plan at a glance: today's ring, where the plan is, and its dates. */
+function Overview({
+  required,
+  completed,
+  stage,
+  dates,
+  daysLeft,
+}: {
+  required: number;
+  completed: number;
+  stage: string;
+  dates: string;
+  daysLeft: number | null;
+}) {
+  const done = Math.min(completed, required);
+  const allDone = required > 0 && done >= required;
+  return (
+    <Card tone="hero" contentStyle={styles.overview}>
+      <ProgressRing progress={required ? done / required : 0} size={76} stroke={6} colorsPair={allDone ? gradients.success : gradients.primary}>
+        <Text style={styles.ringText}>{required ? `${done}/${required}` : '–'}</Text>
+      </ProgressRing>
+      <View style={styles.flex}>
+        <Text style={t.micro}>{stage}</Text>
+        <Text style={styles.overviewTitle}>{required === 0 ? 'Nothing due today' : allDone ? 'All done today' : `${required - done} left today`}</Text>
+        <Text style={styles.overviewMeta}>
+          {dates}
+          {daysLeft ? ` · ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left` : ''}
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
-  meta: {
+  overview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  ringText: {
+    ...font.bold,
+    fontSize: 15,
+    color: colors.heroText,
+  },
+  overviewTitle: {
+    ...font.serif,
+    fontSize: 22,
+    lineHeight: 26,
+    color: colors.heroText,
+    marginTop: 2,
+  },
+  overviewMeta: {
     ...t.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: -spacing.xs,
-    marginBottom: spacing.lg,
+    color: colors.heroTextSecondary,
+    marginTop: 2,
+  },
+  section: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
   flex: {
     flex: 1,
@@ -212,18 +277,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.sm,
   },
-  hint: {
-    ...t.aside,
-    fontSize: 15,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
   empty: {
     ...t.caption,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginVertical: spacing.md,
   },
   addRow: {
+    marginTop: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,

@@ -2,22 +2,23 @@ import React, { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, font, gradients, radius, spacing, TRACK_COLORS, type as t, withAlpha } from '../../theme';
 import { Card } from '../../components/Card';
-import { Icon } from '../../components/Icon';
+import { Checkbox } from '../../components/Checkbox';
+import { Pill } from '../../components/Controls';
+import { Icon, type IconName } from '../../components/Icon';
 import { RealIcon } from '../../components/RealIcon';
 import { ProgressBar } from '../../components/Progress';
-import { formatDayMonth, fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
-import type { GridCell, Track, TrackGrid } from './routinesApi';
+import { fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
+import { routinesApi, type GridCell, type Track, type TrackGrid } from './routinesApi';
 
-/** "04 Oct – 02 Nov · Day 3 of 30" */
-export function periodLabel(track: Track): string {
-  const range = `${formatDayMonth(track.start_date)} – ${track.end_date ? formatDayMonth(track.end_date) : 'ongoing'}`;
-  if (track.status === 'UPCOMING') return `${range} · Starts soon`;
-  if (track.status === 'ENDED') return `${range} · Ended`;
-  if (track.day_number && track.total_days) return `${range} · Day ${track.day_number} of ${track.total_days}`;
-  return range;
+/** "Day 3 of 30", "Starts soon" or "Finished": where a plan is in its period. */
+export function stageLabel(track: Track): string {
+  if (track.status === 'UPCOMING') return 'Starts soon';
+  if (track.status === 'ENDED' || track.status === 'ARCHIVED') return 'Finished';
+  if (track.day_number && track.total_days) return `Day ${track.day_number} of ${track.total_days}`;
+  return 'Active';
 }
 
-/** A stable jewel color for a category: its own color, or one picked from its name. */
+/** A stable jewel color for a plan: its own color, or one picked from its name. */
 export function categoryColor(seed: string, explicit?: string | null): string {
   if (explicit && /^#[0-9a-f]{6}$/i.test(explicit)) return explicit;
   let h = 0;
@@ -25,7 +26,7 @@ export function categoryColor(seed: string, explicit?: string | null): string {
   return TRACK_COLORS[h % TRACK_COLORS.length];
 }
 
-/** A category's initial in a jewel-toned double ring. */
+/** A plan's initial in a jewel-toned double ring. */
 export function Monogram({ name, color, size = 46, done = false }: { name: string; color: string; size?: number; done?: boolean }) {
   const ring = done ? colors.success : color;
   return (
@@ -47,29 +48,38 @@ export function Monogram({ name, color, size = 46, done = false }: { name: strin
   );
 }
 
-/** One line about a category today: progress, or why nothing is due. */
+/** One line about a plan today: progress, or why nothing is due. */
 function todayLine(track: Track): string {
   if (track.status === 'UPCOMING') return 'Starts soon';
-  if (track.status === 'ENDED' || track.status === 'ARCHIVED') return 'Ended';
-  if (track.today_required === 0) return track.action_count ? 'Nothing due today' : 'No tasks yet';
-  return `${Math.min(track.today_completed, track.today_required)} of ${track.today_required} done today`;
+  if (track.status === 'ENDED' || track.status === 'ARCHIVED') return 'Plan finished';
+  if (track.today_required === 0) return track.action_count ? 'Nothing due today' : 'Add your first daily task';
+  if (track.today_completed >= track.today_required) return 'All done for today';
+  return `${Math.min(track.today_completed, track.today_required)} of ${track.today_required} tasks done today`;
 }
 
-/** One category as a compact row: its initial, name, today's progress and a fine gauge. */
+/** One plan as a card: its initial, name, where it is in its period, and today's progress. */
 export function CategoryCard({ track, onPress, style }: { track: Track; onPress: () => void; style?: StyleProp<ViewStyle> }) {
   const allDone = track.today_required > 0 && track.today_completed >= track.today_required;
   const progress = track.today_required > 0 ? track.today_completed / track.today_required : 0;
   const color = categoryColor(track.name, track.color);
+  const active = track.status === 'ACTIVE';
+  // Start loading the plan while the finger is still down, so it opens ready.
+  const prefetchTrack = routinesApi.usePrefetch('getTrack');
+  const prefetchGrid = routinesApi.usePrefetch('trackGrid');
   return (
     <Card
       onPress={onPress}
+      onPressIn={() => {
+        prefetchTrack(track.id);
+        prefetchGrid(track.id);
+      }}
       style={[styles.card, style]}
       contentStyle={styles.cardContent}
       accent={color}
-      accessibilityLabel={`${track.name}, ${todayLine(track)}`}
+      accessibilityLabel={`${track.name}, ${stageLabel(track)}, ${todayLine(track)}`}
     >
       <View style={styles.cardRow}>
-        <Monogram name={track.name} color={color} size={40} done={allDone} />
+        <Monogram name={track.name} color={color} size={44} done={allDone} />
         <View style={styles.flex}>
           <Text style={styles.cardTitle} numberOfLines={1}>
             {track.name}
@@ -78,16 +88,115 @@ export function CategoryCard({ track, onPress, style }: { track: Track; onPress:
             {todayLine(track)}
           </Text>
         </View>
+        <Pill
+          label={stageLabel(track)}
+          color={active ? colors.gold : colors.textSecondary}
+          background={active ? colors.goldSoft : colors.glassStrong}
+        />
         <Icon name="chevron-right" size={18} color={colors.textTertiary} />
       </View>
-      {track.today_required > 0 ? (
-        <ProgressBar progress={progress} height={3} colorsPair={allDone ? gradients.success : [withAlpha(color, 0.7), color]} style={styles.cardBar} />
+      {active && track.today_required > 0 ? (
+        <ProgressBar progress={progress} height={4} colorsPair={allDone ? gradients.success : [withAlpha(color, 0.7), color]} style={styles.cardBar} />
       ) : null}
     </Card>
   );
 }
 
-// ---- The category table ---------------------------------------------------------
+const STEPS: { icon: IconName; title: string; text: string }[] = [
+  { icon: 'flag', title: 'Create a plan', text: 'A goal with dates, like “30 days of fitness”.' },
+  { icon: 'list', title: 'Add daily tasks', text: 'Small things to do every day, like “Walk 20 minutes”.' },
+  { icon: 'check-circle', title: 'Tick them off', text: 'Finish all of today’s tasks to grow your streak.' },
+];
+
+/** Three numbered steps that explain plans to someone new. */
+export function HowItWorks({ style }: { style?: StyleProp<ViewStyle> }) {
+  return (
+    <Card style={style} contentStyle={styles.how}>
+      <Text style={t.micro}>How it works</Text>
+      {STEPS.map((step, i) => (
+        <View key={step.title} style={styles.howRow}>
+          <View style={styles.howNumber}>
+            <Text style={styles.howNumberText}>{i + 1}</Text>
+          </View>
+          <View style={styles.flex}>
+            <Text style={t.bodyStrong}>{step.title}</Text>
+            <Text style={[t.caption, styles.cardMeta]}>{step.text}</Text>
+          </View>
+          <Icon name={step.icon} size={18} color={colors.gold} strokeWidth={1.7} />
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+/**
+ * Today's tasks as a plain checklist: tap the circle when done, tap the name
+ * to rename or delete. The clearest way in for someone new; the table below
+ * it keeps the history.
+ */
+export function TodayChecklist({
+  grid,
+  onToggle,
+  onTaskPress,
+}: {
+  grid: TrackGrid;
+  onToggle: (row: TrackGrid['rows'][number], isDone: boolean) => void;
+  onTaskPress: (row: TrackGrid['rows'][number]) => void;
+}) {
+  const todayIndex = grid.days.indexOf(grid.today);
+  return (
+    <Card padded={false}>
+      {grid.rows.map((row, i) => {
+        const cell = todayIndex >= 0 ? row.cells[todayIndex] : 'FUTURE';
+        const done = cell === 'DONE';
+        const canTick = todayIndex >= 0 && cell !== 'NONE' && cell !== 'FUTURE';
+        return (
+          <View key={row.action_id} style={[styles.checkRow, i < grid.rows.length - 1 && styles.bottomLine]}>
+            {canTick ? (
+              <Checkbox checked={done} onPress={() => onToggle(row, done)} accessibilityLabel={`${row.title}, ${done ? 'done' : 'not done yet'}`} />
+            ) : (
+              <View style={[styles.box, styles.boxFuture]} />
+            )}
+            <Pressable
+              onPress={() => onTaskPress(row)}
+              style={({ pressed }) => [styles.flex, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`${row.title}. Tap to rename or delete.`}
+            >
+              <Text style={[t.bodyStrong, done && styles.doneText]} numberOfLines={2}>
+                {row.title}
+              </Text>
+              <Text style={[t.caption, styles.cardMeta]}>{done ? 'Done today' : canTick ? 'Every day' : 'Not due today'}</Text>
+            </Pressable>
+            <Icon name="edit" size={15} color={colors.textTertiary} />
+          </View>
+        );
+      })}
+    </Card>
+  );
+}
+
+/** The key under the history table. */
+export function TableLegend() {
+  return (
+    <View style={styles.legend}>
+      <View style={styles.legendItem}>
+        <RealIcon name="check" size={16} />
+        <Text style={t.caption}>Done</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <Icon name="x" size={13} color={colors.danger} strokeWidth={2} />
+        <Text style={t.caption}>Missed</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.box, styles.boxTodo, styles.legendBox]} />
+        <Text style={t.caption}>To do</Text>
+      </View>
+    </View>
+  );
+}
+
+// ---- The plan's history table ---------------------------------------------------------
 
 const NAME_W = 124;
 const COL_W = 52;
@@ -346,5 +455,58 @@ const styles = StyleSheet.create({
   },
   none: {
     color: colors.textTertiary,
+  },
+
+  how: {
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  howRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  howNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.goldLine,
+    backgroundColor: colors.goldSoft,
+  },
+  howNumberText: {
+    ...font.serif,
+    fontSize: 17,
+    lineHeight: 20,
+    color: colors.gold,
+    includeFontPadding: false,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  doneText: {
+    color: colors.textSecondary,
+    textDecorationLine: 'line-through',
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  legendBox: {
+    width: 14,
+    height: 14,
   },
 });

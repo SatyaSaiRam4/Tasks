@@ -77,7 +77,7 @@ export function AuthLayout({
             </Animated.View>
             <Text style={styles.panelQuote}>Small promises, kept daily, become the life you meant to live.</Text>
             <View style={styles.panelRule} />
-            <Text style={styles.panelCaption}>Categories · Streaks · Reminders · Private Vault</Text>
+            <Text style={styles.panelCaption}>Plans · Streaks · Reminders · Private Vault</Text>
           </View>
         ) : null}
         <View style={styles.flex}>{form}</View>

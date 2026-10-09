@@ -53,7 +53,7 @@ export function DashboardScreen() {
           celebrate({
             icon: 'trophy',
             tone: c.is_perfect ? 'streak' : 'success',
-            eyebrow: 'Category finished',
+            eyebrow: 'Plan finished',
             title: c.track_name,
             subtitle: c.is_perfect
               ? `${c.duration_days} days, every task done. Amazing!`
@@ -111,7 +111,7 @@ export function DashboardScreen() {
       </FadeIn>
 
       <FadeIn index={3}>
-        <Text style={styles.section}>Today’s categories</Text>
+        <Text style={styles.section}>Today’s plans</Text>
         <ListGroup>
           {groups.length ? (
             groups.map((g, i) => (
@@ -127,7 +127,7 @@ export function DashboardScreen() {
           ) : (
             <ListRow
               leading={<RealIcon name="target" size={34} />}
-              title={data.total_tracks ? 'Nothing due today' : 'Create your first category'}
+              title={data.total_tracks ? 'Nothing due today' : 'Create your first plan'}
               onPress={() => (data.total_tracks ? navigation.navigate('RoutinesTab') : navigation.navigate('TrackEditor'))}
               last
             />
@@ -160,7 +160,7 @@ function longDate(key: string) {
 function statusLine(d: Dashboard) {
   const { today } = d.streak;
   const tasks = (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'}`;
-  if (d.total_tracks === 0) return { text: 'Add a category to start', color: colors.heroTextSecondary };
+  if (d.total_tracks === 0) return { text: 'Create a plan to start', color: colors.heroTextSecondary };
   if (today.secured) return { text: 'Today is done ✓', color: brand.jade };
   if (today.required === 0) return { text: 'Nothing due today', color: colors.heroTextSecondary };
   if (d.streak.at_risk) return { text: `${tasks(today.remaining)} left to keep it`, color: brand.ember };

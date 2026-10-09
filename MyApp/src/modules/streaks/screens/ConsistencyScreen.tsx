@@ -162,7 +162,7 @@ export function ConsistencyScreen() {
             <HeatmapLegend />
           </Card>
 
-          {completions.data?.length ? <SectionHeader title="Finished categories" /> : null}
+          {completions.data?.length ? <SectionHeader title="Finished plans" /> : null}
           {!completions.data?.length
             ? null
             : completions.data.map(c => (

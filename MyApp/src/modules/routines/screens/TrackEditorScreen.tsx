@@ -9,7 +9,7 @@ import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TextField } from '../../../components/TextField';
 import { DateField } from '../../../components/PickerFields';
 import { Button } from '../../../components/Button';
-import { IconButton } from '../../../components/Controls';
+import { Chip, ChipRow, IconButton } from '../../../components/Controls';
 import { Icon } from '../../../components/Icon';
 import { ConfirmSheet } from '../../../components/Sheet';
 import { Skeleton } from '../../../components/Feedback';
@@ -21,10 +21,17 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** A category can hold up to this many active tasks. */
+/** A plan can hold up to this many active tasks. */
 const MAX_TASKS = 15;
 
-/** Create a category with its tasks in one go, or edit a category's name and period. */
+/** Quick starts for a new plan's name and length. */
+const NAME_IDEAS = ['Fitness', 'Study', 'Reading', 'Meditation', 'Healthy eating'];
+const LENGTHS = [7, 21, 30, 90];
+
+/**
+ * Create a plan in three numbered steps (name, length, daily tasks), or edit
+ * a plan's name and dates.
+ */
 export function TrackEditorScreen() {
   const navigation = useNavigation<Nav>();
   const trackId = useRoute<RouteProp<RootStackParamList, 'TrackEditor'>>().params?.trackId;
@@ -65,7 +72,7 @@ export function TrackEditorScreen() {
 
   const save = async () => {
     setError(null);
-    if (!name.trim()) return setError('Give your category a name.');
+    if (!name.trim()) return setError('Give your plan a name.');
     if (end < start) return setError('The end date must be on or after the start date.');
     if (datesChanged && hasHistory && !confirmDates) return setConfirmDates(true);
     setConfirmDates(false);
@@ -84,20 +91,20 @@ export function TrackEditorScreen() {
             await createTask({ trackId: tr.id, title, repeat_type: 'DAILY' }).unwrap();
           }
         } catch (err) {
-          // The category exists now, so go there rather than risk creating it twice.
+          // The plan exists now, so go there rather than risk creating it twice.
           Toast.fail(getErrorMessage(err, 'Some tasks were not added. Add them here.'), 2);
         }
         navigation.replace('TrackDetail', { trackId: tr.id });
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not save this category.'));
+      setError(getErrorMessage(err, 'Could not save this plan.'));
     }
   };
 
   if (editing && existing.isLoading) {
     return (
       <Screen edges={['top', 'bottom']}>
-        <ScreenHeader title="Edit category" subtitle="Category" close />
+        <ScreenHeader title="Edit plan" subtitle="Plan" close />
         <Skeleton height={56} rounded={14} style={styles.skelGap} />
         <Skeleton height={56} rounded={14} style={styles.skelGap} />
         <Skeleton height={56} rounded={28} style={styles.skelGap} />
@@ -107,11 +114,25 @@ export function TrackEditorScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <ScreenHeader title={editing ? 'Edit category' : 'New category'} subtitle="Category" close />
-      <Text style={styles.intro}>{editing ? 'Refine the name or the period of this goal.' : 'Name a goal, pick the dates and add its tasks.'}</Text>
+      <ScreenHeader title={editing ? 'Edit plan' : 'New plan'} subtitle="Plan" close />
+      <Text style={styles.intro}>{editing ? 'Change the name or the dates of this plan.' : 'A plan is a goal with an end date. You do its tasks every day until then.'}</Text>
 
-      <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Gym" maxLength={80} autoFocus={!editing} />
+      <Step number={1} title="Name your plan" />
+      <TextField value={name} onChangeText={setName} placeholder="e.g. 30 days of fitness" maxLength={80} autoFocus={!editing} />
+      {editing ? null : (
+        <ChipRow style={styles.chips}>
+          {NAME_IDEAS.map(idea => (
+            <Chip key={idea} label={idea} selected={name === idea} onPress={() => setName(idea)} />
+          ))}
+        </ChipRow>
+      )}
 
+      <Step number={2} title="How long?" />
+      <ChipRow style={styles.chips}>
+        {LENGTHS.map(n => (
+          <Chip key={n} label={`${n} days`} selected={days === n} onPress={() => setEnd(toDateKey(addDays(fromDateKey(start), n - 1)))} />
+        ))}
+      </ChipRow>
       <View style={styles.dates}>
         <View style={styles.flex}>
           <DateField label="From" value={start} onChange={v => v && setStart(v)} />
@@ -124,14 +145,14 @@ export function TrackEditorScreen() {
 
       {editing ? null : (
         <View style={styles.tasks}>
-          <Text style={styles.label}>Tasks</Text>
+          <Step number={3} title="Add daily tasks" hint="Small things you will do every day. You can add more later." />
           {tasks.length < MAX_TASKS ? (
             <View style={styles.addRow}>
               <View style={styles.flex}>
                 <TextField
                   value={taskName}
                   onChangeText={setTaskName}
-                  placeholder={tasks.length ? 'Add another task' : 'e.g. Workout'}
+                  placeholder={tasks.length ? 'Add another task' : 'e.g. Walk 20 minutes'}
                   onSubmitEditing={addTask}
                   returnKeyType="done"
                   blurOnSubmit={false}
@@ -161,7 +182,7 @@ export function TrackEditorScreen() {
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button label={editing ? 'Save' : 'Create'} onPress={save} loading={creating || updating || addingTasks} size="lg" />
+      <Button label={editing ? 'Save changes' : 'Create plan'} onPress={save} loading={creating || updating || addingTasks} size="lg" />
 
       <ConfirmSheet
         visible={confirmDates}
@@ -176,7 +197,54 @@ export function TrackEditorScreen() {
   );
 }
 
+/** A numbered step heading: "1  Name your plan". */
+function Step({ number, title, hint }: { number: number; title: string; hint?: string }) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepHead}>
+        <View style={styles.stepNumber}>
+          <Text style={styles.stepNumberText}>{number}</Text>
+        </View>
+        <Text style={t.subtitle}>{title}</Text>
+      </View>
+      {hint ? <Text style={[t.caption, styles.stepHint]}>{hint}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  step: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  stepHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+  },
+  stepNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.goldLine,
+    backgroundColor: colors.goldSoft,
+  },
+  stepNumberText: {
+    ...font.bold,
+    fontSize: 13,
+    color: colors.gold,
+    includeFontPadding: false,
+  },
+  stepHint: {
+    marginTop: spacing.xs,
+    marginLeft: 36,
+  },
+  chips: {
+    paddingBottom: spacing.md,
+  },
   skelGap: {
     marginTop: spacing.md,
     marginBottom: spacing.lg,
@@ -199,11 +267,6 @@ const styles = StyleSheet.create({
   },
   tasks: {
     marginBottom: spacing.md,
-  },
-  label: {
-    ...t.micro,
-    marginBottom: spacing.sm,
-    marginLeft: 2,
   },
   taskRow: {
     flexDirection: 'row',

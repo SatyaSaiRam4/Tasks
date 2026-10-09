@@ -12,6 +12,8 @@ interface CardProps {
   contentStyle?: StyleProp<ViewStyle>;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Fires as the finger lands, e.g. to prefetch what the press opens. */
+  onPressIn?: () => void;
   /** Gradient fill instead of the tone's own surface. */
   gradient?: [string, string] | readonly [string, string];
   gradientOpacity?: [number, number];
@@ -41,6 +43,7 @@ export function Card({
   contentStyle,
   onPress,
   onLongPress,
+  onPressIn,
   gradient,
   gradientOpacity,
   tone = 'default',
@@ -87,7 +90,10 @@ export function Card({
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
-        onPressIn={press.onPressIn}
+        onPressIn={() => {
+          onPressIn?.();
+          press.onPressIn();
+        }}
         onPressOut={press.onPressOut}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
