@@ -21,7 +21,7 @@
  */
 const PRODUCTION_API_ORIGIN = 'https://tasks-xxbg.onrender.com';
 const LOCAL_API_ORIGIN = 'http://127.0.0.1:8003';
-const USE_LOCAL_API = true;
+const USE_LOCAL_API = false;
 
 /** The backend's API prefix (see Backend/app/api/router.py). */
 const API_PREFIX = '/api/v1';

@@ -60,8 +60,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.get("/health")
-@app.get("/health/live")
+# HEAD too: uptime monitors (e.g. UptimeRobot) send HEAD requests by default.
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/health/live", methods=["GET", "HEAD"])
 def health_live():
     """Liveness for uptime monitors: the process is up. No auth, no database."""
     return {"status": "ok"}
