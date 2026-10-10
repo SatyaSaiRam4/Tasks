@@ -19,7 +19,7 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { tab: 'HomeTab', title: name => `Hi ${name}, I’m Satya!`, text: 'I’ll show you how Memo works. It is easy, I promise.', gesture: 'wave' },
+  { tab: 'HomeTab', title: name => `Hi ${name}, I’m Melo!`, text: 'I’ll show you how Memo works. It is easy, I promise.', gesture: 'wave' },
   {
     tab: 'RoutinesTab',
     title: () => '1. Make a plan',
@@ -65,7 +65,7 @@ const STEPS: Step[] = [
   { tab: 'HomeTab', title: () => 'You are ready!', text: 'Make your first plan now. You can watch this tour again in Settings.', gesture: 'cheer' },
 ];
 
-/** Reveals text a few letters at a time, like Satya is saying it. Tap to finish. */
+/** Reveals text a few letters at a time, like Melo is saying it. Tap to finish. */
 function useTypewriter(text: string, enabled: boolean) {
   const [shown, setShown] = useState(enabled ? 0 : text.length);
   useEffect(() => {
@@ -90,7 +90,7 @@ function useTypewriter(text: string, enabled: boolean) {
 
 /**
  * A game-style guide: the real app stays visible but dimmed and untouchable,
- * while Satya at the bottom moves, talks and explains each tab in a speech
+ * while Melo at the bottom moves, talks and explains each tab in a speech
  * bubble. Shown once after sign-up, and again when replayed from Settings.
  */
 export function SatyaTour({ goToTab }: { goToTab: (tab: keyof MainTabParamList) => void }) {
@@ -138,7 +138,7 @@ export function SatyaTour({ goToTab }: { goToTab: (tab: keyof MainTabParamList) 
           <Sheen color={gradients.heroSheen} inset="18%" />
           <View style={styles.tail} />
           <View style={styles.head}>
-            <Text style={styles.name}>Satya · your guide</Text>
+            <Text style={styles.name}>Melo · your guide</Text>
             <Text style={styles.count}>
               {index + 1} / {STEPS.length}
             </Text>

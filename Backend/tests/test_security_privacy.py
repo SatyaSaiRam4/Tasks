@@ -121,7 +121,7 @@ def test_public_ids_are_generated_and_settings_default_private(client):
     assert user["onboarding_completed"] is False
     me = client.get(f"{API}/users/me", headers=headers).json()
     assert me["settings"]["is_public_profile"] is False
-    assert me["settings"]["confirmation_mode"] == "STANDARD"
+    assert me["settings"]["confirmation_mode"] == "QUICK"  # one-tap confirm is the default
 
 
 def test_onboarding_flag_round_trip(client, auth):

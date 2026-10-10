@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The alarm sounds are only named from JavaScript (notification channels),
+     so resource shrinking must not remove them from release builds. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/alarm_*" />

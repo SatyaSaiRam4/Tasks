@@ -34,7 +34,7 @@ export function RegisterScreen() {
     if (!canSubmit) return;
     setError(null);
     try {
-      // On success the navigator moves to Satya's first-time tour automatically.
+      // On success the navigator moves to Melo's first-time tour automatically.
       await register({ display_name: name.trim(), email: email.trim().toLowerCase(), password }).unwrap();
     } catch (err) {
       setError(getErrorMessage(err, 'Could not create your account.'));

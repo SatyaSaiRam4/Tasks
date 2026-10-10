@@ -33,12 +33,12 @@ class UserSettings(Base):
     animations_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     reduced_motion: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
-    # Satya
+    # Melo
     satya_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
 
     # Streak
     confirmation_mode: Mapped[str] = mapped_column(
-        String(16), default=ConfirmationMode.STANDARD, server_default=ConfirmationMode.STANDARD, nullable=False
+        String(16), default=ConfirmationMode.QUICK, server_default=ConfirmationMode.QUICK, nullable=False
     )
 
     # Vault (0 = never auto-lock while the app stays in the foreground)

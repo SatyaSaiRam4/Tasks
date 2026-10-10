@@ -11,7 +11,7 @@
  *               the desktop rail) is drawn over every signed-in screen, so
  *               the five destinations are always one tap away.
  *   First sign-in → the welcome story (once per account on this device),
- *   then Satya's tour drawn over the real app. Both replay from Settings.
+ *   then Melo's tour drawn over the real app. Both replay from Settings.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -46,6 +46,7 @@ import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScre
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
 import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
+import { REOPEN_SCREEN_KEY } from '../utils/appReload';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
 import { TrackDetailScreen } from '../modules/routines/screens/TrackDetailScreen';
@@ -80,7 +81,8 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   ResetPassword: { email?: string } | undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
-  TrackDetail: { trackId: string };
+  /** `created`: just made in the editor, so open ready to add the first task. */
+  TrackDetail: { trackId: string; created?: boolean };
   TrackEditor: { trackId?: string } | undefined;
   Consistency: undefined;
   Achievements: undefined;
@@ -330,6 +332,22 @@ export function RootNavigator() {
       })
       .catch(() => undefined);
   }, [isNewUser, user, dispatch]);
+
+  // After a theme change restarts the app, go back to where the user was.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    AsyncStorage.getItem(REOPEN_SCREEN_KEY)
+      .then(screen => {
+        if (screen !== 'Settings') return;
+        AsyncStorage.removeItem(REOPEN_SCREEN_KEY).catch(() => undefined);
+        const open = (tries = 0) => {
+          if (navigationRef.isReady()) navigationRef.navigate('Settings');
+          else if (tries < 40) setTimeout(() => open(tries + 1), 50);
+        };
+        open();
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated]);
 
   const closeStory = useCallback(() => {
     if (user) AsyncStorage.setItem(storySeenKey(user.id), '1').catch(() => undefined);

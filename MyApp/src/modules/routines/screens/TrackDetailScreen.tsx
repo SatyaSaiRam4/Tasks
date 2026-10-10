@@ -28,7 +28,7 @@ import {
   type TrackGrid,
 } from '../routinesApi';
 import { useCompletion } from '../CompletionProvider';
-import { CategoryTable, TableLegend, TodayChecklist, stageLabel } from '../components';
+import { CategoryTable, TableLegend, stageLabel } from '../components';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -38,13 +38,15 @@ type Row = TrackGrid['rows'][number];
 const MAX_TASKS = 15;
 
 /**
- * One plan, kept to what matters today: where the plan is, today's tasks to
- * tick, and a box to add a task (optionally only until a date). The history
- * table, editing and deleting sit behind small icons in the header.
+ * One plan: where it is today, then its tasks date by date (tasks down the
+ * side, days across, today's column in gold to tick), then a box to add a
+ * task, optionally only until a date. Editing and deleting the plan sit
+ * behind small icons in the header. A plan just created opens with the add
+ * box first, as step 2 of making a plan.
  */
 export function TrackDetailScreen() {
   const navigation = useNavigation<Nav>();
-  const { trackId } = useRoute<RouteProp<RootStackParamList, 'TrackDetail'>>().params;
+  const { trackId, created } = useRoute<RouteProp<RootStackParamList, 'TrackDetail'>>().params;
   const track = useGetTrackQuery(trackId);
   const tracks = useListTracksQuery();
   const grid = useTrackGridQuery(trackId);
@@ -60,7 +62,6 @@ export function TrackDetailScreen() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [editName, setEditName] = useState('');
   const [editUntil, setEditUntil] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const untilById = useMemo(() => new Map((actions.data ?? []).map(a => [a.id, a.end_date])), [actions.data]);
@@ -133,10 +134,59 @@ export function TrackDetailScreen() {
   };
 
   const toggle = (row: Row, isDone: boolean) => request({ actionId: row.action_id, title: row.title, isCompleted: isDone });
-  const taskLine = (row: Row) => {
+  const untilLine = (row: Row) => {
     const until = untilById.get(row.action_id);
-    return until ? `Every day until ${formatDayMonth(until)}` : 'Every day';
+    return until ? `until ${formatDayMonth(until)}` : undefined;
   };
+  const firstTask = !rows.length && Boolean(grid.data);
+
+  const addCard = (
+    <Card style={styles.addCard} contentStyle={styles.addContent}>
+      <Text style={t.bodyStrong}>{taskLimitReached ? 'This plan is full' : 'Add a task'}</Text>
+      {taskLimitReached ? (
+        <Text style={[t.caption, styles.mtXs]}>A plan can have up to {MAX_TASKS} tasks. Delete one to add another.</Text>
+      ) : (
+        <>
+          <View style={styles.addRow}>
+            <View style={styles.flex}>
+              <TextField
+                value={newTask}
+                onChangeText={setNewTask}
+                placeholder="e.g. Walk 20 minutes"
+                onSubmitEditing={() => {
+                  if (!adding) add();
+                }}
+                returnKeyType="done"
+                blurOnSubmit={false}
+                maxLength={200}
+                editable={!adding}
+                autoFocus={Boolean(created)}
+              />
+            </View>
+            <IconButton
+              icon="plus"
+              size={22}
+              color={colors.gold}
+              style={styles.addButton}
+              accessibilityLabel="Add task"
+              onPress={() => {
+                if (!adding) add();
+              }}
+            />
+          </View>
+          <DateField
+            label="Until (optional)"
+            value={newUntil}
+            onChange={setNewUntil}
+            placeholder="Every day until the plan ends"
+            minDate={today}
+            maxDate={tr?.end_date ?? undefined}
+            clearable
+          />
+        </>
+      )}
+    </Card>
+  );
 
   return (
     <Screen
@@ -151,7 +201,6 @@ export function TrackDetailScreen() {
         title={tr?.name}
         right={
           <View style={styles.headerIcons}>
-            <IconButton icon="calendar" accessibilityLabel="History" onPress={() => setShowHistory(true)} />
             <IconButton icon="edit" accessibilityLabel="Edit plan" onPress={() => navigation.navigate('TrackEditor', { trackId })} />
             <IconButton icon="trash" color={colors.danger} accessibilityLabel="Delete plan" onPress={() => setConfirmDelete(true)} />
           </View>
@@ -169,73 +218,32 @@ export function TrackDetailScreen() {
         <Skeleton height={112} rounded={20} />
       )}
 
-      <SectionHeader title="Today’s tasks" style={styles.section} />
-      {!grid.data ? (
-        <Skeleton height={140} rounded={20} />
-      ) : rows.length ? (
-        <TodayChecklist grid={grid.data} onToggle={toggle} onTaskPress={openTask} subtitle={taskLine} />
-      ) : (
-        <Text style={styles.empty}>No tasks yet. Add something small you will do every day, like “Read 10 pages”.</Text>
-      )}
+      {created || firstTask ? (
+        <View style={styles.stepNote}>
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>2</Text>
+          </View>
+          <Text style={[t.bodyStrong, styles.flex]}>Now add the daily tasks for this plan.</Text>
+        </View>
+      ) : null}
+      {created || firstTask ? addCard : null}
 
-      <Card style={styles.addCard} contentStyle={styles.addContent}>
-        <Text style={t.bodyStrong}>{taskLimitReached ? 'This plan is full' : 'Add a task'}</Text>
-        {taskLimitReached ? (
-          <Text style={[t.caption, styles.mtXs]}>A plan can have up to {MAX_TASKS} tasks. Delete one to add another.</Text>
-        ) : (
-          <>
-            <View style={styles.addRow}>
-              <View style={styles.flex}>
-                <TextField
-                  value={newTask}
-                  onChangeText={setNewTask}
-                  placeholder="e.g. Walk 20 minutes"
-                  onSubmitEditing={() => {
-                    if (!adding) add();
-                  }}
-                  returnKeyType="done"
-                  blurOnSubmit={false}
-                  maxLength={200}
-                  editable={!adding}
-                />
-              </View>
-              <IconButton
-                icon="plus"
-                size={22}
-                color={colors.gold}
-                style={styles.addButton}
-                accessibilityLabel="Add task"
-                onPress={() => {
-                  if (!adding) add();
-                }}
-              />
-            </View>
-            <DateField
-              label="Until (optional)"
-              value={newUntil}
-              onChange={setNewUntil}
-              placeholder="Every day until the plan ends"
-              minDate={today}
-              maxDate={tr?.end_date ?? undefined}
-              clearable
-            />
-          </>
-        )}
-      </Card>
+      {rows.length ? (
+        <>
+          <SectionHeader title="Tasks by date" style={styles.section} />
+          {grid.data ? (
+            <CategoryTable grid={grid.data} onToggle={toggle} onTaskPress={openTask} subtitle={untilLine} />
+          ) : (
+            <Skeleton height={160} rounded={20} />
+          )}
+          <TableLegend />
+          <Text style={styles.hint}>Tick a box in today’s gold column when you finish that task. Tap a task’s name to edit it.</Text>
+        </>
+      ) : !grid.data ? (
+        <Skeleton height={160} rounded={20} style={styles.section} />
+      ) : null}
 
-      <Sheet visible={showHistory} onClose={() => setShowHistory(false)} title="History">
-        {grid.data && rows.length ? (
-          <>
-            <CategoryTable grid={grid.data} onToggle={toggle} onTaskPress={row => {
-              setShowHistory(false);
-              openTask(row);
-            }} />
-            <TableLegend />
-          </>
-        ) : (
-          <Text style={styles.empty}>History appears here once you add tasks.</Text>
-        )}
-      </Sheet>
+      {created || firstTask ? null : addCard}
 
       <Sheet visible={Boolean(editing)} onClose={() => setEditing(null)} title="Edit task">
         <TextField label="Task" value={editName} onChangeText={setEditName} placeholder="Task name" maxLength={200} />
@@ -337,10 +345,31 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
   },
-  empty: {
+  hint: {
     ...t.caption,
     textAlign: 'center',
-    marginVertical: spacing.md,
+    marginTop: spacing.sm,
+  },
+  stepNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+  },
+  stepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.goldLine,
+    backgroundColor: colors.goldSoft,
+  },
+  stepBadgeText: {
+    ...font.bold,
+    fontSize: 14,
+    color: colors.gold,
   },
   addCard: {
     marginTop: spacing.lg,

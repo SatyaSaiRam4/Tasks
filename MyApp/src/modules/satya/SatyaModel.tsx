@@ -12,17 +12,17 @@ const LOAD_TIMEOUT_MS = 8000;
 
 type Phase = 'loading' | 'ready' | 'fallback';
 
-/** Whole-puppet moves Satya can make (see assets/web/satya/index.html). */
+/** Whole-puppet moves Melo can make (see assets/web/satya/index.html). */
 export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft' | 'lookRight' | 'cheer' | 'walk' | 'think';
 
 /**
- * Satya, rendered from the bundled GLB through <model-viewer> in a WebView.
+ * Melo, rendered from the bundled GLB through <model-viewer> in a WebView.
  * Never blocks the screen: a shimmering figure shows while it loads, and an
  * animated orb is the fallback if WebGL is missing, the model fails, or
  * loading takes too long.
  *
  * `intro="long"` plays the fuller entrance (first visit); "short" otherwise.
- * `gesture` makes Satya move (a list plays in order); change `gestureKey`
+ * `gesture` makes Melo move (a list plays in order); change `gestureKey`
  * to replay the same move.
  */
 export function SatyaModel({
@@ -60,7 +60,7 @@ export function SatyaModel({
   const uri = `${MODEL_PAGE}?motion=${reduced ? 'reduced' : 'full'}&intro=${intro}`;
 
   return (
-    <View style={{ width: size, height: size }} accessible accessibilityLabel="Satya, your guide">
+    <View style={{ width: size, height: size }} accessible accessibilityLabel="Melo, your guide">
       <Glow color={colors.gold} size={size * 1.25} intensity={0.32} style={[styles.glow, { left: -size * 0.125, top: -size * 0.125 }]} />
       {phase === 'loading' ? <SatyaSkeleton size={size} /> : phase === 'fallback' ? <SatyaOrb size={size * 0.62} /> : null}
       {canRender3D && phase !== 'fallback' ? (
@@ -95,14 +95,14 @@ export function SatyaModel({
 /** A shimmering head-and-body silhouette shown while the 3D model loads. */
 function SatyaSkeleton({ size }: { size: number }) {
   return (
-    <View style={[StyleSheet.absoluteFill, styles.center]} accessibilityLabel="Loading Satya">
+    <View style={[StyleSheet.absoluteFill, styles.center]} accessibilityLabel="Loading Melo">
       <Skeleton width={size * 0.26} height={size * 0.26} rounded={size * 0.13} />
       <Skeleton width={size * 0.44} height={size * 0.42} rounded={size * 0.16} style={{ marginTop: size * 0.04 }} />
     </View>
   );
 }
 
-/** The non-3D Satya: a breathing gradient orb with a sparkle. Used when 3D isn't available. */
+/** The non-3D Melo: a breathing gradient orb with a sparkle. Used when 3D isn't available. */
 export function SatyaOrb({ size = 120 }: { size?: number }) {
   const { reduced } = useMotion();
   const breathe = useRef(new Animated.Value(0)).current;

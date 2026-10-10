@@ -2,7 +2,7 @@
 
 Memo is a personal routines and wellbeing app for organizing goals into
 plans, completing scheduled tasks, building streaks, setting reminders,
-and keeping private notes in an encrypted Vault. Satya is the in-app guide.
+and keeping private notes in an encrypted Vault. Melo is the in-app guide.
 
 The workspace contains two separately run applications:
 
@@ -21,14 +21,15 @@ component names still say "category", e.g. `CategoryCard`).
 - The Plans tab shows today's progress across all plans, then one list of
   plans (active first; each card says Day X of Y, Starts soon or Finished).
   With no plans it shows a three-step "How it works" guide.
-- A new plan is created in three numbered steps: name (with quick ideas),
-  length (7/21/30/90-day presets or dates) and daily tasks. More tasks can be
-  added later from the plan. Tasks use daily recurrence.
+- A plan is made in two steps: the editor takes its name (with quick ideas)
+  and length (7/21/30/90-day presets or dates), then the new plan opens ready
+  to add its daily tasks ("step 2"). Tasks use daily recurrence.
   Backend task records and API schemas also support recurrence rules, optional
   times, priorities, descriptions, steps, and reminder settings.
 - A plan's screen shows an overview (today's ring, day X of Y, dates), then
-  today's tasks as a checklist, then a History grid of tasks by day with a
-  legend. Completions are editable for today; past days are retained.
+  its tasks date by date (tasks down the side, days across, today's column in
+  gold to tick) with a legend, then the add-task box. Edit and delete are
+  header icons. Completions are editable for today; past days are retained.
 - Completing a task requires confirmation. Settings offers Standard and Quick
   confirmation modes.
 - Plans and tasks can be edited or deleted. Plan date changes preserve
@@ -116,7 +117,7 @@ component names still say "category", e.g. `CategoryCard`).
   can also be controlled in Settings.
 - Settings include display name, light/dark theme, accent color, animation and
   reduced-motion controls, notification preferences, completion confirmation,
-  profile visibility, Vault PIN and auto-lock, and Satya preferences/tour.
+  profile visibility, Vault PIN and auto-lock, and Melo preferences/tour.
 - Admin-only screens provide app statistics and user management. Admin routes
   do not provide access to Vault contents.
 
@@ -150,7 +151,7 @@ component names still say "category", e.g. `CategoryCard`).
   Profile) are defined in `MyApp/src/navigation/RootNavigator.tsx`.
 - Feature modules in `MyApp/src/modules/` include auth, home, routines,
   reminders, streaks, vault, profile, discover, settings, admin, onboarding,
-  users, and Satya.
+  users, and Melo.
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
   `MyApp/src/config/env.ts`. Release builds use the production backend
@@ -179,18 +180,19 @@ component names still say "category", e.g. `CategoryCard`).
   are used for the tab bar, streak, badges, wallet, reminders and Vault.
 - Local notifications use `react-native-notify-kit`. `BackgroundSync` refreshes
   reminder/task alarms and the streak warning while signed in.
-- Satya's model is rendered in a WebView from the mobile app's bundled assets.
+- Melo's model is rendered in a WebView from the mobile app's bundled assets.
   The GLB is a glove puppet with no skeleton or animations, so
   `assets/web/satya/index.html` animates it as a whole: an idle sway and
   breath, plus gestures (`talk`, `wave`, `hop`, `nod`, `spin`, `lookLeft`,
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  a boy asks his mom to remind him about his project, she forgets, and Memo
-  remembers. The boy and mom are SVG characters
-  (`modules/onboarding/Characters.tsx`) and Satya narrates. It plays once
-  per account on a device, then Satya's tour runs; both replay from Settings.
-- Satya's tour has nine steps with a title, typed-out text and a gesture
+  Aarav asks Mom to wake him at 6 for his exam, she forgets and he
+  oversleeps; next time Memo's alarm wakes him on time. It plays in 3D
+  (three.js, `web/story`), with the SVG characters in
+  `modules/onboarding/Characters.tsx` as the fallback; Melo narrates. It plays once
+  per account on a device, then Melo's tour runs; both replay from Settings.
+- Melo's tour has nine steps with a title, typed-out text and a gesture
   each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
   (`keepUnusedDataFor` in `baseApi.ts`), so revisited screens open from cache
@@ -314,3 +316,17 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   `API_URL` and (cleanup only) `CRON_SECRET`.
 - The welcome story's 3D stage is built from `MyApp/web/story/story.js` with
   `npm run build:story` (three.js, bundled to `assets/web/story`).
+
+## Appearance and defaults
+
+- New installs start in the light theme. Changing the theme or accent restarts
+  the app's JavaScript in place (Android `AppReloadModule`, about half a
+  second) and reopens Settings, because screen styles are built at start-up.
+  On iOS release builds the change applies the next time the app opens.
+- New accounts use Quick (one-tap) completion confirmation.
+- Alarm channels are named `memo-alarm-v2-<sound>`; older `alarm-*` channels
+  are deleted at start-up, since Android keeps a channel's first sound forever.
+- Reminders: pick a day on the date strip (today by default) or the calendar;
+  the All / Sent / Failed / Done tabs filter that day.
+- Home's streak card also shows the six badges in one row.
+- The guide is called Melo (code and settings keys still say `satya`).

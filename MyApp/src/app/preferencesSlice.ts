@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 /**
  * A synchronous mirror of the user's server-side settings that affect how
- * the UI behaves (motion, Satya, completion confirmation), so any component
+ * the UI behaves (motion, Melo, completion confirmation), so any component
  * can read them without subscribing to a query.
  */
 export interface PreferencesState {
@@ -24,7 +24,7 @@ const initialState: PreferencesState = {
   animationsEnabled: true,
   reducedMotion: false,
   satyaEnabled: true,
-  confirmationMode: 'STANDARD',
+  confirmationMode: 'QUICK',
   vaultAutolockMinutes: 5,
   notifyActions: true,
   notifyReminders: true,
