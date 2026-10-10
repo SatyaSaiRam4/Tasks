@@ -18,3 +18,8 @@ jest.mock('react-native-nitro-sound', () => {
     }),
   };
 });
+
+jest.mock('react-native-image-picker', () => ({
+  launchImageLibrary: () => Promise.resolve({ didCancel: true }),
+  launchCamera: () => Promise.resolve({ didCancel: true }),
+}));

@@ -115,6 +115,38 @@ def test_public_profile_respects_each_visibility_toggle(client, auth):
         assert private_field not in body
 
 
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+
+
+def test_profile_photo_upload_limits_and_privacy(client, auth):
+    sam, sam_user = register(client, email="sam@example.com", name="Sam")
+    up = client.put(f"{API}/users/me/photo", files={"file": ("me.png", PNG, "image/png")}, headers=sam)
+    assert up.status_code == 200, up.text
+    url = up.json()["photo_url"]
+    assert url.startswith(f"/users/{sam_user['public_id']}/photo?v=")
+    # The owner can always see it.
+    own = client.get(f"{API}{url}", headers=sam)
+    assert own.status_code == 200 and own.content == PNG and own.headers["content-type"] == "image/png"
+    # Others only once the profile is public, and not after the photo is hidden.
+    assert client.get(f"{API}{url}", headers=auth).status_code == 404
+    client.patch(f"{API}/users/me/settings", json={"is_public_profile": True}, headers=sam)
+    found = client.get(f"{API}/users/search", params={"public_id": sam_user["public_id"]}, headers=auth).json()
+    assert found["photo_url"] == url
+    assert client.get(f"{API}{url}", headers=auth).status_code == 200
+    client.patch(f"{API}/users/me/settings", json={"show_photo": False}, headers=sam)
+    hidden = client.get(f"{API}/users/search", params={"public_id": sam_user["public_id"]}, headers=auth).json()
+    assert hidden["photo_url"] is None
+    assert client.get(f"{API}{url}", headers=auth).status_code == 404
+    assert client.get(f"{API}{url}").status_code == 401
+    # Too big, wrong type, then remove.
+    big = client.put(f"{API}/users/me/photo", files={"file": ("big.jpg", b"0" * (10 * 1024 * 1024 + 1), "image/jpeg")}, headers=sam)
+    assert big.status_code == 413
+    assert client.put(f"{API}/users/me/photo", files={"file": ("a.txt", b"hi", "text/plain")}, headers=sam).status_code == 415
+    gone = client.delete(f"{API}/users/me/photo", headers=sam)
+    assert gone.status_code == 200 and gone.json()["photo_url"] is None
+    assert client.get(f"{API}{url}", headers=sam).status_code == 404
+
+
 def test_public_ids_are_generated_and_settings_default_private(client):
     headers, user = register(client, name="Satya Sai")
     assert user["public_id"].startswith("SATYASAI_") and len(user["public_id"]) == len("SATYASAI_") + 5

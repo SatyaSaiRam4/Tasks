@@ -1,10 +1,11 @@
 /* eslint-env browser */
 /**
- * Memo's welcome story, in 3D. Aarav tells Mom the art school admissions
- * open on 1 March, four months away. The months fly by, she forgets, and the
- * admissions close. Melo arrives: tell Memo once, even months ahead, and it
- * reminds you on the day. This time Mom saves it in Memo once; on
- * 1 March it reminds her, and Aarav gets in.
+ * Memo's welcome story, in 3D. Aarav asks Mom to remind him of Grandma's
+ * birthday, two days away. Two busy days fly by, she forgets, and they miss
+ * the call. Melo arrives: tell Memo once, days or months ahead, and it
+ * reminds you on the day. This time Mom saves it in Memo; on the birthday it
+ * reminds her, and Aarav calls Grandma. Nothing is ever held in front of a
+ * face: the card sits at chest height, the phone floats between them.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
  * and drives it with window.story.show(sceneIndex); captions, progress and
@@ -268,6 +269,9 @@ function makePerson({
     eyes.push(eye);
     head.add(mesh(new THREE.SphereGeometry(headR * 0.13, 12, 10), mat(0xf29c9c, { transparent: true, opacity: 0.55 }), { x: side * headR * 0.55, y: -headR * 0.18, z: headR * 0.8 }, false));
   }
+  const nose = mesh(new THREE.SphereGeometry(headR * 0.09, 12, 10), skin, { y: -headR * 0.08, z: headR * 0.98 }, false);
+  nose.scale.set(1, 0.8, 0.7);
+  head.add(nose);
   const brows = [-1, 1].map(side => {
     const brow = mesh(new THREE.BoxGeometry(headR * 0.28, headR * 0.05, headR * 0.05), hair, { x: side * headR * 0.36, y: headR * 0.33, z: headR * 0.9 }, false);
     head.add(brow);
@@ -492,8 +496,7 @@ function busyThing(kind) {
 
 /**
  * The phone, its screen drawn on a canvas. draw(screen) switches between the
- * wedding photos Riya finds too late, her Memo reminders, and the reminder
- * ringing on the day.
+ * reminder being saved, the reminder going off on the day, and the call.
  */
 function makePhone() {
   const g = new THREE.Group();
@@ -514,8 +517,9 @@ function makePhone() {
     c.fillText(value, 210, y);
   };
   /**
-   * Draws one screen. spec.type: 'ring' (a Memo reminder going off), 'ad'
-   * (a sale advert), 'photos' (a friend's wedding post) or 'paid'.
+   * Draws one screen. spec.type: 'ring' (a Memo reminder going off),
+   * 'saved' (a reminder just saved), 'call' (a video call with Grandma),
+   * 'ad', 'photos' or 'paid'.
    */
   g.userData.draw = spec => {
     const grad = c.createLinearGradient(0, 0, 0, 800);
@@ -553,6 +557,26 @@ function makePhone() {
       text(spec.title ?? '', 510, '700 30px sans-serif');
       text(spec.date ?? '', 555, '600 27px sans-serif', '#f3dca6');
       text(spec.sub ?? '', 680, '500 26px sans-serif', 'rgba(239,233,220,0.7)');
+    } else if (spec.type === 'call') {
+      // A video call: Grandma big, Aarav small in the corner.
+      const bg = c.createLinearGradient(0, 0, 0, 800);
+      bg.addColorStop(0, '#f6d8b8');
+      bg.addColorStop(1, '#e7a98a');
+      c.fillStyle = bg;
+      c.fillRect(0, 0, 420, 800);
+      text('👵', 380, '220px sans-serif');
+      text('Grandma', 120, '800 40px sans-serif', '#3b2620');
+      text('Video call · 00:12', 165, '600 26px sans-serif', 'rgba(59,38,32,0.7)');
+      text('🎂 Happy birthday!', 560, '800 34px sans-serif', '#8a3b2e');
+      c.fillStyle = '#1b2440';
+      roundRect(c, 290, 600, 100, 130, 18);
+      c.fill();
+      text('👦', 690, '64px sans-serif');
+      c.fillStyle = '#e2574c';
+      c.beginPath();
+      c.arc(150, 700, 38, 0, Math.PI * 2);
+      c.fill();
+      text('📞', 714, '36px sans-serif');
     } else if (spec.type === 'paid') {
       text('✅', 300, '150px sans-serif');
       text('Bill paid', 420, '800 50px sans-serif');
@@ -601,92 +625,23 @@ function canvasTexture(width, height, paint) {
   return tex;
 }
 
-/** A sign on two posts: "ADMISSIONS CLOSED", "ADMISSION CONFIRMED" and so on. */
-function makeBoard(lines, color) {
-  const tex = canvasTexture(512, 256, c => {
-    c.fillStyle = color;
-    c.fillRect(0, 0, 512, 256);
-    c.strokeStyle = '#ffffff';
-    c.lineWidth = 10;
-    c.strokeRect(14, 14, 484, 228);
-    c.fillStyle = '#ffffff';
-    c.textAlign = 'center';
-    c.font = '900 76px sans-serif';
-    c.fillText(lines[0], 256, 125);
-    c.font = '600 36px sans-serif';
-    c.fillText(lines[1] ?? '', 256, 195);
-  });
-  const g = new THREE.Group();
-  g.add(mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshBasicMaterial({ map: tex }), { shadow: false }));
-  for (const side of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8), mat(0x777777), { x: side * 0.5, y: -0.6 }));
-  return g;
-}
-
-/** Outside a school: sky, road, the building with its name, trees. */
-function makeStreet(name) {
-  const g = new THREE.Group();
-  g.add(mesh(new THREE.PlaneGeometry(40, 14), new THREE.MeshBasicMaterial({ color: 0x9fd0ff }), { y: 7, z: -6, shadow: false }));
-  const ground = mesh(new THREE.PlaneGeometry(40, 20), mat(0x6f8f4f, { roughness: 1 }), { z: -2, shadow: false });
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  g.add(ground);
-  const road = mesh(new THREE.PlaneGeometry(40, 1.6), mat(0x4a4d55, { roughness: 1 }), { y: 0.005, z: -0.6, shadow: false });
-  road.rotation.x = -Math.PI / 2;
-  road.receiveShadow = true;
-  g.add(road);
-  for (let i = -10; i <= 10; i++) {
-    const stripe = mesh(new THREE.PlaneGeometry(0.5, 0.06), mat(0xf2f2f2), { x: i * 1.2, y: 0.01, z: -0.6, shadow: false });
-    stripe.rotation.x = -Math.PI / 2;
-    g.add(stripe);
-  }
-  // The school.
-  const school = new THREE.Group();
-  school.add(mesh(new THREE.BoxGeometry(5, 2.4, 1), mat(0xe7c9a0, { roughness: 0.9 }), { y: 1.2 }));
-  school.add(mesh(new THREE.BoxGeometry(5.2, 0.15, 1.2), mat(0xb5653f), { y: 2.45 }));
-  for (let i = -2; i <= 2; i++) {
-    for (const y of [0.85, 1.75]) school.add(mesh(new THREE.PlaneGeometry(0.5, 0.45), new THREE.MeshBasicMaterial({ color: 0x5b8def }), { x: i * 0.95, y, z: 0.51, shadow: false }));
-  }
-  const sign = canvasTexture(512, 96, c => {
-    c.fillStyle = '#2a3a6e';
-    c.fillRect(0, 0, 512, 96);
-    c.fillStyle = '#ffffff';
-    c.textAlign = 'center';
-    c.font = '800 52px sans-serif';
-    c.fillText(name, 256, 66);
-  });
-  school.add(mesh(new THREE.PlaneGeometry(2.2, 0.42), new THREE.MeshBasicMaterial({ map: sign }), { y: 2.15, z: 0.52, shadow: false }));
-  school.position.set(0.3, 0, -3.2);
-  g.add(school);
-  for (const x of [-2.6, 3.0]) {
-    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.8, 8), mat(0x7a4a2a), { x, y: 0.4, z: -1.6 }));
-    g.add(mesh(new THREE.ConeGeometry(0.55, 1.3, 12), mat(0x3f8f4f), { x, y: 1.4, z: -1.6 }));
-  }
-  return g;
-}
-
-/** Aarav's drawing for the art school. */
-function makeDrawing() {
+/** The birthday card Aarav made for Grandma. */
+function makeCard() {
   const tex = canvasTexture(256, 200, c => {
-    c.fillStyle = '#fffdf6';
+    c.fillStyle = '#fff4e6';
     c.fillRect(0, 0, 256, 200);
-    c.fillStyle = '#9fd0ff';
-    c.fillRect(8, 8, 240, 110);
-    c.fillStyle = '#6fbf5f';
-    c.fillRect(8, 118, 240, 74);
-    c.fillStyle = '#f7c843';
-    c.beginPath();
-    c.arc(205, 45, 24, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#e2574c';
-    c.fillRect(60, 85, 80, 60);
+    c.strokeStyle = '#d4af6a';
+    c.lineWidth = 8;
+    c.strokeRect(6, 6, 244, 188);
+    c.textAlign = 'center';
+    c.font = '64px sans-serif';
+    c.fillText('🎂', 128, 92);
+    c.fillStyle = '#c0392b';
+    c.font = '800 30px sans-serif';
+    c.fillText('Happy Birthday', 128, 140);
     c.fillStyle = '#8a3b2e';
-    c.beginPath();
-    c.moveTo(50, 88);
-    c.lineTo(100, 45);
-    c.lineTo(150, 88);
-    c.fill();
-    c.fillStyle = '#5b3a1a';
-    c.fillRect(90, 115, 20, 30);
+    c.font = '700 26px sans-serif';
+    c.fillText('Grandma ♥', 128, 176);
   });
   const g = new THREE.Group();
   g.add(mesh(new THREE.PlaneGeometry(0.34, 0.27), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), { shadow: false }));
@@ -825,7 +780,7 @@ const GAP = 8;
 // ---- Stages: one little world per story ---------------------------------------------------
 
 /** A room with its own camera and lights; `light()` sets the time of day (or a power cut). */
-function makeStage({ street } = {}) {
+function makeStage() {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x0b1122, 6, 14);
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
@@ -844,18 +799,6 @@ function makeStage({ street } = {}) {
   const room = makeRoom();
   scene.add(room);
   const stage = { scene, camera, room, view: null, power: 1, sky: null };
-  if (street) {
-    stage.street = makeStreet(street);
-    stage.street.visible = false;
-    scene.add(stage.street);
-  }
-  /** 'home' (the living room) or 'street' (outside the school). */
-  stage.place = where => {
-    room.visible = where === 'home';
-    if (stage.street) stage.street.visible = where === 'street';
-    if (stage.calendar) stage.calendar.visible = where === 'home';
-    scene.fog.color.set(where === 'street' ? 0x9fd0ff : stage.sky.bg);
-  };
   stage.light = sky => {
     stage.sky = sky;
     scene.background = new THREE.Color(sky.bg);
@@ -865,7 +808,6 @@ function makeStage({ street } = {}) {
     room.userData.sky.scale.setScalar(sky.sun ? 1.5 : 1);
     room.userData.sky.visible = Boolean(sky.moon || sky.sun);
     stage.setPower(1);
-    stage.place('home');
   };
   /** 1 is normal light, 0 a power cut (only the moonlight left). */
   stage.setPower = level => {
@@ -889,12 +831,12 @@ function addThings(stage) {
   });
 }
 
-/** Small things whirl around a busy head. */
+/** Small things whirl around a busy person at waist height, never in front of a face. */
 function whirl(things, t, centerX) {
   things.forEach((thing, i) => {
     const a = t * 1.3 + (i / things.length) * Math.PI * 2;
     thing.visible = true;
-    thing.position.set(Math.cos(a) * 0.9 + centerX * 0.5, 1.4 + 0.16 * Math.sin(t * 2 + i), Math.sin(a) * 0.45 + 0.3);
+    thing.position.set(Math.cos(a) * 0.75 + centerX, 0.75 + 0.08 * Math.sin(t * 2 + i), Math.sin(a) * 0.4);
     thing.rotation.set(t * 0.7 + i, t + i, 0);
     if (thing.userData.spin) thing.userData.spin.rotation.z = -t * 6;
     thing.scale.setScalar(0.6 + 0.4 * ease(seg(t, 0.1 * i, 0.1 * i + 0.6)));
@@ -917,7 +859,7 @@ function busyDay(p, t, stopAt) {
   }
 }
 
-/** A phone floating in front, ringing between a and b. */
+/** A phone floating between Aarav and Mom (clear of their faces), ringing between a and b. */
 function ringPhone(phone, t, a, b, { x = 0.35, y = 1.35, scale = 0.5 } = {}) {
   phone.visible = true;
   phone.scale.setScalar(scale * ease(seg(t, a - 0.3, a + 0.1)) + 0.001);
@@ -941,27 +883,22 @@ function cast(stage, spec) {
   return p;
 }
 
-// The art school story.
-const B = makeStage({ street: 'CITY ART SCHOOL' });
+// Grandma's birthday story: it all happens at home.
+const B = makeStage();
 B.aarav = cast(B, AARAV);
 B.mom = cast(B, MOM);
 B.phone = makePhone();
-B.drawing = makeDrawing();
-B.closed = makeBoard(['ADMISSIONS', 'Closed on 8 March'], '#b71c1c');
-B.confirmed = makeBoard(['ADMITTED ✓', 'Welcome, Aarav!'], '#2e7d32');
+B.card = makeCard();
 B.calendar = makeCalendar([
-  ['NOV', '1', 'Opens 1 March'],
-  ['DEC', '1', ''],
-  ['JAN', '1', ''],
-  ['FEB', '1', ''],
-  ['MAR', '1', 'Admissions open'],
-  ['MAR', '10', 'Too late'],
+  ['OCT', '12', 'In 2 days: Grandma 🎂'],
+  ['OCT', '13', ''],
+  ['OCT', '14', 'Grandma’s birthday'],
+  ['OCT', '15', 'One day late'],
 ]);
 B.confetti = makeConfetti(90);
 B.things = addThings(B);
-B.scene.add(B.phone, B.drawing, B.closed, B.confirmed, B.calendar, B.confetti);
-
-B.calendar.position.set(1.05, 1.9, -2.15);
+B.scene.add(B.phone, B.card, B.calendar, B.confetti);
+B.calendar.position.set(1.15, 2.05, -2.15);
 
 // Melo's arrival.
 const M = makeStage();
@@ -1081,7 +1018,6 @@ const EVENING = { bg: 0x241b33, window: 0x5a3b6e, moon: false, lamp: 3 };
 const DUSK = { bg: 0x1d2236, window: 0x1b2a52, moon: true, lamp: 5 };
 const MORNING = { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 };
 const MAGIC = { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 };
-const DAY = { bg: 0x9fd0ff, window: 0xbfe3ff, sun: true, lamp: 0 };
 
 /** Panel camera: Aarav and Mom side by side, framed from the knees up. */
 const PANEL_CAM = { x: 0, y: 1.15, z: 4.4, look: [0, 1.25, 0], width: 2.9 };
@@ -1090,19 +1026,10 @@ const PANEL_CAM = { x: 0, y: 1.15, z: 4.4, look: [0, 1.25, 0], width: 2.9 };
  * A scene is either three panels (`panels`: one entry per story, each with
  * its own setup and update) or one full-screen stage.
  */
-/** Moves a stage outside the school (or back home) at most once per scene. */
-function goOutside(stage, sky) {
-  if (stage.outside) return false;
-  stage.outside = true;
-  stage.light(sky);
-  stage.place('street');
-  return true;
-}
-
-/** A hand-held prop (the form, the drawing) follows a person's right hand. */
+/** A hand-held prop (the card) at chest height beside the body, below the face. */
 function inHand(prop, p, raise = 0) {
   prop.visible = true;
-  prop.position.set(p.root.position.x + 0.28, p.hips.position.y + 0.45 + raise, p.root.position.z + 0.3);
+  prop.position.set(p.root.position.x + 0.34, p.hips.position.y + 0.12 + raise, p.root.position.z + 0.3);
   prop.rotation.set(-0.15, -0.3, 0.05);
 }
 
@@ -1112,7 +1039,7 @@ const STORY_CAM = { x: 0, y: 1.1, z: 4.6, look: [0, 1.15, 0], width: 2.8 };
 /** Each scene sets things up once, then poses everyone for time t (seconds). */
 const SCENES = [
   {
-    // Aarav shows Mom his drawing: admissions open on 1 March, four months away.
+    // Aarav shows Mom the card he made: Grandma's birthday is in 2 days.
     stage: B,
     sky: DUSK,
     camera: STORY_CAM,
@@ -1122,14 +1049,14 @@ const SCENES = [
       B.mom.root.position.set(0.65, 0, 0);
       B.mom.root.rotation.y = -0.45;
       B.calendar.userData.show(0);
-      say(B, B.aarav, 'Mom, the art school admissions open on 1 March! That’s 4 months away.', 1.4, { until: 5.6 });
-      say(B, B.mom, 'Four months? I’ll remember, don’t worry.', 5.8, { gold: true });
+      say(B, B.aarav, 'Mom, Grandma’s birthday is in 2 days! Please remind me to call her. 🎂', 1.4, { until: 5.6 });
+      say(B, B.mom, 'Just 2 days? I’ll remember, don’t worry.', 5.8, { gold: true });
     },
     update(t) {
-      moves.walk(B.aarav, t, 0, 1.3, -2.4, -0.55, 0.5);
+      moves.walk(B.aarav, t, 0, 1.3, -2.4, -0.6, 0.5);
       const raise = bump(seg(t, 2.6, 5.0));
-      inHand(B.drawing, B.aarav, 0.25 * raise);
-      moves.hold(B.aarav, 0.8 + 0.4 * raise);
+      inHand(B.card, B.aarav, 0.1 * raise);
+      moves.hold(B.aarav, 0.6 + 0.2 * raise);
       moves.talk(B.aarav, t, 1.5, 5.2);
       moves.clap(B.mom, t, 3.2, 4.8);
       moves.talk(B.mom, t, 5.9, 7.8);
@@ -1137,46 +1064,46 @@ const SCENES = [
     },
   },
   {
-    // Four months fly by, Mom forgets, and the admissions close.
+    // Two busy days fly by, Mom forgets, and the birthday passes.
     stage: B,
     sky: EVENING,
     camera: STORY_CAM,
     setup() {
-      B.outside = false;
       B.mom.setMood('happy');
-      B.mom.root.position.set(0, 0, 0);
+      B.mom.root.position.set(0.2, 0, 0);
       B.calendar.userData.show(0);
-      say(B, B.mom, 'Admissions… March… I’ll remember.', 0.8, { thought: true, until: 4.6 });
-      say(B, B.aarav, 'Admissions closed on 8 March… we missed it. 😞', 5.8, { until: 8.8 });
-      say(B, B.mom, 'I’m so sorry, beta… I forgot.', 9.0, { gold: true });
+      say(B, B.mom, 'Grandma… birthday… I’ll remember.', 0.8, { thought: true, until: 4.6 });
+      say(B, B.aarav, 'Mom… Grandma’s birthday was yesterday. We forgot to call her. 😞', 5.6, { until: 9.0 });
+      say(B, B.mom, 'Oh no, beta… I forgot.', 9.2, { gold: true });
     },
     update(t) {
       if (t < 4.7) {
-        tearPages(B.calendar, t);
+        const p = Math.min(t / 1.4, 2.999);
+        B.calendar.userData.show(Math.floor(p) + 1, p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
         busyDay(B.mom, t, 99);
         whirl(B.things, t, B.mom.root.position.x);
         return;
       }
-      if (goOutside(B, DAY)) {
+      if (!B.settled) {
+        B.settled = true;
         B.things.forEach(th => (th.visible = false));
-        B.aarav.setMood('happy');
-        B.mom.setMood('happy');
-        B.aarav.root.position.set(-0.55, 0, 0.3);
-        B.aarav.root.rotation.y = 0.3;
-        B.mom.root.position.set(-1.2, 0, 0.1);
-        B.mom.root.rotation.y = 0.4;
-        B.closed.visible = true;
+        B.calendar.userData.show(3);
+        B.aarav.root.position.set(-0.6, 0, 0.2);
+        B.aarav.root.rotation.y = 0.4;
+        B.mom.root.position.set(0.6, 0, 0);
+        B.mom.root.rotation.y = -0.4;
       }
       const k = t - 4.7;
-      B.closed.position.set(0.65, lerp(3.4, 1.6, ease(seg(k, 0.2, 0.7))) + 0.04 * bump(seg(k, 0.7, 1.0)), 0.1);
-      inHand(B.drawing, B.aarav);
-      moves.hold(B.aarav, 0.7);
-      if (k > 0.9) {
+      inHand(B.card, B.aarav);
+      moves.hold(B.aarav, 0.5);
+      if (k > 0.8) {
         B.aarav.setMood('sad');
-        moves.sad(B.aarav, ease(seg(k, 0.9, 1.6)));
+        moves.sad(B.aarav, ease(seg(k, 0.8, 1.5)));
       }
-      if (k > 4.0) B.mom.setMood('sad');
-      moves.think(B.mom, t, 8.8, 99);
+      if (k > 4.4) {
+        B.mom.setMood('sad');
+        moves.sad(B.mom, 0.35 * ease(seg(k, 4.4, 5.0)));
+      }
     },
   },
   {
@@ -1191,7 +1118,7 @@ const SCENES = [
       M.aarav.root.rotation.y = 0.55;
       M.mom.root.position.set(1.25, 0, -0.1);
       M.mom.root.rotation.y = -0.55;
-      say(M, M.melo, 'Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on the day.', 2.0, { gold: true });
+      say(M, M.melo, 'Hi, I’m Melo! Tell Memo once, days or months ahead, and I’ll remind you right on the day.', 2.0, { gold: true });
     },
     update(t) {
       const drop = seg(t, 0, 0.9);
@@ -1215,65 +1142,67 @@ const SCENES = [
     },
   },
   {
-    // This time Mom saves it in Memo, four months ahead; on 1 March it rings.
+    // This time Mom saves it in Memo; on the birthday it reminds her and Aarav calls Grandma.
     stage: B,
     sky: MORNING,
     camera: STORY_CAM,
     setup() {
-      B.outside = false;
       B.aarav.setMood('happy');
       B.mom.setMood('happy');
-      B.aarav.root.position.set(-0.6, 0, 0);
+      B.aarav.root.position.set(-0.65, 0, 0);
       B.aarav.root.rotation.y = 0.4;
-      B.mom.root.position.set(0.55, 0, 0);
+      B.mom.root.position.set(0.65, 0, 0);
       B.mom.root.rotation.y = -0.4;
       B.calendar.userData.show(0);
-      B.phone.userData.draw({ type: 'saved', emoji: '🎨', title: 'Art school admissions', date: '1 March · 9:00 AM', sub: 'In 4 months · Memo will remind you' });
+      B.phone.userData.draw({ type: 'saved', emoji: '🎂', title: 'Call Grandma: birthday', date: '14 Oct · 8:00 AM', sub: 'In 2 days · Memo will remind you' });
       B.phone.userData.screen = 'saved';
-      say(B, B.mom, 'Saved in Memo, for 1 March. Done! ✅', 1.2, { gold: true, until: 3.4 });
-      say(B, B.aarav, 'I got in! Thank you, Mom! 🎨', 10.4);
+      say(B, B.mom, 'Saved in Memo, for 14 October. Done! ✅', 1.2, { gold: true, until: 3.4 });
+      say(B, B.aarav, 'Happy birthday, Grandma! 🎂 I made you a card!', 9.4, { until: 12.2 });
+      say(B, B.mom, 'She’s so happy! Thank you, Memo. 💛', 12.4, { gold: true });
     },
     update(t) {
-      inHand(B.drawing, B.aarav);
-      moves.hold(B.aarav, 0.7);
+      inHand(B.card, B.aarav);
+      moves.hold(B.aarav, 0.5);
+      const phone = { x: 0.0, y: 1.3 };
       if (t < 3.4) {
-        // Mom saves the reminder months ahead.
-        // (No ringing here: it appears at 0.3 s and just shows the saved reminder.)
-        ringPhone(B.phone, t, 0.3, 0.3, { x: 0.0, y: 1.3, scale: 0.95 * (1 - ease(seg(t, 3.0, 3.4))) + 0.001 });
+        // Mom saves the reminder two days ahead. (No ringing: it just shows it's saved.)
+        ringPhone(B.phone, t, 0.3, 0.3, { ...phone, scale: 0.9 * (1 - ease(seg(t, 3.0, 3.4))) + 0.001 });
         moves.talk(B.mom, t, 1.3, 3.0);
         return;
       }
-      if (t < 5.6) {
-        // The months fly by…
+      if (t < 4.8) {
+        // The two days fly by…
         B.phone.visible = false;
-        const p = Math.min((t - 3.4) / 0.5, 4);
-        B.calendar.userData.show(Math.min(Math.floor(p) + 1, 4), p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
+        const p = Math.min((t - 3.4) / 0.6, 2);
+        B.calendar.userData.show(Math.min(Math.floor(p) + 1, 2), p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
         return;
       }
-      if (t < 8.8) {
-        // …and on 1 March, Memo rings.
+      B.calendar.userData.show(2);
+      if (t < 8.4) {
+        // …and on 14 October, Memo reminds her.
         if (B.phone.userData.screen !== 'ring') {
-          B.phone.userData.draw({ type: 'ring', time: '9:00', date: '1 March', emoji: '🎨', title: 'Art school admissions', sub: 'Open today · apply now' });
+          B.phone.userData.draw({ type: 'ring', time: '8:00', date: '14 October', emoji: '🎂', title: 'Grandma’s birthday', sub: 'Call her today' });
           B.phone.userData.screen = 'ring';
         }
-        B.calendar.userData.show(4);
-        ringPhone(B.phone, t, 5.9, 7.8, { x: 0.0, y: 1.3, scale: 0.95 * (1 - ease(seg(t, 8.3, 8.75))) + 0.001 });
-        if (t > 6.2) moves.nod(B.mom, t, 6.2, 7.4);
+        ringPhone(B.phone, t, 5.1, 7.4, { ...phone, scale: 0.9 });
+        if (t > 5.6) B.aarav.setMood('surprised');
+        if (t > 6.6) B.aarav.setMood('happy');
+        moves.nod(B.mom, t, 5.6, 6.8);
+        moves.clap(B.aarav, t, 6.8, 8.0);
         return;
       }
-      if (goOutside(B, DAY)) {
-        B.phone.visible = false;
-        B.confirmed.visible = true;
-        B.mom.root.position.set(-1.1, 0, 0.1);
-        B.mom.root.rotation.y = 0.4;
+      // The video call with Grandma.
+      if (B.phone.userData.screen !== 'call') {
+        B.phone.userData.draw({ type: 'call' });
+        B.phone.userData.screen = 'call';
       }
-      const k = t - 8.8;
-      B.confirmed.position.set(0.65, lerp(3.4, 1.6, ease(seg(k, 0.1, 0.6))), 0.1);
-      inHand(B.drawing, B.aarav, 0.25 * bump(seg(k, 0.8, 2.2)));
-      moves.jump(B.aarav, t, 9.6, 10.8);
-      moves.clap(B.mom, t, 9.8, 11.6);
-      B.confetti.visible = k > 0.8;
-      if (B.confetti.visible) B.confetti.userData.update(k - 0.8);
+      ringPhone(B.phone, t, 0, 0, { ...phone, scale: 0.9 });
+      moves.wave(B.aarav, t, 8.6, 11.0, 'L');
+      moves.talk(B.aarav, t, 9.5, 12.0);
+      moves.clap(B.mom, t, 12.4, 14.0);
+      const k = t - 9.4;
+      B.confetti.visible = k > 0;
+      if (B.confetti.visible) B.confetti.userData.update(k);
     },
   },
   {
@@ -1301,20 +1230,14 @@ const SCENES = [
   },
 ];
 
-/** A calendar page tears off about every second, as weeks go by. */
-function tearPages(calendar, t) {
-  const p = Math.min(t / 1.05, 4.999);
-  calendar.userData.show(Math.floor(p) + 1, p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
-}
-
 // ---- Playing ------------------------------------------------------------------------------
 
 let current = -1;
 let startedAt = 0;
 
 function resetStage(stage) {
-  for (const key of ['phone', 'drawing', 'closed', 'confirmed', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
-  stage.outside = false;
+  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
+  stage.settled = false;
   if (stage.things) stage.things.forEach(th => (th.visible = false));
   if (stage.phone) stage.phone.userData.paid = undefined;
   if (stage.calendar) stage.calendar.userData.show(0);

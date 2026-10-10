@@ -54,6 +54,7 @@ import {
   useUpdateSettingsMutation,
   type SettingsUpdate,
 } from '../../users/usersApi';
+import { usePhotoActions } from '../../users/usePhotoActions';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -69,6 +70,7 @@ const AUTOLOCK = [
 export function SettingsScreen() {
   const navigation = useNavigation<Nav>();
   const me = useGetMeQuery();
+  const photoActions = usePhotoActions();
   const vault = useGetVaultStatusQuery();
   const refreshToken = useAppSelector(selectRefreshToken);
   const [updateSettings] = useUpdateSettingsMutation();
@@ -171,7 +173,7 @@ export function SettingsScreen() {
       <ScreenHeader title="Settings" subtitle="Preferences" />
 
       <Card tone="hero" contentStyle={styles.member}>
-        <Avatar name={me.data.display_name} emoji={me.data.avatar} size={58} />
+        <Avatar name={me.data.display_name} emoji={me.data.avatar} photo={me.data.photo_url} size={58} />
         <View style={styles.flex}>
           <Text style={styles.memberName} numberOfLines={1}>
             {me.data.display_name}
@@ -197,6 +199,13 @@ export function SettingsScreen() {
       <SectionHeader title="Account" />
       <ListGroup>
         <ListRow icon="user" title="Display name" value={me.data.display_name} onPress={() => { setName(me.data!.display_name); setSheet('name'); }} />
+        <ListRow
+          icon="camera"
+          title="Profile photo"
+          subtitle={me.data.photo_url ? 'Tap to change. Up to 10 MB' : 'Add a photo, up to 10 MB'}
+          value={photoActions.uploading ? 'Uploading…' : undefined}
+          onPress={photoActions.change}
+        />
         <ListRow icon="tag" title="User ID" value={me.data.public_id} />
         <ListRow icon="message" title="Email" value={me.data.email} />
         <ListRow icon="key" title="Password" subtitle="Change your password" onPress={() => navigation.navigate('ChangePassword')} />
@@ -322,7 +331,8 @@ export function SettingsScreen() {
           <>
             {toggle('show_current_streak', 'Show current streak', undefined, false, 'flame')}
             {toggle('show_best_streak', 'Show best streak', undefined, false, 'trophy')}
-            {toggle('show_achievements', 'Show achievements', undefined, true, 'award')}
+            {toggle('show_achievements', 'Show achievements', undefined, false, 'award')}
+            {toggle('show_photo', 'Show profile photo', 'Off: others see your initials', true, 'camera')}
           </>
         ) : null}
       </ListGroup>

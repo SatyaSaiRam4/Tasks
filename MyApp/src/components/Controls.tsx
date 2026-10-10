@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { brand, colors, font, gradients, hitSlop, radius, shadow, spacing, TAB_BAR_HEIGHT, TOUCH_TARGET, type as t, withAlpha } from '../theme';
 import { useMotion } from '../hooks/useMotion';
@@ -7,6 +7,8 @@ import { useLayout } from '../hooks/useLayout';
 import { easeOut, usePressScale } from '../animations';
 import { Glow, Gradient } from './Gradient';
 import { Icon, type IconName } from './Icon';
+import { useAppSelector } from '../app/hooks';
+import { API_BASE_URL } from '../config/env';
 
 // ---- IconButton ---------------------------------------------------------------
 
@@ -238,7 +240,11 @@ export function GoldRule({ style }: { style?: StyleProp<ViewStyle> }) {
 // ---- Avatar -------------------------------------------------------------------------
 
 /** Initials (or an emoji) on midnight, inside a fine champagne ring. */
-export function Avatar({ name, emoji, size = 44 }: { name: string; emoji?: string | null; size?: number }) {
+export function Avatar({ name, emoji, photo, size = 44 }: { name: string; emoji?: string | null; photo?: string | null; size?: number }) {
+  // Photos are served only to signed-in users, so the request carries the token.
+  const token = useAppSelector(s => s.auth.accessToken);
+  const [failed, setFailed] = useState<string | null>(null);
+  const showPhoto = !!photo && failed !== photo;
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -249,10 +255,19 @@ export function Avatar({ name, emoji, size = 44 }: { name: string; emoji?: strin
   return (
     <Gradient colors={gradients.gold} borderRadius={size / 2} style={{ width: size, height: size, padding: ring }}>
       <Gradient colors={gradients.hero} borderRadius={size / 2} style={styles.avatarInner}>
-        {/* A natural line height (no fixed one), so the glyph is never clipped by the circle. */}
-        <Text style={[styles.avatarText, emoji ? font.regular : font.bold, { fontSize: size * (emoji ? 0.46 : initials.length > 1 ? 0.36 : 0.42) }]}>
-          {emoji || initials || '•'}
-        </Text>
+        {showPhoto ? (
+          <Image
+            source={{ uri: `${API_BASE_URL}${photo}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined }}
+            style={{ width: size - ring * 2, height: size - ring * 2, borderRadius: size / 2 }}
+            onError={() => setFailed(photo)}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          // A natural line height (no fixed one), so the glyph is never clipped by the circle.
+          <Text style={[styles.avatarText, emoji ? font.regular : font.bold, { fontSize: size * (emoji ? 0.46 : initials.length > 1 ? 0.36 : 0.42) }]}>
+            {emoji || initials || '•'}
+          </Text>
+        )}
       </Gradient>
     </Gradient>
   );

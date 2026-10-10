@@ -12,11 +12,11 @@ import { Kid, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): Aarav tells Mom the art school admissions open on
- * 1 March, four months away. The months fly by, she forgets, and they miss
- * it. Melo arrives: tell Memo once, even months ahead, and it reminds you
- * on the day. This time Mom saves it in Memo once; on 1 March it reminds
- * her, and Aarav gets in. Ends on what the app does. Plays like a phone
+ * again from Settings): Aarav asks Mom to remind him of Grandma's
+ * birthday, two days away. Two busy days fly by, she forgets, and they miss
+ * the call. Melo arrives: tell Memo once, days or months ahead, and it
+ * reminds you on the day. This time Mom saves it in Memo; on the birthday it
+ * reminds her, and Aarav calls Grandma. Ends on what the app does. Plays like a phone
  * "story": it moves on by itself; tap the right side for next, the left for
  * back.
  *
@@ -34,10 +34,10 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Aarav. Something big is 4 months away.', duration: 9500, Body: ArtAskScene },
-  { caption: 'Four months fly by… and then…', duration: 12000, Body: ArtMissedScene },
+  { caption: 'Meet Aarav. Grandma’s birthday is in 2 days.', duration: 9500, Body: AskScene },
+  { caption: 'Two busy days fly by… and then…', duration: 12500, Body: MissedScene },
   { caption: 'That’s why Memo is here.', duration: 8000, Body: SatyaScene },
-  { caption: 'This time, Mom tells Memo, months ahead.', duration: 13500, Body: RemindScene },
+  { caption: 'This time, Mom tells Memo.', duration: 15000, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -254,23 +254,23 @@ function DuoRow({ line, index }: { line: Line; index: number }) {
   );
 }
 
-function ArtAskScene() {
+function AskScene() {
   return (
     <Duo
       lines={[
-        { who: 'Aarav', mood: 'happy', text: 'Mom, art school admissions open on 1 March! That’s 4 months away.' },
-        { who: 'Mom', mood: 'happy', text: 'Four months? I’ll remember, don’t worry.' },
+        { who: 'Aarav', mood: 'happy', text: 'Mom, Grandma’s birthday is in 2 days! Please remind me to call her. 🎂' },
+        { who: 'Mom', mood: 'happy', text: 'Just 2 days? I’ll remember, don’t worry.' },
       ]}
     />
   );
 }
 
-function ArtMissedScene() {
+function MissedScene() {
   return (
     <Duo
       lines={[
-        { who: 'Aarav', mood: 'sad', text: 'Admissions closed on 8 March… we missed it. 😞' },
-        { who: 'Mom', mood: 'sad', text: 'I’m so sorry, beta… I forgot.' },
+        { who: 'Aarav', mood: 'sad', text: 'Mom… Grandma’s birthday was yesterday. We forgot to call her. 😞' },
+        { who: 'Mom', mood: 'sad', text: 'Oh no, beta… I forgot.' },
       ]}
     />
   );
@@ -280,7 +280,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on the day." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! Tell Memo once, days or months ahead, and I’ll remind you right on the day." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />
@@ -293,8 +293,8 @@ function RemindScene() {
   return (
     <Duo
       lines={[
-        { who: 'Mom', mood: 'happy', text: 'Saved in Memo, for 1 March. Done! ✅' },
-        { who: 'Aarav', mood: 'happy', text: '“Art school admissions open today” — I got in! 🎨' },
+        { who: 'Mom', mood: 'happy', text: 'Saved in Memo, for 14 October. Done! ✅' },
+        { who: 'Aarav', mood: 'happy', text: 'Happy birthday, Grandma! 🎂 I made you a card!' },
       ]}
     />
   );

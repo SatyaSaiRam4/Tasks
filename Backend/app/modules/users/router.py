@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit
@@ -20,6 +20,22 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
 @router.patch("/me", response_model=MeOut)
 def update_me(payload: ProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return service.update_profile(db, current_user, payload.model_dump(exclude_unset=True))
+
+
+@router.put("/me/photo", response_model=MeOut)
+async def upload_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit.hit(f"photo-upload:{current_user.id}", limit=10, window_seconds=600)
+    data = await file.read(service.MAX_PHOTO_BYTES + 1)
+    return service.set_photo(db, current_user, data, (file.content_type or "").lower())
+
+
+@router.delete("/me/photo", response_model=MeOut)
+def delete_photo(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return service.delete_photo(db, current_user)
 
 
 @router.get("/me/profile", response_model=MyProfileOut)
@@ -55,3 +71,14 @@ def search(
 ):
     rate_limit.hit(f"user-search:{current_user.id}", limit=20, window_seconds=60)
     return service.public_profile(db, public_id)
+
+
+@router.get("/{public_id}/photo")
+def get_photo(
+    public_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    data, mime = service.get_photo(db, public_id, current_user)
+    # The URL carries a version, so a changed photo has a new URL.
+    return Response(content=data, media_type=mime, headers={"Cache-Control": "private, max-age=86400"})

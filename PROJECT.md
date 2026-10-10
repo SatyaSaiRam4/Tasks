@@ -186,12 +186,11 @@ component names still say "category", e.g. `CategoryCard`).
   breath, plus gestures (`talk`, `wave`, `hop`, `nod`, `spin`, `lookLeft`,
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
-- New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`)
-  that shows what an alarm can't do: Aarav tells Mom the art school
-  admissions open on 1 March, four months away; the months fly by and she
-  forgets. Melo says: tell Memo once, even months ahead, and it reminds you on
-  the day; Mom saves
-  the reminder once, it rings on 1 March, and Aarav gets in. It plays in 3D
+- New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
+  Aarav asks Mom to remind him of Grandma's birthday in 2 days; two busy
+  days fly by and she forgets. Melo says: tell Memo once, days or months
+  ahead, and it reminds you on the day; Mom saves it in Memo, it reminds her
+  on 14 October, and Aarav video-calls Grandma with his card. It plays in 3D
   (three.js, `web/story`); flat illustrated scenes are the fallback. It plays
   once per account on a device, then Melo's tour runs; both replay from
   Settings.
@@ -205,7 +204,7 @@ component names still say "category", e.g. `CategoryCard`).
 ### Nginx
 
 - `deploy/nginx/nginx.conf` puts Nginx in front of uvicorn: keep-alive
-  upstream connections, gzip, timeouts and a 2 MB body limit. API responses
+  upstream connections, gzip, timeouts and an 11 MB body limit (profile photos are up to 10 MB). API responses
   are per-user and are never cached (`Cache-Control: no-store`).
 - `deploy/docker-compose.yml` runs `api` (built from `Backend/Dockerfile`,
   reading `Backend/.env`, running `alembic upgrade head` on start) and `nginx`
@@ -433,3 +432,24 @@ have streaks). Keep it honest: update the table when those apps change.
   (`src/widget`) whenever Home's data changes, and clears them on logout.
   Nothing from the Vault is shown. Long-press the home screen → Widgets →
   Memo to add it.
+- The recorder is created lazily and guarded (`makeSound()`), so a build
+  without the native module shows the note without the voice part instead of
+  crashing when you add a note.
+
+## Profile photos and the header menu
+
+- The top bar of every tab shows the user's profile picture
+  (`modules/users/ProfileMenu.tsx`). Tapping it opens a menu: the photo with
+  Add/Change/Remove, then Find a friend (search by User ID), Wallet and
+  Settings, each with its icon. Settings → Account → Profile photo changes it too.
+- Photos are picked from the gallery with `react-native-image-picker`
+  (resized to 800 px), up to 10 MB, JPEG/PNG/WebP/HEIC. `PUT /users/me/photo`
+  (multipart) stores them in `users.photo` (never loaded in lists), with
+  `photo_mime` and `photo_version`; `DELETE /users/me/photo` removes it.
+- `GET /users/{public_id}/photo` needs sign-in. The owner always sees it;
+  others only when the profile is public and Settings → Privacy → Show
+  profile photo is on (`user_settings.show_photo`, on by default). Anything
+  else is a 404, like a missing user. `photo_url` in `/users/me` and in the
+  friend search carries the version, so a changed photo is fetched fresh.
+  Searching a friend's User ID shows their photo when they allow it.
+- Migration `f4b9d2e61c08` adds the columns: run `alembic upgrade head`.

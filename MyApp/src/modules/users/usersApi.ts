@@ -17,6 +17,8 @@ export interface UserSettings {
   show_current_streak: boolean;
   show_best_streak: boolean;
   show_achievements: boolean;
+  /** Others who find you can see your profile photo. */
+  show_photo: boolean;
 }
 
 export interface Me {
@@ -25,6 +27,8 @@ export interface Me {
   display_name: string;
   public_id: string;
   avatar: string | null;
+  /** API path of the profile photo (with a version), or null. */
+  photo_url: string | null;
   timezone: string;
   role: 'USER' | 'ADMIN';
   created_at: string;
@@ -61,6 +65,7 @@ export interface PublicProfile {
   display_name: string;
   public_id: string;
   avatar: string | null;
+  photo_url: string | null;
   member_since: string;
   current_streak: number | null;
   best_streak: number | null;
@@ -130,6 +135,20 @@ export const usersApi = baseApi.injectEndpoints({
       },
     }),
 
+    uploadPhoto: builder.mutation<Me, { uri: string; type: string; name: string }>({
+      query: ({ uri, type, name }) => {
+        const form = new FormData();
+        form.append('file', { uri, name, type } as unknown as Blob);
+        return { url: '/users/me/photo', method: 'PUT', body: form };
+      },
+      invalidatesTags: ['Me', 'Profile'],
+    }),
+
+    deletePhoto: builder.mutation<Me, void>({
+      query: () => ({ url: '/users/me/photo', method: 'DELETE' }),
+      invalidatesTags: ['Me', 'Profile'],
+    }),
+
     getMyProfile: builder.query<MyProfile, void>({
       query: () => '/users/me/profile',
       providesTags: ['Profile'],
@@ -189,6 +208,8 @@ export const usersApi = baseApi.injectEndpoints({
 export const {
   useGetMeQuery,
   useUpdateMeMutation,
+  useUploadPhotoMutation,
+  useDeletePhotoMutation,
   useGetMyProfileQuery,
   useUpdateSettingsMutation,
   useCompleteOnboardingMutation,

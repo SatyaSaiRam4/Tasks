@@ -43,6 +43,52 @@ def ensure_settings(db: Session, user_id) -> UserSettings:
     return settings
 
 
+def photo_url(user: User) -> str | None:
+    return f"/users/{user.public_id}/photo?v={user.photo_version}" if user.photo_mime else None
+
+
+MAX_PHOTO_BYTES = 10 * 1024 * 1024
+PHOTO_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"}
+
+
+def set_photo(db: Session, user: User, data: bytes, mime: str) -> MeOut:
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The photo is empty.")
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Photos can be up to 10 MB.")
+    if mime not in PHOTO_TYPES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Choose a JPEG, PNG or WebP photo.")
+    user.photo = data
+    user.photo_mime = "image/jpeg" if mime == "image/jpg" else mime
+    user.photo_version += 1
+    db.commit()
+    db.refresh(user)
+    return me(db, user)
+
+
+def delete_photo(db: Session, user: User) -> MeOut:
+    user.photo = None
+    user.photo_mime = None
+    user.photo_version += 1
+    db.commit()
+    db.refresh(user)
+    return me(db, user)
+
+
+def get_photo(db: Session, public_id: str, viewer: User) -> tuple[bytes, str]:
+    """The photo, for its owner always, for others only if they show it on a
+    public profile. Anything else is the same 404, so IDs can't be probed."""
+    not_found = HTTPException(status.HTTP_404_NOT_FOUND, "No photo.")
+    user = db.scalar(select(User).where(func.upper(User.public_id) == public_id.strip().upper()))
+    if user is None or not user.is_active or user.photo_mime is None:
+        raise not_found
+    if viewer.id != user.id:
+        settings = ensure_settings(db, user.id)
+        if not (settings.is_public_profile and settings.show_photo):
+            raise not_found
+    return user.photo, user.photo_mime
+
+
 def me(db: Session, user: User) -> MeOut:
     settings = ensure_settings(db, user.id)
     db.commit()
@@ -52,6 +98,7 @@ def me(db: Session, user: User) -> MeOut:
         display_name=user.display_name,
         public_id=user.public_id,
         avatar=user.avatar,
+        photo_url=photo_url(user),
         timezone=user.timezone,
         role=user.role.value,
         created_at=user.created_at,
@@ -157,6 +204,7 @@ def public_profile(db: Session, public_id: str) -> PublicProfileOut:
         display_name=user.display_name,
         public_id=user.public_id,
         avatar=user.avatar,
+        photo_url=photo_url(user) if settings.show_photo else None,
         member_since=user.created_at.date(),
         current_streak=stats.current_streak if settings.show_current_streak else None,
         best_streak=stats.best_streak if settings.show_best_streak else None,
