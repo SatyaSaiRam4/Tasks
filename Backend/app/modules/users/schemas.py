@@ -41,6 +41,7 @@ class SettingsOut(BaseModel):
     show_current_streak: bool
     show_best_streak: bool
     show_achievements: bool
+    show_photo: bool
 
 
 class SettingsUpdate(BaseModel):
@@ -59,6 +60,7 @@ class SettingsUpdate(BaseModel):
     show_current_streak: bool | None = None
     show_best_streak: bool | None = None
     show_achievements: bool | None = None
+    show_photo: bool | None = None
 
     @field_validator("confirmation_mode")
     @classmethod
@@ -88,6 +90,8 @@ class MeOut(BaseModel):
     display_name: str
     public_id: str
     avatar: str | None
+    # Path of the profile photo under the API (with a version), or null.
+    photo_url: str | None = None
     timezone: str
     role: str
     created_at: datetime
@@ -119,6 +123,7 @@ class PublicProfileOut(BaseModel):
     display_name: str
     public_id: str
     avatar: str | None
+    photo_url: str | None = None
     member_since: date
     current_streak: int | None
     best_streak: int | None

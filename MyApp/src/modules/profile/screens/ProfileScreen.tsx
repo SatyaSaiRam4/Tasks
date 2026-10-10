@@ -46,7 +46,7 @@ export function ProfileScreen() {
               <Sheen color={gradients.heroSheen} inset="20%" />
               <View style={styles.avatarWrap}>
                 <Glow color={brand.champagne} size={200} intensity={0.3} style={styles.avatarGlow} />
-                <Avatar name={data.me.display_name} emoji={data.me.avatar} size={84} />
+                <Avatar name={data.me.display_name} emoji={data.me.avatar} photo={data.me.photo_url} size={84} />
               </View>
               <Text style={[t.title, styles.name]}>{data.me.display_name}</Text>
               <View style={styles.idRow}>

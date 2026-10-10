@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
-import { createSound } from 'react-native-nitro-sound';
+type SoundType = ReturnType<typeof import('react-native-nitro-sound').createSound>;
 import { useAppSelector } from '../../app/hooks';
 import { colors, font, radius, spacing, type as t, withAlpha } from '../../theme';
 import { Icon } from '../../components/Icon';
@@ -15,6 +15,20 @@ const MAX_SECONDS = 4 * 60;
 export interface Recording {
   uri: string;
   seconds: number;
+}
+
+/**
+ * The recorder/player, created on first use. If this build of the app was
+ * made without the audio module (an old install), there is none, and the
+ * note screen simply hides voice notes instead of failing.
+ */
+function makeSound(): SoundType | null {
+  try {
+    const { createSound } = require('react-native-nitro-sound') as typeof import('react-native-nitro-sound');
+    return createSound();
+  } catch {
+    return null;
+  }
 }
 
 const clock = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
@@ -54,7 +68,9 @@ export function VoiceNote({
   onRemove: () => void;
   disabled?: boolean;
 }) {
-  const sound = useRef(createSound()).current;
+  const soundRef = useRef<SoundType | null | undefined>(undefined);
+  if (soundRef.current === undefined) soundRef.current = makeSound();
+  const sound = soundRef.current;
   const accessToken = useAppSelector(s => s.auth.accessToken);
   const vaultToken = useAppSelector(selectVaultToken);
   const [state, setState] = useState<'idle' | 'recording' | 'playing'>('idle');
@@ -67,6 +83,7 @@ export function VoiceNote({
   const length = recording?.seconds ?? (hasSaved ? savedSeconds! : 0);
 
   useEffect(() => {
+    if (!sound) return;
     return () => {
       sound.removeRecordBackListener();
       sound.removePlayBackListener();
@@ -89,6 +106,7 @@ export function VoiceNote({
   }, [state, pulse]);
 
   const stopRecording = async () => {
+    if (!sound) return;
     sound.removeRecordBackListener();
     try {
       const uri = await sound.stopRecorder();
@@ -100,6 +118,7 @@ export function VoiceNote({
   };
 
   const startRecording = async () => {
+    if (!sound) return;
     touchVault();
     if (!(await micAllowed())) {
       Toast.info('Allow the microphone in your phone’s settings to record.', 2.5);
@@ -124,6 +143,7 @@ export function VoiceNote({
   };
 
   const play = async () => {
+    if (!sound) return;
     touchVault();
     try {
       sound.addPlayBackListener(meta => setPosition(meta.currentPosition / 1000));
@@ -146,10 +166,13 @@ export function VoiceNote({
   };
 
   const stopPlaying = async () => {
-    await sound.stopPlayer().catch(() => undefined);
+    await sound?.stopPlayer().catch(() => undefined);
     setState('idle');
     setPosition(0);
   };
+
+  // An install without the audio module: no voice notes, everything else works.
+  if (!sound) return null;
 
   if (state === 'recording') {
     return (

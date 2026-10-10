@@ -6,8 +6,8 @@ import { riseStyle, useEntrance } from '../animations';
 import { useLayout } from '../hooks/useLayout';
 import { Wordmark } from './Brand';
 import { IconButton } from './Controls';
-import { RealIcon } from './RealIcon';
 import { Gradient } from './Gradient';
+import { ProfileMenu } from '../modules/users/ProfileMenu';
 
 /**
  * Header for pushed screens: back/close button, a centered serif title and
@@ -52,18 +52,14 @@ export function ScreenHeader({
   );
 }
 
-type Navigate = { navigate: (...args: unknown[]) => void };
-
 /**
  * The brand bar at the top of every tab: the Memo mark on the left, then
- * screen actions, Search (find a friend by User ID), Wallet and Settings
- * on the right. Reminders and
+ * screen actions and the user's profile picture on the right. The picture
+ * opens a menu with Find a friend, Wallet and Settings. Reminders and
  * Profile live in the tab bar, which is on every screen. With the desktop
  * rail the mark lives in the rail.
  */
 export function TopBar({ actions }: { actions?: React.ReactNode }) {
-  // Loosely typed: this bar is rendered inside both tab and stack screens.
-  const navigation = useNavigation<Navigate>();
   const { hasRail } = useLayout();
   const drop = useEntrance(0, 420);
   return (
@@ -71,9 +67,7 @@ export function TopBar({ actions }: { actions?: React.ReactNode }) {
       {hasRail ? <View /> : <Wordmark size="sm" />}
       <View style={styles.topActions}>
         {actions}
-        <IconButton icon="search" accessibilityLabel="Find a friend by User ID" onPress={() => navigation.navigate('Discover')} />
-        <IconButton glyph={<RealIcon name="wallet" size={24} />} accessibilityLabel="Wallet" onPress={() => navigation.navigate('Wallet')} />
-        <IconButton icon="settings" accessibilityLabel="Settings" onPress={() => navigation.navigate('Settings')} />
+        <ProfileMenu />
       </View>
     </Animated.View>
   );

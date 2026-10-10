@@ -92,7 +92,7 @@ export function DiscoverScreen() {
           <FadeIn>
             <Card>
               <View style={styles.row}>
-                <Avatar name={data.display_name} emoji={data.avatar} size={52} />
+                <Avatar name={data.display_name} emoji={data.avatar} photo={data.photo_url} size={52} />
                 <View style={styles.flex}>
                   <Text style={t.heading}>{data.display_name}</Text>
                   <Text style={styles.publicId}>{data.public_id}</Text>

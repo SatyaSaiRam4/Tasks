@@ -2,10 +2,10 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -35,6 +35,11 @@ class User(Base):
     # IANA zone name; every "which day is it" decision (streaks, today's actions) uses this.
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC", nullable=False)
     avatar: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # A profile photo (JPEG/PNG/WebP, up to 10 MB), loaded only when served.
+    photo: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
+    photo_mime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Bumped on every change, so apps fetch the new photo instead of a cached one.
+    photo_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     onboarding_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
