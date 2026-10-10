@@ -2,7 +2,7 @@
 # awake. Without it, the first request after ~15 idle minutes waits for the
 # server to start (up to about a minute). Free for public repositories.
 #
-# Needs the API_URL repository secret, e.g. https://tasks-xxbg.onrender.com
+# Needs the API_URL repository secret, e.g. https://tasks-singapore.onrender.com
 name: Keep awake
 
 on:

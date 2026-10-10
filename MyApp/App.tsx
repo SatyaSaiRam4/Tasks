@@ -14,6 +14,7 @@ import AntProvider from '@ant-design/react-native/lib/provider';
 import enUS from '@ant-design/react-native/lib/locale-provider/en_US';
 
 import { store } from './src/app/store';
+import { hydrateApiCache, refreshHydrated } from './src/api/persistCache';
 import { useAppDispatch, useAppSelector } from './src/app/hooks';
 import { restoreSession, selectIsAuthenticated, selectIsBootstrapped } from './src/modules/auth/authSlice';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -63,7 +64,13 @@ function AppContent() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   useEffect(() => {
-    dispatch(restoreSession());
+    // Last session's data first, so screens open full; then sign in and refresh it.
+    hydrateApiCache(dispatch)
+      .then(async entries => {
+        await dispatch(restoreSession());
+        refreshHydrated(dispatch, entries);
+      })
+      .catch(() => dispatch(restoreSession()));
     initNotifications().catch(() => {
       // Permission denied: everything still saves, notifications just won't show.
     });

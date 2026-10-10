@@ -87,26 +87,34 @@ export function Kid({ size = 150, mood = 'happy', wave = false }: { size?: numbe
   );
 }
 
-/** The mother: rose kurta with a gold dupatta, hair in a bun, a bindi. */
-export function Mom({ size = 190, mood = 'happy' }: { size?: number; mood?: Mood }) {
+/** A woman in a kurta with a gold dupatta, hair in a bun, a bindi. `colors` sets the kurta. */
+export function Mom({
+  size = 190,
+  mood = 'happy',
+  colors = ['#D8698A', '#8E3A5E'],
+}: {
+  size?: number;
+  mood?: Mood;
+  colors?: [string, string];
+}) {
   const skin = '#E9B48F';
   const hair = '#3B2620';
   return (
     <Svg width={size * (130 / 240)} height={size} viewBox="0 0 130 240">
       <Defs>
-        <LinearGradient id="momKurta" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#D8698A" />
-          <Stop offset="1" stopColor="#8E3A5E" />
+        <LinearGradient id={`kurta${colors[0].slice(1)}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={colors[0]} />
+          <Stop offset="1" stopColor={colors[1]} />
         </LinearGradient>
       </Defs>
       <Ellipse cx={65} cy={232} rx={42} ry={6} fill="#000" opacity={0.25} />
       <Rect x={29} y={68} width={72} height={58} rx={22} fill={hair} />
-      <Rect x={24} y={112} width={14} height={60} rx={7} fill="url(#momKurta)" />
-      <Rect x={92} y={112} width={14} height={60} rx={7} fill="url(#momKurta)" />
+      <Rect x={24} y={112} width={14} height={60} rx={7} fill={`url(#kurta${colors[0].slice(1)})`} />
+      <Rect x={92} y={112} width={14} height={60} rx={7} fill={`url(#kurta${colors[0].slice(1)})`} />
       <Circle cx={31} cy={174} r={7} fill={skin} />
       <Circle cx={99} cy={174} r={7} fill={skin} />
       <Rect x={58} y={88} width={14} height={18} fill={skin} />
-      <Path d="M38 110 Q65 96 92 110 L104 226 Q65 236 26 226 Z" fill="url(#momKurta)" />
+      <Path d="M38 110 Q65 96 92 110 L104 226 Q65 236 26 226 Z" fill={`url(#kurta${colors[0].slice(1)})`} />
       <Path d="M44 108 L98 214" stroke="#E7C17A" strokeWidth={7} strokeLinecap="round" opacity={0.85} />
       <Circle cx={65} cy={60} r={28} fill={skin} />
       <Path d="M37 58 C36 28 94 28 93 58 C88 44 77 38 65 40 C53 38 42 44 37 58 Z" fill={hair} />

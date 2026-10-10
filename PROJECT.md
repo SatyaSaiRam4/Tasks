@@ -155,7 +155,7 @@ component names still say "category", e.g. `CategoryCard`).
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
   `MyApp/src/config/env.ts`. Release builds use the production backend
-  (https://tasks-xxbg.onrender.com); debug builds use the local origin there
+  (https://tasks-singapore.onrender.com); debug builds use the local origin there
   while `USE_LOCAL_API` is true.
 - The "Midnight & Champagne" design system lives in `MyApp/src/theme/`:
   `palette.ts` (brand colors, dark and light themes, accents),
@@ -187,8 +187,9 @@ component names still say "category", e.g. `CategoryCard`).
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  Aarav asks Mom to wake him at 6 for his exam, she forgets and he
-  oversleeps; next time Memo's alarm wakes him on time. It plays in 3D
+  Riya is invited to her best friend's wedding two months away and plans to
+  shop a sale in ten days; weeks fly by and she misses both. Melo arrives,
+  and this time Memo reminds her of both, months ahead. It plays in 3D
   (three.js, `web/story`), with the SVG characters in
   `modules/onboarding/Characters.tsx` as the fallback; Melo narrates. It plays once
   per account on a device, then Melo's tour runs; both replay from Settings.
@@ -330,3 +331,16 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   the All / Sent / Failed / Done tabs filter that day.
 - Home's streak card also shows the six badges in one row.
 - The guide is called Melo (code and settings keys still say `satya`).
+
+## Speed
+
+- The app keeps a copy of its last-loaded data on the device
+  (`MyApp/src/api/persistCache.ts`; never Vault or admin data, tied to the
+  user, removed on logout). Screens open with it at once and refresh in the
+  background. Wallet and streak data are prefetched after sign-in.
+- The API tests a pooled database connection only after it has been idle for
+  60 s (`Backend/app/db/session.py`), instead of on every request.
+- Theme changes lay a snapshot of the screen over the app while it restarts
+  underneath, and fade it out once Settings is drawn, so nothing flickers.
+- The biggest remaining cost is distance: the database is in Mumbai, so the
+  Render service should run in Singapore.

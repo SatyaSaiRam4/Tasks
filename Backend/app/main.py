@@ -72,8 +72,9 @@ def health_live():
     return {"status": "ok"}
 
 
-@app.get("/health/ready")
+@app.api_route("/health/ready", methods=["GET", "HEAD"])
 def health_ready():
+    """Also checks the database, so a monitor pinging this keeps both awake."""
     db_ok = test_connection()
     return {"status": "ok" if db_ok else "degraded", "database": db_ok}
 

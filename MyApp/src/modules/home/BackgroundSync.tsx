@@ -13,6 +13,8 @@ import { useGetMeQuery } from '../users/usersApi';
 import { useGetDashboardQuery } from '../streaks/streaksApi';
 import { useGetAgendaQuery, type Agenda } from '../routines/routinesApi';
 import { useListRemindersQuery } from '../reminders/remindersApi';
+import { walletApi } from '../wallet/walletApi';
+import { streaksApi } from '../streaks/streaksApi';
 
 function planned(agenda: Agenda | undefined): PlannedAction[] {
   if (!agenda) return [];
@@ -42,6 +44,14 @@ export function BackgroundSync() {
   const tomorrowKey = todayKey ? toDateKey(addDays(fromDateKey(todayKey), 1)) : undefined;
   const tomorrow = useGetAgendaQuery(tomorrowKey ? { day: tomorrowKey } : undefined, { skip: !tomorrowKey });
   const reminders = useListRemindersQuery();
+
+  // Load the screens one tap away, so opening them is instant.
+  const prefetchWallet = walletApi.usePrefetch('getWallet');
+  const prefetchStreak = streaksApi.usePrefetch('getStreak');
+  useEffect(() => {
+    prefetchWallet(undefined, { ifOlderThan: 300 });
+    prefetchStreak(undefined, { ifOlderThan: 300 });
+  }, [prefetchWallet, prefetchStreak]);
 
   // Refresh when the app returns to the foreground (the day may have changed).
   useEffect(() => {

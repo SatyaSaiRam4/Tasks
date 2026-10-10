@@ -33,7 +33,7 @@ import { ErrorState, SkeletonList } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
 import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from '../../../utils/storage';
-import { reloadApp } from '../../../utils/appReload';
+import { hideReloadCover, reloadApp } from '../../../utils/appReload';
 import {
   ALARM_LENGTHS,
   ALARM_SOUNDS,
@@ -90,6 +90,14 @@ export function SettingsScreen() {
   useEffect(() => {
     loadAlarmPreferences().then(setAlarm);
   }, []);
+
+  // After a theme reload, the snapshot over the screen fades out once
+  // Settings is drawn with its data (a no-op any other time).
+  useEffect(() => {
+    if (!me.data) return;
+    const timer = setTimeout(hideReloadCover, 250);
+    return () => clearTimeout(timer);
+  }, [me.data]);
 
   const pickAlarm = (next: AlarmPreferences) => {
     setAlarm(next);
