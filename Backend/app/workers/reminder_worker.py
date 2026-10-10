@@ -1,6 +1,9 @@
 """Background jobs, run in-process on a single APScheduler instance.
 
-  * WhatsApp side-channel for due reminders (every REMINDER_POLL_SECONDS).
+  * WhatsApp side-channel for due reminders, then marking reminders whose time
+    has passed as done (every REMINDER_POLL_SECONDS).
+  * The daily cleanup at 02:00 IST (also callable by the GitHub Actions job):
+    plans and tasks 7 days after their end, done reminders 7 days later.
   * Streak finalization for every user (every STREAK_FINALIZE_MINUTES), so
     ended days, Track bonuses and achievements are settled even for users who
     don't open the app. Request handlers also finalize lazily, so this job is a
@@ -25,18 +28,33 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def _poll_due_reminders() -> None:
-    if not is_configured():
-        return
+    db = SessionLocal()
+    try:
+        whatsapp_ready = is_configured()
+        if whatsapp_ready:
+            for reminder in reminders_service.get_due_whatsapp_reminders(db):
+                message = reminder.title if not reminder.note else f"{reminder.title} — {reminder.note}"
+                sent = send_whatsapp_reminder(reminder.whatsapp_number, message)
+                reminders_service.mark_whatsapp_result(db, reminder.id, sent)
+                if not sent:
+                    logger.warning("WhatsApp send failed for reminder %s", reminder.id)
+        reminders_service.auto_complete_due(db, whatsapp_ready)
+    except Exception:
+        db.rollback()
+        logger.exception("Reminder poll failed")
+    finally:
+        db.close()
+
+
+def _daily_cleanup() -> None:
+    from app.modules.maintenance.service import run_cleanup
 
     db = SessionLocal()
     try:
-        due = reminders_service.get_due_whatsapp_reminders(db)
-        for reminder in due:
-            message = reminder.title if not reminder.note else f"{reminder.title} — {reminder.note}"
-            sent = send_whatsapp_reminder(reminder.whatsapp_number, message)
-            reminders_service.mark_whatsapp_result(db, reminder.id, sent)
-            if not sent:
-                logger.warning("WhatsApp send failed for reminder %s", reminder.id)
+        run_cleanup(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Daily cleanup failed")
     finally:
         db.close()
 
@@ -75,6 +93,8 @@ def start_reminder_worker() -> None:
     _scheduler.add_job(
         _finalize_all_streaks, "interval", minutes=STREAK_FINALIZE_MINUTES, id="streak_finalize", max_instances=1
     )
+    # 20:30 UTC is 02:00 in India.
+    _scheduler.add_job(_daily_cleanup, "cron", hour=20, minute=30, id="daily_cleanup", max_instances=1)
     _scheduler.start()
 
 

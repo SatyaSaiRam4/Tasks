@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, font, gradients, radius, spacing, TRACK_COLORS, type as t, withAlpha } from '../../theme';
 import { Card } from '../../components/Card';
 import { Pill } from '../../components/Controls';
@@ -8,6 +8,7 @@ import { RealIcon } from '../../components/RealIcon';
 import { ProgressBar } from '../../components/Progress';
 import { fromDateKey, MONTH_SHORT, WEEKDAY_SHORT } from '../../utils/date';
 import { routinesApi, type GridCell, type Track, type TrackGrid } from './routinesApi';
+import { useCompletion } from './CompletionProvider';
 
 /** "Day 3 of 30", "Starts soon" or "Finished": where a plan is in its period. */
 export function stageLabel(track: Track): string {
@@ -173,6 +174,7 @@ export function CategoryTable({
 }) {
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const todayIndex = grid.days.indexOf(grid.today);
+  const { pendingId } = useCompletion();
 
   return (
     <View style={styles.table}>
@@ -230,6 +232,7 @@ export function CategoryTable({
                   <Mark
                     cell={cell}
                     label={`${row.title}, ${grid.days[di]}`}
+                    saving={di === todayIndex && pendingId === row.action_id}
                     onPress={di === todayIndex && cell !== 'NONE' ? () => onToggle(row, cell === 'DONE') : undefined}
                   />
                 </View>
@@ -250,9 +253,13 @@ const MARK_LABEL: Record<GridCell, string> = {
   NONE: 'not scheduled',
 };
 
-function Mark({ cell, label, onPress }: { cell: GridCell; label: string; onPress?: () => void }) {
-  const box =
-    cell === 'DONE' ? (
+function Mark({ cell, label, onPress, saving }: { cell: GridCell; label: string; onPress?: () => void; saving?: boolean }) {
+  // While a tick is being saved, the box turns into a small spinner.
+  const box = saving ? (
+    <View style={styles.box}>
+      <ActivityIndicator size="small" color={colors.gold} />
+    </View>
+  ) : cell === 'DONE' ? (
       <RealIcon name="check" size={26} />
     ) : cell === 'MISSED' ? (
       <Icon name="x" size={15} color={colors.danger} strokeWidth={2} />

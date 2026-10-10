@@ -209,3 +209,20 @@ def test_reminder_track_must_belong_to_the_user(client, auth, clock):
     at = (clock.now + timedelta(hours=1)).isoformat()
     res = client.post(f"{API}/reminders", json={"title": "x", "remind_at": at, "track_id": track["id"]}, headers=auth)
     assert res.status_code == 404
+
+
+def test_reminders_move_to_done_once_their_time_passes(client, auth, clock, db):
+    from datetime import datetime, timezone
+
+    from app.modules.reminders.service import auto_complete_due
+
+    soon = (clock.now + timedelta(hours=1)).isoformat()
+    later = (clock.now + timedelta(hours=5)).isoformat()
+    r1 = client.post(f"{API}/reminders", json={"title": "Call", "remind_at": soon}, headers=auth).json()
+    r2 = client.post(f"{API}/reminders", json={"title": "Pay bill", "remind_at": later}, headers=auth).json()
+
+    marked = auto_complete_due(db, whatsapp_ready=False, now=clock.now + timedelta(hours=2))
+    assert marked == 1
+    done = client.get(f"{API}/reminders/{r1['id']}", headers=auth).json()
+    assert datetime.fromisoformat(done["completed_at"]) == datetime.fromisoformat(r1["remind_at"]).astimezone(timezone.utc)
+    assert client.get(f"{API}/reminders/{r2['id']}", headers=auth).json()["completed_at"] is None
