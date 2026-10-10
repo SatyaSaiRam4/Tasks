@@ -2,8 +2,8 @@
 
 A phone notification is a short nudge on this device; an alarm is the same
 nudge, loud. WhatsApp is personal and reaches any number, even when the app
-is closed or uninstalled, so it says who it's for, what, exactly when, and
-the note, in full.
+is closed or uninstalled, so it says who it's for, what, and exactly when.
+The one-line style also carries the note.
 
 WhatsApp template variables can't contain line breaks, so every value here
 is a single line; the template itself provides the layout.
@@ -25,6 +25,6 @@ def whatsapp_variables(style: str, name: str, title: str, note: str | None, at: 
     when = _when(at, timezone)
     extra = " ".join((note or "").split())
     if style == "detailed":
-        return [first, title, when, extra or "No extra notes"]
+        return [first, title, when]
     one_line = f"⏰ {title} · {when}" + (f" · 📝 {extra}" if extra else "")
     return [one_line]

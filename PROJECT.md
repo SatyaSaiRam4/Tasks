@@ -384,21 +384,21 @@ picks the shape (`Backend/app/integrations/messages.py`):
 
 - `single` (default, the original template): one variable {{1}}, e.g.
   `⏰ Call the electrician · Sat, 10 Oct at 6:30 PM · 📝 Bring the warranty card`.
-- `detailed`: four variables, for this template (category Utility):
+- `detailed`: three variables, for this template (category Utility).
+  Header (text, no emoji or formatting): `Memo reminder`. Body:
 
   ```
-  🔔 *Memo reminder*
+  Hi {{1}}, this is your reminder from Memo.
 
-  Hi {{1}}, it's time for:
-  *{{2}}*
+  It's time for: *{{2}}*
 
-  🗓 {{3}}
-  📝 {{4}}
+  🗓 When: {{3}}
 
-  Sent by Memo · reminders that reach you anywhere.
+  You set this reminder in the Memo app. Open the app to snooze or change it.
   ```
 
-  Sample values: `Satya`, `Call the electrician`, `Sat, 10 Oct at 6:30 PM`,
-  `Bring the warranty card`. Create and get it approved in MSG91, set
+  Footer: `Sent by Memo.`
+
+  Sample values: `Satya`, `Call the electrician`, `Sat, 10 Oct at 6:30 PM`. Create and get it approved in MSG91, set
   `MSG91_WHATSAPP_TEMPLATE_NAME` to its name and
   `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed` on Render.
