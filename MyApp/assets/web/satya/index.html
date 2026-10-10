@@ -38,11 +38,11 @@
   </head>
   <body>
     <!--
-      Satya. The model file is MyApp/assets/models/model.glb; replace it with
+      Melo. The model file is MyApp/assets/models/model.glb; replace it with
       any GLB and rebuild the app. Embedded animations play automatically,
       preferring one named "idle".
 
-      The current model is a glove puppet with no skeleton, so Satya is
+      The current model is a glove puppet with no skeleton, so Melo is
       animated as a whole puppet here: an idle sway and breath, plus gestures
       the app triggers with window.satya.play(name): talk, wave, hop, nod,
       spin, lookLeft, lookRight, cheer, walk, think;
@@ -51,7 +51,7 @@
     <div id="puppet">
     <model-viewer
       id="mv"
-      alt="Satya, your guide"
+      alt="Melo, your guide"
       autoplay
       loading="eager"
       reveal="auto"
@@ -186,7 +186,7 @@
             }
           }
 
-          // Turning moves the camera around Satya's middle (the model's own
+          // Turning moves the camera around Melo's middle (the model's own
           // origin is off-center, so rotating the model would swing it
           // sideways); the side-to-side tilt is a plain 2D rotation.
           mv.cameraOrbit = (-yaw).toFixed(2) + 'deg ' + (78 - pitch).toFixed(2) + 'deg 105%';

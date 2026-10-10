@@ -22,6 +22,7 @@ import { formatDateTime } from '../../../utils/date';
 import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks/streaksApi';
 import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
+import { BadgeStrip } from '../../streaks/Tiers';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -179,6 +180,9 @@ function StreakHero({
           <Text style={styles.streakLabel}>Streak</Text>
         </View>
         <Stat label="Best" value={String(best)} />
+      </View>
+      <View style={styles.badges}>
+        <BadgeStrip best={best} size={28} />
       </View>
       <Pressable onPress={onWallet} style={({ pressed }) => [styles.quote, pressed && styles.pressed]} accessibilityRole="button">
         <RealIcon name="coin" size={20} />
@@ -423,12 +427,16 @@ const styles = StyleSheet.create({
     ...t.micro,
     color: colors.heroTextSecondary,
   },
+  badges: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
   quote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     alignSelf: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm + 2,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderRadius: radius.pill,

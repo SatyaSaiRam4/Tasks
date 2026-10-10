@@ -2,7 +2,7 @@ import type { Dashboard } from '../streaks/streaksApi';
 import { greetingFor } from '../../utils/date';
 
 /**
- * Satya's one-line tip for the dashboard. Picks the single most useful thing
+ * Melo's one-line tip for the dashboard. Picks the single most useful thing
  * to say from the user's real state: never random, always short.
  */
 export function satyaMessage(d: Dashboard): string {

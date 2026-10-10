@@ -33,6 +33,7 @@ import { ErrorState, SkeletonList } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
 import { getErrorMessage } from '../../../utils/apiError';
 import { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from '../../../utils/storage';
+import { reloadApp } from '../../../utils/appReload';
 import {
   ALARM_LENGTHS,
   ALARM_SOUNDS,
@@ -118,14 +119,14 @@ export function SettingsScreen() {
   const pickAccent = async (key: AccentName) => {
     setAccent(key);
     await AsyncStorage.setItem(ACCENT_STORAGE_KEY, key).catch(() => undefined);
-    set({ accent_color: ACCENTS[key].primary });
-    Toast.info('Accent saved. It applies the next time you open the app.', 2);
+    await set({ accent_color: ACCENTS[key].primary });
+    if (!(await reloadApp('Settings'))) Toast.info('Accent saved. It applies the next time you open the app.', 2);
   };
 
   const pickTheme = async (mode: ThemeMode) => {
     setThemeMode(mode);
     await AsyncStorage.setItem(THEME_STORAGE_KEY, mode).catch(() => undefined);
-    Toast.info('Theme saved. It applies the next time you open the app.', 2);
+    if (!(await reloadApp('Settings'))) Toast.info('Theme saved. It applies the next time you open the app.', 2);
   };
 
   if (me.isLoading) {
@@ -318,13 +319,13 @@ export function SettingsScreen() {
         />
       </ListGroup>
 
-      <SectionHeader title="Satya" />
+      <SectionHeader title="Melo" />
       <ListGroup>
-        {toggle('satya_enabled', 'Satya on Home', 'Short tips from your guide', false, 'sparkles')}
+        {toggle('satya_enabled', 'Melo on Home', 'Short tips from your guide', false, 'sparkles')}
         <ListRow
           icon="play"
           title="Replay tour"
-          subtitle="Walk through the app with Satya again"
+          subtitle="Walk through the app with Melo again"
           onPress={async () => {
             await resetOnboarding().unwrap().catch(() => undefined);
           }}

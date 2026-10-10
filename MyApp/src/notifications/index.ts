@@ -56,8 +56,14 @@ const ALARM_STORAGE_KEY = '@memo/alarm_preferences';
 const DEFAULT_ALARM: AlarmPreferences = { sound: 'alarm_classic', seconds: 30 };
 let alarmPrefs: AlarmPreferences = DEFAULT_ALARM;
 
-/** Android fixes a channel's sound when it is created, so each sound has its own channel. */
-const alarmChannelId = (sound: AlarmSound) => `alarm-${sound}`;
+/**
+ * Android fixes a channel's sound when it is created, so each sound has its
+ * own channel. The version is in the id because a channel made before its
+ * sound file was installed keeps the default sound forever; bumping it makes
+ * fresh channels (and initNotifications deletes the old ones).
+ */
+const ALARM_CHANNEL_PREFIX = 'memo-alarm-v2-';
+const alarmChannelId = (sound: AlarmSound) => `${ALARM_CHANNEL_PREFIX}${sound}`;
 const STOP_ACTION = 'stop-alarm';
 
 /** Reads this device's alarm sound and length (they are per device, like a ringtone). */
@@ -110,7 +116,7 @@ export async function testAlarm(prefs: AlarmPreferences): Promise<void> {
 }
 
 function isAlarm(notification: Notification | undefined) {
-  return Boolean(notification?.android?.channelId?.startsWith('alarm-'));
+  return Boolean(notification?.android?.channelId?.startsWith(ALARM_CHANNEL_PREFIX));
 }
 
 /**
@@ -147,6 +153,10 @@ export function initNotifications(): Promise<void> {
       await notifee.requestPermission();
       for (const channel of Object.values(CHANNELS)) {
         await notifee.createChannel({ ...channel, visibility: AndroidVisibility.PUBLIC });
+      }
+      // Older alarm channels may hold the default sound; remove them.
+      for (const channel of await notifee.getChannels()) {
+        if (channel.id.startsWith('alarm-')) await notifee.deleteChannel(channel.id);
       }
       for (const sound of ALARM_SOUNDS) {
         await notifee.createChannel({
