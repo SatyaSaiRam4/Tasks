@@ -11,10 +11,9 @@ def test_single_template_is_one_line():
     assert "\n" not in line  # WhatsApp rejects line breaks in template variables
 
 
-def test_detailed_template_fills_four_variables():
-    assert whatsapp_variables("detailed", "Satya Sai", "Pay the bill", None, AT, "Asia/Kolkata") == [
+def test_detailed_template_fills_three_variables():
+    assert whatsapp_variables("detailed", "Satya Sai", "Pay the bill", "Online", AT, "Asia/Kolkata") == [
         "Satya",
         "Pay the bill",
         "Sat, 10 Oct at 6:30 PM",
-        "No extra notes",
     ]
