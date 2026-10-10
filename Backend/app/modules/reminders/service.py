@@ -145,6 +145,32 @@ def get_due_whatsapp_reminders(db: Session) -> list[Reminder]:
     return list(db.scalars(stmt))
 
 
+def auto_complete_due(db: Session, whatsapp_ready: bool, now: datetime | None = None) -> int:
+    """Marks reminders done once their time has passed: the notification has
+    fired, so they move to the app's Done tab by themselves (and the daily
+    cleanup deletes them 7 days later). One still waiting for its WhatsApp
+    send is left until the send has been tried, unless WhatsApp isn't set up
+    or 30 minutes have gone by. Returns how many were marked."""
+    now = now or datetime.now(timezone.utc)
+    due = Reminder.remind_at <= now - timedelta(minutes=1)
+    stale = Reminder.remind_at <= now - timedelta(minutes=30)
+    waiting = Reminder.whatsapp_status == WhatsAppStatus.PENDING
+    stmt = select(Reminder).where(
+        Reminder.status == ReminderStatus.ACTIVE,
+        Reminder.completed_at.is_(None),
+        due,
+        (~waiting) | stale if whatsapp_ready else due,
+    )
+    reminders = list(db.scalars(stmt))
+    for reminder in reminders:
+        reminder.completed_at = reminder.remind_at
+        if reminder.whatsapp_status == WhatsAppStatus.PENDING:
+            reminder.whatsapp_status = WhatsAppStatus.FAILED if whatsapp_ready else WhatsAppStatus.NOT_REQUESTED
+    if reminders:
+        db.commit()
+    return len(reminders)
+
+
 def mark_whatsapp_result(db: Session, reminder_id: UUID, sent: bool) -> None:
     reminder = db.get(Reminder, reminder_id)
     if not reminder:

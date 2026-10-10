@@ -1,4 +1,6 @@
 import React, { useId, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { CelebrationSpec } from '../../components/Celebration';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { colors, font, gradients, radius, spacing, type as t } from '../../theme';
@@ -30,6 +32,55 @@ export const TIERS: Tier[] = [
 ];
 
 /** How many tiers a best streak has earned. */
+/** The highest badge earned with this best streak, or -1 for none yet. */
+export function tierIndex(best: number): number {
+  let index = -1;
+  TIERS.forEach((tier, i) => {
+    if (best >= tier.days) index = i;
+  });
+  return index;
+}
+
+const seenKey = (userId: string) => `@memo/tier_seen_${userId}`;
+const seenInMemory = new Map<string, number>();
+
+/**
+ * Congratulates the user once for each badge they reach ("You reached
+ * Bronze!"). The first check on a device only records the badges already
+ * held, so nobody is congratulated for old news.
+ */
+export async function celebrateNewTier(userId: string, best: number, celebrate: (spec: CelebrationSpec) => void) {
+  const reached = tierIndex(best);
+  let seen = seenInMemory.get(userId);
+  if (seen === undefined) {
+    const raw = await AsyncStorage.getItem(seenKey(userId)).catch(() => null);
+    seen = raw === null ? reached : Number(raw);
+    // A check that ran while this one waited may already have recorded more.
+    seen = Math.max(seen, seenInMemory.get(userId) ?? -1);
+  }
+  seenInMemory.set(userId, Math.max(seen, reached));
+  if (reached > seen) {
+    const tier = TIERS[reached];
+    const next = TIERS[reached + 1];
+    celebrate({
+      icon: 'award',
+      tone: 'primary',
+      eyebrow: 'New badge',
+      title: `You reached ${tier.name}!`,
+      subtitle: tier.reward
+        ? `${tier.reward} has been added to your Wallet.`
+        : next
+          ? `Streak ${tier.days} reached. Next: ${next.name} at ${next.days}.`
+          : `Streak ${tier.days}. The highest badge there is.`,
+      stats: [
+        { label: 'Badge', value: tier.name },
+        { label: 'Best streak', value: String(best) },
+      ],
+    });
+  }
+  AsyncStorage.setItem(seenKey(userId), String(Math.max(seen, reached))).catch(() => undefined);
+}
+
 export function earnedCount(best: number) {
   return TIERS.filter(tr => best >= tr.days).length;
 }
@@ -125,7 +176,7 @@ export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
  * All six badges as one small, even row (no names), for tight spots like the
  * Home streak card. Earned ones shine; tap any for its steps.
  */
-export function BadgeStrip({ best, size = 30 }: { best: number; size?: number }) {
+export function BadgeStrip({ best, size = 30, labels }: { best: number; size?: number; labels?: 'hero' | 'default' }) {
   const [shown, setShown] = useState<Tier>(TIERS[0]);
   const [open, setOpen] = useState(false);
   return (
@@ -143,9 +194,17 @@ export function BadgeStrip({ best, size = 30 }: { best: number; size?: number })
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel={`${tier.name} badge, ${earned ? 'earned' : `streak ${tier.days} needed`}. Show steps.`}
-              style={({ pressed }) => pressed && styles.pressed}
+              style={({ pressed }) => [styles.stripCell, pressed && styles.pressed]}
             >
               <TierBadge tier={tier} earned={earned} size={size} />
+              {labels ? (
+                <Text
+                  style={[styles.stripName, labels === 'hero' && styles.stripNameHero, !earned && styles.stripNameLocked]}
+                  numberOfLines={1}
+                >
+                  {tier.name}
+                </Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -212,7 +271,24 @@ const styles = StyleSheet.create({
   strip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  stripCell: {
     alignItems: 'center',
+    gap: 3,
+    minWidth: 44,
+  },
+  stripName: {
+    ...font.semibold,
+    fontSize: 9.5,
+    letterSpacing: 0.3,
+    color: colors.text,
+  },
+  stripNameHero: {
+    color: colors.heroText,
+  },
+  stripNameLocked: {
+    opacity: 0.5,
   },
   name: {
     ...font.bold,

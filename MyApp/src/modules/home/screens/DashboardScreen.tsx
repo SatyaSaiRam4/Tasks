@@ -22,7 +22,9 @@ import { formatDateTime } from '../../../utils/date';
 import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks/streaksApi';
 import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
-import { BadgeStrip } from '../../streaks/Tiers';
+import { BadgeStrip, celebrateNewTier } from '../../streaks/Tiers';
+import { useAppSelector } from '../../../app/hooks';
+import { selectCurrentUser } from '../../auth/authSlice';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -42,6 +44,13 @@ export function DashboardScreen() {
   const completions = useGetTrackCompletionsQuery();
   const tracks = useListTracksQuery();
   const { celebrate } = useCelebration();
+  const user = useAppSelector(selectCurrentUser);
+  const best = data?.streak.best_streak;
+
+  // A badge reached since the last visit gets its congratulations here.
+  useEffect(() => {
+    if (user && best !== undefined) celebrateNewTier(user.id, best, celebrate).catch(() => undefined);
+  }, [user, best, celebrate]);
   const celebrated = useRef(false);
 
   // Celebrate finished categories the user hasn't seen yet.
@@ -182,13 +191,11 @@ function StreakHero({
         <Stat label="Best" value={String(best)} />
       </View>
       <View style={styles.badges}>
-        <BadgeStrip best={best} size={28} />
+        <BadgeStrip best={best} size={28} labels="hero" />
       </View>
-      <Pressable onPress={onWallet} style={({ pressed }) => [styles.quote, pressed && styles.pressed]} accessibilityRole="button">
+      <Pressable onPress={onWallet} style={({ pressed }) => [styles.quote, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Earn money with streaks. Open Wallet.">
         <RealIcon name="coin" size={20} />
-        <Text style={styles.quoteText}>
-          Earn money with streaks · <Text style={styles.quoteStrong}>500 = ₹10</Text>
-        </Text>
+        <Text style={styles.quoteText}>Earn money with streaks</Text>
         <Icon name="chevron-right" size={14} color={colors.heroTextTertiary} />
       </Pressable>
     </Card>
@@ -448,10 +455,6 @@ const styles = StyleSheet.create({
     ...font.medium,
     fontSize: 12.5,
     color: colors.heroTextSecondary,
-  },
-  quoteStrong: {
-    ...font.bold,
-    color: brand.champagneLight,
   },
   homeCard: {
     marginTop: spacing.md,
