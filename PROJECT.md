@@ -155,7 +155,7 @@ component names still say "category", e.g. `CategoryCard`).
 - Redux Toolkit and RTK Query manage client state and API requests. Shared API
   configuration is in `MyApp/src/api/baseApi.ts`; the backend URL is set in
   `MyApp/src/config/env.ts`. Release builds use the production backend
-  (https://tasks-xxbg.onrender.com); debug builds use the local origin there
+  (https://tasks-singapore.onrender.com); debug builds use the local origin there
   while `USE_LOCAL_API` is true.
 - The "Midnight & Champagne" design system lives in `MyApp/src/theme/`:
   `palette.ts` (brand colors, dark and light themes, accents),

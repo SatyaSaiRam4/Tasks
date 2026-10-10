@@ -5,7 +5,8 @@
  *
  * React Native has no build-time environment variables (no Vite/CRA/Next
  * style VITE_* or REACT_APP_*), so the URL is chosen here:
- *  - Release builds always talk to the production backend on Render.
+ *  - Release builds always talk to the production backend on Render (Singapore,
+ *    next to the Mumbai database).
  *  - Debug builds (`npx react-native run-android`) use LOCAL_API_ORIGIN when
  *    USE_LOCAL_API is true, so local development keeps working. Set it to
  *    false to point a debug build at production.
@@ -19,7 +20,7 @@
  *
  * Only public URLs belong here: anything in the app bundle can be read by users.
  */
-const PRODUCTION_API_ORIGIN = 'https://tasks-xxbg.onrender.com';
+const PRODUCTION_API_ORIGIN = 'https://tasks-singapore.onrender.com';
 const LOCAL_API_ORIGIN = 'http://127.0.0.1:8003';
 const USE_LOCAL_API = false;
 
@@ -28,7 +29,7 @@ const API_PREFIX = '/api/v1';
 
 const origin = __DEV__ && USE_LOCAL_API ? LOCAL_API_ORIGIN : PRODUCTION_API_ORIGIN;
 
-/** e.g. "https://tasks-xxbg.onrender.com/api/v1" — no trailing slash, prefix added once. */
+/** e.g. "https://tasks-singapore.onrender.com/api/v1" — no trailing slash, prefix added once. */
 export const API_BASE_URL = `${origin.replace(/\/+$/, '')}${API_PREFIX}`;
 
 /** Network request timeout, in milliseconds. */
