@@ -58,8 +58,9 @@ function dayHeading(key: string, todayKey: string) {
 
 /**
  * The open Vault: all notes grouped by the day they were written, or one
- * day at a time (date strip, like Reminders). The search box and the
- * calendar button share the top row; picking a day shows that day's notes. The bin icon by
+ * day at a time (date strip and calendar, like Reminders). The search icon
+ * at the end of the All notes / By date row turns that row into the search
+ * box, so search adds no row of its own. The bin icon by
  * the lock opens the bin: deleted notes wait there for 30 days (open one to
  * restore it or delete it for good), then the daily cleanup removes them.
  */
@@ -72,6 +73,7 @@ function UnlockedVault() {
   const [mode, setMode] = useState<Mode>('all');
   const [day, setDay] = useState(todayKey);
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const entries = useListVaultEntriesQuery({ view: showDeleted ? 'trash' : 'all', q: query.trim() || undefined });
 
   const all = useMemo(() => entries.data ?? [], [entries.data]);
@@ -132,56 +134,53 @@ function UnlockedVault() {
             </Pressable>
           ) : null}
 
-          <View style={styles.searchRow}>
-            {!showDeleted ? (
-              <View style={styles.search}>
-                <Icon name="search" size={18} color={colors.violet} strokeWidth={1.7} />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search notes"
-                  placeholderTextColor={colors.textTertiary}
-                  style={styles.searchInput}
-                  accessibilityLabel="Search notes"
-                  autoCorrect={false}
+          {showDeleted ? (
+            <View style={[styles.binNote, styles.modes]}>
+              <Icon name="clock" size={15} color={colors.textSecondary} />
+              <Text style={[t.caption, styles.flex]}>
+                Deleted notes stay here for 30 days, then they’re deleted for good. Open one to restore it.
+              </Text>
+            </View>
+          ) : (
+            // One row: the All notes / By date switch with a search icon; the icon
+            // turns the same row into the search box.
+            <View style={[styles.searchRow, styles.modes]}>
+              {searching ? (
+                <View style={styles.search}>
+                  <Icon name="search" size={18} color={colors.violet} strokeWidth={1.7} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search notes"
+                    placeholderTextColor={colors.textTertiary}
+                    style={styles.searchInput}
+                    accessibilityLabel="Search notes"
+                    autoCorrect={false}
+                    autoFocus
+                  />
+                </View>
+              ) : (
+                <Segmented
+                  options={[
+                    { value: 'all', label: 'All notes', count: all.length || undefined },
+                    { value: 'date', label: 'By date' },
+                  ]}
+                  value={mode}
+                  onChange={v => setMode(v as Mode)}
+                  style={styles.flex}
                 />
-              </View>
-            ) : null}
-            {!showDeleted ? (
-              <DatePicker
-                value={fromDateKey(day)}
-                precision="day"
-                minDate={new Date(2020, 0, 1)}
-                maxDate={new Date()}
-                onChange={(d: Date) => {
-                  setDay(toDateKey(d));
-                  setMode('date');
+              )}
+              <IconButton
+                icon={searching ? 'x' : 'search'}
+                color={searching ? colors.text : colors.violet}
+                accessibilityLabel={searching ? 'Close search' : 'Search notes'}
+                onPress={() => {
+                  if (searching) setQuery('');
+                  setSearching(v => !v);
                 }}
-                title="Notes from which day?"
-              >
-                <CalendarButton />
-              </DatePicker>
-            ) : (
-              <View style={styles.binNote}>
-                <Icon name="clock" size={15} color={colors.textSecondary} />
-                <Text style={[t.caption, styles.flex]}>
-                  Deleted notes stay here for 30 days, then they’re deleted for good. Open one to restore it.
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {!showDeleted ? (
-            <Segmented
-              options={[
-                { value: 'all', label: 'All notes', count: all.length || undefined },
-                { value: 'date', label: 'By date' },
-              ]}
-              value={mode}
-              onChange={v => setMode(v as Mode)}
-              style={styles.modes}
-            />
-          ) : null}
+              />
+            </View>
+          )}
         </View>
 
         {mode === 'date' && !showDeleted ? (
@@ -194,6 +193,16 @@ function UnlockedVault() {
                   <Text style={styles.link}>Today</Text>
                 </Pressable>
               ) : null}
+              <DatePicker
+                value={fromDateKey(day)}
+                precision="day"
+                minDate={new Date(2020, 0, 1)}
+                maxDate={new Date()}
+                onChange={(d: Date) => setDay(toDateKey(d))}
+                title="Notes from which day?"
+              >
+                <CalendarButton />
+              </DatePicker>
             </View>
           </>
         ) : null}

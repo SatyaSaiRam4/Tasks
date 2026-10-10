@@ -186,13 +186,14 @@ component names still say "category", e.g. `CategoryCard`).
   breath, plus gestures (`talk`, `wave`, `hop`, `nod`, `spin`, `lookLeft`,
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
-- New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  the night before his exam Aarav asks Mom to wake him at 6; she forgets and
-  he oversleeps. Melo arrives, and before the next exam Memo's alarm wakes
-  him at dawn. It plays in 3D (three.js, `web/story`): a living room and a
-  bedroom with a sunbeam, floating Zzz, a dawn that brightens and slow camera
-  moves; flat illustrated scenes are the fallback. It plays once per account
-  on a device, then Melo's tour runs; both replay from Settings.
+- New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`)
+  that shows what an alarm can't do: Aarav tells Mom the art school
+  admissions open on 1 March, four months away; the months fly by and she
+  forgets. Melo explains that Memo remembers dates months ahead; Mom saves
+  the reminder once, it rings on 1 March, and Aarav gets in. It plays in 3D
+  (three.js, `web/story`); flat illustrated scenes are the fallback. It plays
+  once per account on a device, then Melo's tour runs; both replay from
+  Settings.
 - Melo's tour has nine steps with a title, typed-out text and a gesture
   each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
@@ -352,8 +353,8 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   Tabs: Upcoming (the default), Done, Failed, All. The server also runs the daily cleanup
   itself at 02:00 IST (done reminders and ended plans 7 days later), in
   addition to the GitHub Actions job.
-- Vault: All notes (grouped by day) or By date (date strip). The search box
-  and the calendar button share the top row.
+- Vault: All notes (grouped by day) or By date (date strip and calendar).
+  The search icon at the end of that row turns the row into the search box.
   Deleting a note moves it to the bin (icon beside the lock); it can be
   restored or deleted for good from there, and the daily cleanup deletes bin
   notes after 30 days (`VAULT_BIN_DAYS`). Notes outside the bin are never
@@ -363,7 +364,7 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   congratulations. Bottom sheets are drawn in the main window
   (`components/SheetHost.tsx`), not in a Modal. When a text field in a sheet
   is focused, the sheet moves to the top of the screen, clear of the
-  keyboard.
+  keyboard; the task sheet always opens at the top (`placement="top"`).
 - Profile and the streak screen show badges only; the older achievements
   list is no longer linked or announced.
 
