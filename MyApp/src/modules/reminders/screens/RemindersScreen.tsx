@@ -39,10 +39,10 @@ const isFailed = (r: Reminder) => r.whatsapp_status === 'FAILED';
 
 /** Which reminders each tab shows. Done ones live only in "Done" (the bin). */
 const TABS: { value: Tab; label: string; match: (r: Reminder) => boolean }[] = [
-  { value: 'all', label: 'All', match: () => true },
   { value: 'upcoming', label: 'Upcoming', match: r => !isDone(r) },
   { value: 'done', label: 'Done', match: r => isDone(r) && !isFailed(r) },
   { value: 'failed', label: 'Failed', match: r => isFailed(r) },
+  { value: 'all', label: 'All', match: () => true },
 ];
 
 const EMPTY: Record<Tab, { title: string; message: string }> = {
@@ -58,16 +58,16 @@ function dayHeading(key: string, todayKey: string) {
 
 /**
  * Reminders by day: pick a day on the strip (today by default) or from the
- * calendar, then the tabs narrow that day's reminders: All, Upcoming, Done
+ * calendar, then the tabs narrow that day's reminders: Upcoming, Done
  * (a reminder moves there by itself once its time comes; the daily cleanup
- * deletes it 7 days later) and Failed (WhatsApp couldn't send).
+ * deletes it 7 days later), Failed (WhatsApp couldn't send) and All.
  */
 export function RemindersScreen() {
   const navigation = useNavigation<Nav>();
   const { gutter } = useLayout();
   const { data, isLoading, isError, error, refetch, isFetching } = useListRemindersQuery();
   const todayKey = toDateKey(new Date());
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab>('upcoming');
   const [day, setDay] = useState(todayKey);
 
   // A dot under every day that has a reminder (green once they're all done).
@@ -171,8 +171,8 @@ export function RemindersScreen() {
             icon="bell"
             title={EMPTY[tab].title}
             message={EMPTY[tab].message}
-            actionLabel={tab === 'all' && day >= todayKey ? 'Add reminder' : undefined}
-            onAction={tab === 'all' && day >= todayKey ? () => navigation.navigate('ReminderEditor', { date: day }) : undefined}
+            actionLabel={(tab === 'all' || tab === 'upcoming') && day >= todayKey ? 'Add reminder' : undefined}
+            onAction={(tab === 'all' || tab === 'upcoming') && day >= todayKey ? () => navigation.navigate('ReminderEditor', { date: day }) : undefined}
           />
         ) : (
           <>

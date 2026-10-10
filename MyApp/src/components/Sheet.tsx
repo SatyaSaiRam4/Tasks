@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
   Easing,
   Keyboard,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -29,6 +30,17 @@ interface SheetProps {
   subtitle?: string;
   children: React.ReactNode;
   dismissable?: boolean;
+}
+
+/**
+ * Lets a text field inside a sheet say it is being typed in. The sheet then
+ * moves to the top of the screen, out of the keyboard's way, whatever the
+ * keyboard reports (or doesn't) about its height.
+ */
+const SheetInputContext = createContext<{ onInputFocus: () => void; onInputBlur: () => void } | null>(null);
+
+export function useSheetInput() {
+  return useContext(SheetInputContext);
 }
 
 /** The on-screen keyboard's height (0 when it's closed), on both platforms. */
@@ -61,6 +73,25 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
   const progress = useRef(new Animated.Value(0)).current;
   const keyboard = useKeyboardHeight();
   const hosted = useHasSheetHost();
+  const [typing, setTyping] = useState(false);
+  const inputApi = useMemo(
+    () => ({
+      onInputFocus: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setTyping(true);
+      },
+      onInputBlur: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setTyping(false);
+      },
+    }),
+    [],
+  );
+  // While typing, the sheet sits at the top of the screen instead of the bottom.
+  const atTop = !isTablet && (typing || keyboard > 0);
+  useEffect(() => {
+    if (!visible) setTyping(false);
+  }, [visible]);
 
   // In the host there's no Modal to catch Android's back button.
   useEffect(() => {
@@ -91,7 +122,8 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 40 : 460, 0] });
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 0.96 : 1, 1] });
   const content = (
-    <View style={[styles.flex, isTablet && styles.center, { paddingBottom: keyboard }]}>
+    <SheetInputContext.Provider value={inputApi}>
+    <View style={[styles.flex, isTablet && styles.center]}>
         <Animated.View style={[styles.backdrop, { opacity: progress }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -103,7 +135,11 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
         <Animated.View
           style={[
             styles.sheet,
-            isTablet ? styles.dialog : { paddingBottom: (keyboard ? 0 : insets.bottom) + spacing.xl },
+            isTablet
+              ? styles.dialog
+              : atTop
+                ? [styles.sheetTop, { top: insets.top + spacing.sm, paddingBottom: spacing.lg }]
+                : { paddingBottom: insets.bottom + spacing.xl },
             { opacity: isTablet ? progress : 1, transform: [{ translateY }, { scale }] },
           ]}
           accessibilityViewIsModal
@@ -120,6 +156,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
           {children}
         </Animated.View>
     </View>
+    </SheetInputContext.Provider>
   );
 
   // Drawn in the SheetHost (main window) when there is one, so the sheet can
@@ -263,6 +300,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: colors.overlay,
+  },
+  sheetTop: {
+    bottom: undefined,
+    marginHorizontal: spacing.sm,
+    borderRadius: radius.xxl,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheet: {
     position: 'absolute',

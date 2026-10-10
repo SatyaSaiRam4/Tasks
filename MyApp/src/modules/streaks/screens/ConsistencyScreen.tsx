@@ -21,7 +21,6 @@ import {
   useGetHistoryQuery,
   useGetStreakQuery,
   useGetTrackCompletionsQuery,
-  useListAchievementsQuery,
   type HistoryDay,
   type StreakSummary,
 } from '../streaksApi';
@@ -35,7 +34,7 @@ const MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
 /**
  * The streak experience: the current streak as a cinematic hero with the
  * next milestone, the record, this week and this month, milestones,
- * achievements, streak protection, the long calendar and finished categories.
+ * streak protection, the long calendar and finished categories.
  */
 export function ConsistencyScreen() {
   const navigation = useNavigation<Nav>();
@@ -44,13 +43,11 @@ export function ConsistencyScreen() {
   const from = today ? toDateKey(addDays(fromDateKey(today), -181)) : undefined;
   const history = useGetHistoryQuery(today ? { from, to: today } : undefined, { skip: !today });
   const completions = useGetTrackCompletionsQuery();
-  const achievements = useListAchievementsQuery();
   const warningsOn = useAppSelector(s => s.preferences.notifyStreakWarnings);
   const heatmapScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const { columns } = useLayout();
 
   const s = streak.data;
-  const earned = achievements.data?.filter(a => a.earned).length ?? 0;
 
   return (
     <Screen
@@ -105,25 +102,6 @@ export function ConsistencyScreen() {
           <Milestones best={s.best_streak} current={s.current_streak} />
 
           <View style={columns > 1 ? styles.pair : null}>
-            <View style={columns > 1 ? styles.pairItem : null}>
-              <SectionHeader title="Achievements" action="See all" onAction={() => navigation.navigate('Achievements')} />
-              <Card onPress={() => navigation.navigate('Achievements')} accessibilityLabel={`${earned} achievements earned. Open achievements.`}>
-                <View style={styles.row}>
-                  <Medallion icon="award" size={48} color={colors.gold} filled />
-                  <View style={styles.flex}>
-                    <Text style={styles.cardTitle}>
-                      {earned}
-                      <Text style={styles.cardTitleOf}> of {achievements.data?.length ?? '–'} earned</Text>
-                    </Text>
-                    <Text style={t.caption}>Badges for streaks, perfect weeks and finished goals.</Text>
-                  </View>
-                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-                </View>
-                {achievements.data?.length ? (
-                  <ProgressBar progress={earned / achievements.data.length} height={3} colorsPair={gradients.gold} style={styles.mtLg} />
-                ) : null}
-              </Card>
-            </View>
             <View style={columns > 1 ? styles.pairItem : null}>
               <SectionHeader title="Streak protection" action="Manage" onAction={() => navigation.navigate('Settings')} />
               <Card onPress={() => navigation.navigate('Settings')} accessibilityLabel={`Streak warnings are ${warningsOn ? 'on' : 'off'}. Manage in Settings.`}>

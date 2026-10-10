@@ -25,6 +25,13 @@
         height: 100%;
         display: block;
       }
+      /* A soft cinematic vignette over the 3D scene. */
+      #vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0) 55%, rgba(5, 8, 18, 0.55) 100%);
+      }
       #bubbles {
         position: absolute;
         inset: 0;
@@ -129,6 +136,7 @@
   </head>
   <body>
     <canvas id="stage"></canvas>
+    <div id="vignette"></div>
     <div id="bubbles"></div>
     <script>
       // Report any failure, so the app can fall back to the 2D story.

@@ -1,4 +1,5 @@
 import React, { forwardRef, useState } from 'react';
+import { useSheetInput } from './Sheet';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { colors, font, fontSize, hitSlop, radius, spacing, type as t } from '../theme';
 import { Icon, type IconName } from './Icon';
@@ -20,6 +21,8 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
 ) {
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(Boolean(secureTextEntry));
+  // Inside a bottom sheet, typing moves the sheet up out of the keyboard's way.
+  const sheet = useSheetInput();
 
   return (
     <View style={styles.wrap}>
@@ -45,10 +48,12 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
           {...rest}
           onFocus={e => {
             setFocused(true);
+            sheet?.onInputFocus();
             onFocus?.(e);
           }}
           onBlur={e => {
             setFocused(false);
+            sheet?.onInputBlur();
             onBlur?.(e);
           }}
           style={[styles.input, multiline && styles.multiline]}
