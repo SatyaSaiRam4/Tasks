@@ -187,13 +187,13 @@ component names still say "category", e.g. `CategoryCard`).
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  three real-life stories play at once in three 3D panels (three.js,
-  `web/story`): Riya waits for a sale to buy Mom's gift, Arjun's friend
-  Vikram marries in two months, Karan has an electricity bill due. Life gets
-  busy and they forget (sold out, missed wedding, power cut); Melo arrives,
-  they tell Memo, and the reminders ring on the day. Flat illustrated panels
-  are the fallback. It plays once per account on a device, then Melo's tour
-  runs; both replay from Settings.
+  two stories of Aarav and his mom play one after the other in two 3D panels
+  (three.js, `web/story`). Story 1, days ahead: Mom forgets to sign the
+  school-trip form and the bus leaves without him. Story 2, months ahead: she
+  forgets the art school admissions. Melo arrives; Mom tells Memo, both
+  reminders ring on the day, Aarav boards the bus and gets into art school.
+  Flat illustrated panels are the fallback. It plays once per account on a
+  device, then Melo's tour runs; both replay from Settings.
 - Melo's tour has nine steps with a title, typed-out text and a gesture
   each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
@@ -353,9 +353,52 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   Tabs: All, Upcoming, Done, Failed. The server also runs the daily cleanup
   itself at 02:00 IST (done reminders and ended plans 7 days later), in
   addition to the GitHub Actions job.
-- Vault: All notes (grouped by day) or By date (date strip and calendar). The
-  icon beside the search box selects notes for deleting (to Deleted notes;
-  there, restore or delete for good). There is no "delete all".
+- Vault: All notes (grouped by day) or By date (date strip and calendar).
+  Deleting a note moves it to the bin (icon beside the lock); it can be
+  restored or deleted for good from there, and the daily cleanup deletes bin
+  notes after 30 days (`VAULT_BIN_DAYS`). Notes outside the bin are never
+  touched.
 - Ticking a task shows a spinner in its box until the server confirms; the
   tick then appears at once. Reaching a new badge shows a one-time
-  congratulations. Bottom sheets rise above the keyboard on both platforms.
+  congratulations. Bottom sheets are drawn in the main window
+  (`components/SheetHost.tsx`), not in a Modal, so they rise above the
+  keyboard (a Modal's own Android window never hears keyboard events).
+
+## Messages
+
+Three ways Memo reminds, each worded for what it is:
+
+| | Where | Example |
+|---|---|---|
+| Notification (free) | This phone, quietly | **🔔 Call the electrician** · 6:30 PM · Bring the warranty card |
+| Alarm (free) | This phone, loud, until Stop | **⏰ Call the electrician** · It's 6:30 PM. Bring the warranty card. Press Stop when you're on it. |
+| WhatsApp (premium) | Any number, even with the phone off or the app uninstalled | A personal message with the name, the reminder, date and time, and the note |
+
+Task notifications read **✅ Walk 20 minutes** · Time for this task in
+"Fitness". Tick it in Memo when it's done. The 8 PM streak warning reads
+**🔥 2 tasks left today** · Finish them before midnight to keep your streak
+growing. A plan left unfinished costs 1 point.
+
+WhatsApp uses an approved MSG91 template. `MSG91_WHATSAPP_TEMPLATE_STYLE`
+picks the shape (`Backend/app/integrations/messages.py`):
+
+- `single` (default, the original template): one variable {{1}}, e.g.
+  `⏰ Call the electrician · Sat, 10 Oct at 6:30 PM · 📝 Bring the warranty card`.
+- `detailed`: four variables, for this template (category Utility):
+
+  ```
+  🔔 *Memo reminder*
+
+  Hi {{1}}, it's time for:
+  *{{2}}*
+
+  🗓 {{3}}
+  📝 {{4}}
+
+  Sent by Memo · reminders that reach you anywhere.
+  ```
+
+  Sample values: `Satya`, `Call the electrician`, `Sat, 10 Oct at 6:30 PM`,
+  `Bring the warranty card`. Create and get it approved in MSG91, set
+  `MSG91_WHATSAPP_TEMPLATE_NAME` to its name and
+  `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed` on Render.

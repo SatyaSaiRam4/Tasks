@@ -1,15 +1,16 @@
 /* eslint-env browser */
 /**
- * Memo's welcome story, in 3D: three real-life stories at once, in three
- * panels (top, middle, bottom).
+ * Memo's welcome story, in 3D: two stories of Aarav and his mom, one after
+ * the other, in two panels (top, then bottom).
  *
- *   Riya     a big sale opens in 10 days; she'll buy Mom's birthday gift then.
- *   Arjun    his friend Vikram's wedding is in two months.
- *   Karan    an electricity bill is due in 15 days.
+ *   Days ahead    "Sign my school-trip form by Wednesday!" Mom forgets, and
+ *                 on Friday the bus leaves without him.
+ *   Months ahead  "Art school admissions open in 4 months!" Mom forgets, and
+ *                 the admissions close.
  *
- * Life gets busy and all three forget: the sale is sold out, the wedding was
- * yesterday, the power is cut. Then Melo arrives, and this time each of them
- * tells Memo once; the reminders ring on the day and all three make it.
+ * Then Melo arrives; this time Mom tells Memo once, and the reminders ring on
+ * the day: the form is signed and Aarav waves from the bus; he gets into the
+ * art school.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
  * and drives it with window.story.show(sceneIndex); captions, progress and
@@ -584,76 +585,181 @@ function makePhone() {
   return g;
 }
 
-/** A shop sign that drops in: "SOLD OUT · Sale ended". */
-function makeSoldOut() {
+/** Draws on a fresh canvas and returns it as a texture. */
+function canvasTexture(width, height, paint) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const c = canvas.getContext('2d');
-  c.fillStyle = '#b71c1c';
-  c.fillRect(0, 0, 512, 256);
-  c.strokeStyle = '#ffffff';
-  c.lineWidth = 10;
-  c.strokeRect(14, 14, 484, 228);
-  c.fillStyle = '#ffffff';
-  c.textAlign = 'center';
-  c.font = '900 110px sans-serif';
-  c.fillText('SOLD OUT', 256, 140);
-  c.font = '600 38px sans-serif';
-  c.fillText('Sale ended yesterday', 256, 205);
+  canvas.width = width;
+  canvas.height = height;
+  paint(canvas.getContext('2d'));
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** A sign on two posts: "ADMISSIONS CLOSED", "ADMISSION CONFIRMED" and so on. */
+function makeBoard(lines, color) {
+  const tex = canvasTexture(512, 256, c => {
+    c.fillStyle = color;
+    c.fillRect(0, 0, 512, 256);
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 10;
+    c.strokeRect(14, 14, 484, 228);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '900 76px sans-serif';
+    c.fillText(lines[0], 256, 125);
+    c.font = '600 36px sans-serif';
+    c.fillText(lines[1] ?? '', 256, 195);
+  });
   const g = new THREE.Group();
   g.add(mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshBasicMaterial({ map: tex }), { shadow: false }));
-  for (const side of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.5, 6), mat(0x999999), { x: side * 0.45, y: 0.5 }));
+  for (const side of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8), mat(0x777777), { x: side * 0.5, y: -0.6 }));
   return g;
 }
 
-/** The electricity bill Karan puts off paying. */
-function makeBill() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 340;
-  const c = canvas.getContext('2d');
-  c.fillStyle = '#fbfaf5';
-  c.fillRect(0, 0, 256, 340);
-  c.fillStyle = '#f2b705';
-  c.fillRect(0, 0, 256, 60);
-  c.fillStyle = '#1d1d1d';
-  c.textAlign = 'center';
-  c.font = '800 30px sans-serif';
-  c.fillText('⚡ ELECTRICITY', 128, 42);
-  c.font = '700 54px sans-serif';
-  c.fillText('₹2,340', 128, 150);
-  c.font = '600 26px sans-serif';
-  c.fillText('Due: 20 Oct', 128, 210);
-  c.fillStyle = '#c0392b';
-  c.font = '700 22px sans-serif';
-  c.fillText('Late fee after due date', 128, 270);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
+/** Outside a school: sky, road, the building with its name, trees. */
+function makeStreet(name) {
   const g = new THREE.Group();
-  g.add(mesh(new THREE.PlaneGeometry(0.26, 0.34), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), { shadow: false }));
+  g.add(mesh(new THREE.PlaneGeometry(40, 14), new THREE.MeshBasicMaterial({ color: 0x9fd0ff }), { y: 7, z: -6, shadow: false }));
+  const ground = mesh(new THREE.PlaneGeometry(40, 20), mat(0x6f8f4f, { roughness: 1 }), { z: -2, shadow: false });
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  g.add(ground);
+  const road = mesh(new THREE.PlaneGeometry(40, 1.6), mat(0x4a4d55, { roughness: 1 }), { y: 0.005, z: -0.6, shadow: false });
+  road.rotation.x = -Math.PI / 2;
+  road.receiveShadow = true;
+  g.add(road);
+  for (let i = -10; i <= 10; i++) {
+    const stripe = mesh(new THREE.PlaneGeometry(0.5, 0.06), mat(0xf2f2f2), { x: i * 1.2, y: 0.01, z: -0.6, shadow: false });
+    stripe.rotation.x = -Math.PI / 2;
+    g.add(stripe);
+  }
+  // The school.
+  const school = new THREE.Group();
+  school.add(mesh(new THREE.BoxGeometry(5, 2.4, 1), mat(0xe7c9a0, { roughness: 0.9 }), { y: 1.2 }));
+  school.add(mesh(new THREE.BoxGeometry(5.2, 0.15, 1.2), mat(0xb5653f), { y: 2.45 }));
+  for (let i = -2; i <= 2; i++) {
+    for (const y of [0.85, 1.75]) school.add(mesh(new THREE.PlaneGeometry(0.5, 0.45), new THREE.MeshBasicMaterial({ color: 0x5b8def }), { x: i * 0.95, y, z: 0.51, shadow: false }));
+  }
+  const sign = canvasTexture(512, 96, c => {
+    c.fillStyle = '#2a3a6e';
+    c.fillRect(0, 0, 512, 96);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '800 52px sans-serif';
+    c.fillText(name, 256, 66);
+  });
+  school.add(mesh(new THREE.PlaneGeometry(2.2, 0.42), new THREE.MeshBasicMaterial({ map: sign }), { y: 2.15, z: 0.52, shadow: false }));
+  school.position.set(0.3, 0, -3.2);
+  g.add(school);
+  for (const x of [-2.6, 3.0]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.8, 8), mat(0x7a4a2a), { x, y: 0.4, z: -1.6 }));
+    g.add(mesh(new THREE.ConeGeometry(0.55, 1.3, 12), mat(0x3f8f4f), { x, y: 1.4, z: -1.6 }));
+  }
   return g;
 }
 
-/** Shopping bags from the sale, with a gift box. */
-function makeBags() {
+/** A yellow school bus; drive(x, t) moves it and turns the wheels. */
+function makeBus() {
   const g = new THREE.Group();
-  const bag = (color, x, h) => {
-    const b = new THREE.Group();
-    b.add(mesh(new THREE.BoxGeometry(0.26, h, 0.12), mat(color, { roughness: 0.7 }), { y: h / 2 }));
-    b.add(mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 16, Math.PI), mat(0x2a1e1a), { y: h + 0.002 }));
-    b.position.x = x;
-    g.add(b);
+  g.add(mesh(new THREE.BoxGeometry(2.6, 0.9, 0.95), mat(0xf2b705, { roughness: 0.5 }), { y: 0.65 }));
+  g.add(mesh(new THREE.BoxGeometry(0.6, 0.55, 0.95), mat(0xf2b705, { roughness: 0.5 }), { x: 1.55, y: 0.47 }));
+  for (let i = 0; i < 5; i++) g.add(mesh(new THREE.PlaneGeometry(0.34, 0.3), new THREE.MeshBasicMaterial({ color: 0x2a3a5e }), { x: -1.0 + i * 0.45, y: 0.8, z: 0.48, shadow: false }));
+  const sign = canvasTexture(512, 80, c => {
+    c.fillStyle = '#f2b705';
+    c.fillRect(0, 0, 512, 80);
+    c.fillStyle = '#1d1d1d';
+    c.textAlign = 'center';
+    c.font = '900 54px sans-serif';
+    c.fillText('SCHOOL TRIP', 256, 60);
+  });
+  g.add(mesh(new THREE.PlaneGeometry(1.6, 0.22), new THREE.MeshBasicMaterial({ map: sign }), { x: -0.2, y: 0.42, z: 0.48, shadow: false }));
+  const wheels = [];
+  for (const x of [-0.85, 0.95]) {
+    for (const z of [-0.45, 0.45]) {
+      const w = mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 16), mat(0x1d1d1d), { x, y: 0.2, z });
+      w.rotation.x = Math.PI / 2;
+      g.add(w);
+      wheels.push(w);
+    }
+  }
+  g.userData.drive = (x, t) => {
+    g.position.x = x;
+    wheels.forEach(w => (w.rotation.y = -x * 4));
+    g.position.y = 0.01 * Math.sin(t * 20);
   };
-  bag(0xe2574c, -0.18, 0.32);
-  bag(0xd4af6a, 0.12, 0.38);
-  const gift = new THREE.Group();
-  gift.add(mesh(new THREE.BoxGeometry(0.2, 0.18, 0.2), mat(0x5b8def), { y: 0.09 }));
-  gift.add(mesh(new THREE.BoxGeometry(0.04, 0.19, 0.205), mat(0xf7c843), { y: 0.095 }));
-  gift.position.set(0.4, 0, 0.05);
-  g.add(gift);
+  g.scale.setScalar(0.62);
+  return g;
+}
+
+/** The school trip form; sign() adds Mom's signature. */
+function makeForm() {
+  const paint = signed => c => {
+    c.fillStyle = '#fbfaf5';
+    c.fillRect(0, 0, 256, 340);
+    c.fillStyle = '#2a3a6e';
+    c.fillRect(0, 0, 256, 56);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '800 26px sans-serif';
+    c.fillText('SCHOOL TRIP', 128, 38);
+    c.fillStyle = '#1d1d1d';
+    c.font = '600 22px sans-serif';
+    c.fillText('Zoo visit · Friday', 128, 100);
+    c.fillText('Fee: ₹500', 128, 134);
+    c.fillStyle = '#c0392b';
+    c.font = '700 20px sans-serif';
+    c.fillText('Sign by Wednesday', 128, 172);
+    c.fillStyle = '#1d1d1d';
+    c.font = '500 18px sans-serif';
+    c.fillText('Parent’s signature', 128, 290);
+    c.fillRect(40, 268, 176, 2);
+    if (signed) {
+      c.strokeStyle = '#1f4fbf';
+      c.lineWidth = 4;
+      c.beginPath();
+      c.moveTo(50, 260);
+      c.bezierCurveTo(80, 220, 100, 280, 130, 240);
+      c.bezierCurveTo(150, 215, 170, 270, 205, 238);
+      c.stroke();
+    }
+  };
+  const material = new THREE.MeshBasicMaterial({ map: canvasTexture(256, 340, paint(false)), side: THREE.DoubleSide });
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(0.26, 0.34), material, { shadow: false }));
+  g.userData.sign = signed => {
+    material.map = canvasTexture(256, 340, paint(signed));
+    material.needsUpdate = true;
+  };
+  return g;
+}
+
+/** Aarav's drawing for the art school. */
+function makeDrawing() {
+  const tex = canvasTexture(256, 200, c => {
+    c.fillStyle = '#fffdf6';
+    c.fillRect(0, 0, 256, 200);
+    c.fillStyle = '#9fd0ff';
+    c.fillRect(8, 8, 240, 110);
+    c.fillStyle = '#6fbf5f';
+    c.fillRect(8, 118, 240, 74);
+    c.fillStyle = '#f7c843';
+    c.beginPath();
+    c.arc(205, 45, 24, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e2574c';
+    c.fillRect(60, 85, 80, 60);
+    c.fillStyle = '#8a3b2e';
+    c.beginPath();
+    c.moveTo(50, 88);
+    c.lineTo(100, 45);
+    c.lineTo(150, 88);
+    c.fill();
+    c.fillStyle = '#5b3a1a';
+    c.fillRect(90, 115, 20, 30);
+  });
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(0.34, 0.27), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), { shadow: false }));
   return g;
 }
 
@@ -705,39 +811,6 @@ function makeCalendar(months) {
   };
   g.userData.show(0);
   g.position.set(1.05, 2.2, -2.15);
-  return g;
-}
-
-/** The wedding invitation Ananya hands over. */
-function makeInvite() {
-  const g = new THREE.Group();
-  g.add(mesh(new THREE.BoxGeometry(0.3, 0.2, 0.015), mat(0x9b1b30)));
-  g.add(mesh(new THREE.BoxGeometry(0.26, 0.16, 0.017), mat(0xd4af6a, { metalness: 0.5, roughness: 0.35 })));
-  g.add(mesh(new THREE.SphereGeometry(0.03, 12, 10), mat(0x9b1b30), { z: 0.012 }));
-  return g;
-}
-
-/** A marigold arch for the wedding: strings of orange and yellow flowers. */
-function makeArch() {
-  const g = new THREE.Group();
-  const orange = mat(0xf28c1b, { roughness: 0.9 });
-  const yellow = mat(0xf7c843, { roughness: 0.9 });
-  const flower = new THREE.SphereGeometry(0.07, 10, 8);
-  for (let i = 0; i <= 40; i++) {
-    const a = Math.PI * (i / 40);
-    g.add(mesh(flower, i % 2 ? orange : yellow, { x: Math.cos(a) * 1.5, y: Math.sin(a) * 1.4 + 0.9, shadow: false }));
-  }
-  for (const side of [-1, 1]) {
-    for (let j = 0; j < 9; j++) g.add(mesh(flower, j % 2 ? yellow : orange, { x: side * 1.5, y: 0.1 * j + 0.05, shadow: false }));
-    g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 10), mat(0xd4af6a, { metalness: 0.5 }), { x: side * 1.5, y: 0.45 }));
-  }
-  // Hanging strings of flowers inside the arch.
-  for (let k = -3; k <= 3; k++) {
-    for (let j = 0; j < 4; j++) {
-      g.add(mesh(flower, (k + j) % 2 ? orange : yellow, { x: k * 0.35, y: 2.25 - j * 0.14 - Math.abs(k) * 0.05, z: 0.02, shadow: false }));
-    }
-  }
-  g.position.set(0, 0, -1.2);
   return g;
 }
 
@@ -822,7 +895,7 @@ const GAP = 8;
 // ---- Stages: one little world per story ---------------------------------------------------
 
 /** A room with its own camera and lights; `light()` sets the time of day (or a power cut). */
-function makeStage() {
+function makeStage({ street } = {}) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x0b1122, 6, 14);
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
@@ -841,6 +914,18 @@ function makeStage() {
   const room = makeRoom();
   scene.add(room);
   const stage = { scene, camera, room, view: null, power: 1, sky: null };
+  if (street) {
+    stage.street = makeStreet(street);
+    stage.street.visible = false;
+    scene.add(stage.street);
+  }
+  /** 'home' (the living room) or 'street' (outside the school). */
+  stage.place = where => {
+    room.visible = where === 'home';
+    if (stage.street) stage.street.visible = where === 'street';
+    if (stage.calendar) stage.calendar.visible = where === 'home';
+    scene.fog.color.set(where === 'street' ? 0x9fd0ff : stage.sky.bg);
+  };
   stage.light = sky => {
     stage.sky = sky;
     scene.background = new THREE.Color(sky.bg);
@@ -850,6 +935,7 @@ function makeStage() {
     room.userData.sky.scale.setScalar(sky.sun ? 1.5 : 1);
     room.userData.sky.visible = Boolean(sky.moon || sky.sun);
     stage.setPower(1);
+    stage.place('home');
   };
   /** 1 is normal light, 0 a power cut (only the moonlight left). */
   stage.setPower = level => {
@@ -915,10 +1001,8 @@ function ringPhone(phone, t, a, b, { x = 0.35, y = 1.35, scale = 0.5 } = {}) {
   });
 }
 
-const RIYA = { kind: 'woman', skinColor: 0xf0c29e, topColor: 0x2a9d8f, hairColor: 0x2b1b16 };
-const ARJUN = { kind: 'man', skinColor: 0xd9a27a, topColor: 0x3f6fd8, hairColor: 0x1e1512, bottomColor: 0x2b3550 };
-const KARAN = { kind: 'man', skinColor: 0xc98f66, topColor: 0x8a8f99, hairColor: 0x2b2b2b, bottomColor: 0x3b3328, glasses: true, mustache: true };
-const VIKRAM = { kind: 'groom', skinColor: 0xd9a27a, topColor: 0xf3e3c3, hairColor: 0x1e1512 };
+const AARAV = { kind: 'kid' };
+const MOM = { kind: 'mom', skinColor: 0xe9b48f, topColor: 0xc95c7a, hairColor: 0x3b2620 };
 
 function cast(stage, spec) {
   const p = makePerson(spec);
@@ -927,83 +1011,64 @@ function cast(stage, spec) {
   return p;
 }
 
-// Riya and the sale.
-const A = makeStage();
-A.riya = cast(A, RIYA);
+// Story 1, days ahead: the school-trip form.
+const A = makeStage({ street: 'GREENWOOD SCHOOL' });
+A.aarav = cast(A, AARAV);
+A.mom = cast(A, MOM);
 A.phone = makePhone();
+A.form = makeForm();
+A.bus = makeBus();
 A.calendar = makeCalendar([
-  ['OCT', '14', 'Sale in 10 days'],
-  ['OCT', '17', ''],
-  ['OCT', '20', ''],
-  ['OCT', '23', ''],
-  ['OCT', '25', 'Sale ended'],
-  ['OCT', '26', ''],
+  ['MON', '6', 'Trip form'],
+  ['TUE', '7', ''],
+  ['WED', '8', 'Sign today'],
+  ['THU', '9', ''],
+  ['FRI', '10', 'Trip day'],
+  ['SAT', '11', ''],
 ]);
-A.soldOut = makeSoldOut();
-A.bags = makeBags();
 A.confetti = makeConfetti(90);
 A.things = addThings(A);
-A.scene.add(A.phone, A.calendar, A.soldOut, A.bags, A.confetti);
+A.scene.add(A.phone, A.form, A.bus, A.calendar, A.confetti);
 
-// Arjun and his friend Vikram's wedding.
-const B = makeStage();
-B.arjun = cast(B, ARJUN);
-B.vikram = cast(B, VIKRAM);
+// Story 2, months ahead: the art school.
+const B = makeStage({ street: 'CITY ART SCHOOL' });
+B.aarav = cast(B, AARAV);
+B.mom = cast(B, MOM);
 B.phone = makePhone();
-B.invite = makeInvite();
-B.arch = makeArch();
+B.drawing = makeDrawing();
+B.closed = makeBoard(['ADMISSIONS', 'Closed on 8 March'], '#b71c1c');
+B.confirmed = makeBoard(['ADMITTED ✓', 'Welcome, Aarav!'], '#2e7d32');
 B.calendar = makeCalendar([
-  ['DEC', '12', 'Invitation'],
-  ['DEC', '30', ''],
-  ['JAN', '15', ''],
+  ['NOV', '1', 'Opens 1 March'],
+  ['DEC', '1', ''],
+  ['JAN', '1', ''],
   ['FEB', '1', ''],
-  ['FEB', '13', 'Missed it'],
-  ['FEB', '14', ''],
+  ['MAR', '10', 'Too late'],
+  ['MAR', '11', ''],
 ]);
 B.confetti = makeConfetti(90);
 B.things = addThings(B);
-B.scene.add(B.phone, B.invite, B.arch, B.calendar, B.confetti);
+B.scene.add(B.phone, B.drawing, B.closed, B.confirmed, B.calendar, B.confetti);
 
-// Karan and the electricity bill.
-const C = makeStage();
-C.karan = cast(C, KARAN);
-C.phone = makePhone();
-C.bill = makeBill();
-C.calendar = makeCalendar([
-  ['OCT', '5', 'Bill came'],
-  ['OCT', '9', ''],
-  ['OCT', '13', ''],
-  ['OCT', '17', ''],
-  ['OCT', '21', 'Overdue'],
-  ['OCT', '22', ''],
-]);
-C.confetti = makeConfetti(90);
-C.things = addThings(C);
-C.scene.add(C.phone, C.bill, C.calendar, C.confetti);
+for (const st of [A, B]) st.calendar.position.set(1.05, 1.9, -2.15);
 
-for (const st of [A, B, C]) st.calendar.position.set(1.05, 1.9, -2.15);
-
-// Melo's arrival, with all three watching.
+// Melo's arrival.
 const M = makeStage();
-M.riya = cast(M, RIYA);
-M.arjun = cast(M, ARJUN);
-M.karan = cast(M, KARAN);
+M.aarav = cast(M, AARAV);
+M.mom = cast(M, MOM);
 M.melo = new THREE.Group();
 M.sparkles = makeSparkles();
 M.scene.add(M.melo, M.sparkles);
 
-// The finale: everyone, Melo in the middle, under the marigolds.
+// The finale.
 const F = makeStage();
-F.riya = cast(F, RIYA);
-F.arjun = cast(F, ARJUN);
-F.vikram = cast(F, VIKRAM);
-F.karan = cast(F, KARAN);
+F.aarav = cast(F, AARAV);
+F.mom = cast(F, MOM);
 F.melo = new THREE.Group();
-F.arch = makeArch();
 F.confetti = makeConfetti(160);
-F.scene.add(F.melo, F.arch, F.confetti);
+F.scene.add(F.melo, F.confetti);
 
-const PEOPLE = [A.riya, B.arjun, B.vikram, C.karan, M.riya, M.arjun, M.karan, F.riya, F.arjun, F.vikram, F.karan];
+const PEOPLE = [A.aarav, A.mom, B.aarav, B.mom, M.aarav, M.mom, F.aarav, F.mom];
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
 (function loadMelo() {
@@ -1068,6 +1133,16 @@ function label(stage, text) {
 
 const anchor = new THREE.Vector3();
 const lift = new THREE.Vector3(0, 0.36, 0);
+/** Dims a panel that is waiting its turn, with a short note on it. */
+function dim(stage, text) {
+  const el = document.createElement('div');
+  el.className = 'panel-dim';
+  el.style.top = `${stage.view.y}px`;
+  el.style.height = `${stage.view.h}px`;
+  el.innerHTML = `<span>${text}</span>`;
+  bubbleLayer.appendChild(el);
+}
+
 function placeBubbles(t) {
   for (const b of bubbles) {
     const on = t >= b.at && t < b.until;
@@ -1095,347 +1170,394 @@ const EVENING = { bg: 0x241b33, window: 0x5a3b6e, moon: false, lamp: 3 };
 const DUSK = { bg: 0x1d2236, window: 0x1b2a52, moon: true, lamp: 5 };
 const MORNING = { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 };
 const MAGIC = { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 };
+const DAY = { bg: 0x9fd0ff, window: 0xbfe3ff, sun: true, lamp: 0 };
 
-/** Panel camera: two people side by side, framed from the knees up. */
-const PANEL_CAM = { x: 0, y: 1.3, z: 4.6, look: [0, 1.45, 0], width: 3.0 };
+/** Panel camera: Aarav and Mom side by side, framed from the knees up. */
+const PANEL_CAM = { x: 0, y: 1.15, z: 4.4, look: [0, 1.25, 0], width: 2.9 };
 
 /**
  * A scene is either three panels (`panels`: one entry per story, each with
  * its own setup and update) or one full-screen stage.
  */
+/** Moves a stage outside the school (or back home) at most once per scene. */
+function goOutside(stage, sky) {
+  if (stage.outside) return false;
+  stage.outside = true;
+  stage.light(sky);
+  stage.place('street');
+  return true;
+}
+
+/** A hand-held prop (the form, the drawing) follows a person's right hand. */
+function inHand(prop, p, raise = 0) {
+  prop.visible = true;
+  prop.position.set(p.root.position.x + 0.28, p.hips.position.y + 0.45 + raise, p.root.position.z + 0.3);
+  prop.rotation.set(-0.15, -0.3, 0.05);
+}
+
+/**
+ * A scene is either two panels (`panels`: the top story and the bottom one,
+ * each with its own setup and update; `still` marks the one waiting its turn)
+ * or one full-screen stage.
+ */
 const SCENES = [
   {
-    // Three people, three things to remember.
+    // Story 1 begins: the school-trip form.
     panels: [
       {
         stage: A,
         sky: NIGHT,
-        label: '🛍️  Riya · a sale in 10 days',
+        label: '🚌  Story 1 · a few days ahead',
         setup() {
-          A.riya.setMood('happy');
-          A.riya.root.position.set(-0.45, 0, 0);
-          A.riya.root.rotation.y = 0.35;
-          A.phone.userData.draw({ type: 'ad' });
+          A.aarav.setMood('happy');
+          A.mom.setMood('happy');
+          A.mom.root.position.set(0.6, 0, 0);
+          A.mom.root.rotation.y = -0.45;
           A.calendar.userData.show(0);
-          say(A, A.riya, 'The big sale opens in 10 days. I’ll buy Mom’s birthday gift then!', 0.8);
+          say(A, A.aarav, 'Mom, please sign my school-trip form by Wednesday! The trip is on Friday.', 1.3, { until: 5.6 });
+          say(A, A.mom, 'Of course, beta. I’ll sign it.', 5.8, { gold: true });
         },
         update(t) {
-          ringPhone(A.phone, t, 99, 99, { x: 0.45, y: 1.3, scale: 0.42 });
-          moves.hold(A.riya, 0.7);
-          moves.talk(A.riya, t, 0.9, 3.2);
-          moves.nod(A.riya, t, 3.4, 4.4);
+          moves.walk(A.aarav, t, 0, 1.2, -2.4, -0.55, 0.5);
+          const handOver = ease(seg(t, 4.6, 5.3));
+          if (handOver < 1) {
+            moves.hold(A.aarav, 1 - handOver);
+            inHand(A.form, A.aarav, 0.05);
+          }
+          if (handOver > 0) {
+            moves.hold(A.mom, handOver);
+            if (handOver >= 1) inHand(A.form, A.mom);
+          }
+          moves.talk(A.aarav, t, 1.4, 4.6);
+          moves.nod(A.mom, t, 3.0, 4.0);
+          moves.talk(A.mom, t, 5.9, 7.6);
+          moves.jump(A.aarav, t, 7.8, 8.8);
         },
       },
       {
         stage: B,
-        sky: NIGHT,
-        label: '💍  Arjun · a wedding in 2 months',
+        sky: DUSK,
+        label: '🎨  Story 2 · months ahead',
+        still: 'Story 2 comes next',
         setup() {
-          B.arjun.setMood('happy');
-          B.vikram.setMood('happy');
-          B.arjun.root.position.set(-0.6, 0, 0);
-          B.arjun.root.rotation.y = 0.4;
+          B.aarav.root.position.set(-0.5, 0, 0);
+          B.mom.root.position.set(0.6, 0, 0);
+        },
+        update() {},
+      },
+    ],
+  },
+  {
+    // A busy week… and on Friday the bus leaves without him.
+    panels: [
+      {
+        stage: A,
+        sky: EVENING,
+        label: '🚌  Story 1 · that week',
+        setup() {
+          A.outside = false;
+          A.mom.setMood('happy');
+          A.mom.root.position.set(0, 0, 0);
+          A.calendar.userData.show(0);
+          say(A, A.mom, 'Aarav’s form… I’ll do it tonight.', 0.8, { thought: true, until: 4.4 });
+          say(A, A.aarav, 'My form isn’t signed… the bus is leaving without me! 😢', 5.4, { until: 9.0 });
+          say(A, A.mom, 'Oh no… I forgot to sign it!', 9.2, { gold: true });
+        },
+        update(t) {
+          if (t < 4.5) {
+            tearPages(A.calendar, t);
+            busyDay(A.mom, t, 99);
+            whirl(A.things, t, A.mom.root.position.x);
+            inHand(A.form, A.mom);
+            return;
+          }
+          if (goOutside(A, DAY)) {
+            A.things.forEach(th => (th.visible = false));
+            A.aarav.setMood('surprised');
+            A.mom.setMood('happy');
+            A.mom.root.position.set(1.2, 0, 0.3);
+            A.mom.root.rotation.y = -0.6;
+            A.bus.visible = true;
+          }
+          const k = t - 4.5;
+          A.bus.position.z = -0.75;
+          A.bus.userData.drive(lerp(0.3, 5.5, ease(seg(k, 1.6, 3.6))), t);
+          A.aarav.root.position.set(lerp(-0.8, -0.2, ease(seg(k, 1.8, 2.8))), 0, 0.35);
+          A.aarav.root.rotation.y = k > 1.8 && k < 2.8 ? 1.2 : 0.3;
+          inHand(A.form, A.aarav);
+          moves.hold(A.aarav, 0.8);
+          if (k > 3.0) {
+            A.aarav.setMood('sad');
+            moves.sad(A.aarav, ease(seg(k, 3.0, 3.6)));
+          }
+          if (k > 4.4) A.mom.setMood('surprised');
+          moves.shock(A.mom, t, 9.0);
+        },
+      },
+      {
+        stage: B,
+        sky: DUSK,
+        label: '🎨  Story 2 · months ahead',
+        still: 'Story 2 comes next',
+        setup() {
+          B.aarav.root.position.set(-0.5, 0, 0);
+          B.mom.root.position.set(0.6, 0, 0);
+        },
+        update() {},
+      },
+    ],
+  },
+  {
+    // Story 2 begins: the art school, four months away.
+    panels: [
+      {
+        stage: A,
+        sky: DAY,
+        label: '🚌  Story 1 · missed the trip',
+        still: 'Story 1 · the bus left without him',
+        setup() {
+          A.place('street');
+          A.aarav.setMood('sad');
+          A.aarav.root.position.set(-0.2, 0, 0.35);
+          moves.sad(A.aarav, 1);
+        },
+        update() {},
+      },
+      {
+        stage: B,
+        sky: DUSK,
+        label: '🎨  Story 2 · months ahead',
+        setup() {
+          B.aarav.setMood('happy');
+          B.mom.setMood('happy');
+          B.aarav.root.position.set(-0.55, 0, 0);
+          B.aarav.root.rotation.y = 0.5;
+          B.mom.root.position.set(0.6, 0, 0);
+          B.mom.root.rotation.y = -0.45;
           B.calendar.userData.show(0);
-          say(B, B.vikram, 'Arjun, my wedding is on 12 February. You have to come!', 3.6, { gold: true });
+          say(B, B.aarav, 'Mom, art school admissions open on 1 March! That’s 4 months away.', 0.8, { until: 5.2 });
+          say(B, B.mom, 'Four months? I’ll remember, don’t worry.', 5.4, { gold: true });
         },
         update(t) {
-          moves.walk(B.vikram, t, 0.3, 1.6, 2.4, 0.6, -0.4);
-          const card = ease(seg(t, 1.5, 2.0)) * (1 - ease(seg(t, 3.0, 3.4)));
-          moves.hold(B.vikram, card);
-          const pass = ease(seg(t, 2.6, 3.3));
-          B.invite.visible = t > 1.4;
-          B.invite.position.set(lerp(B.vikram.root.position.x - 0.15, B.arjun.root.position.x + 0.3, pass), 1.18 + 0.1 * bump(pass), 0.35);
-          B.invite.rotation.set(-0.2, lerp(-0.4, 0.4, pass), 0);
-          if (t > 3.3) moves.hold(B.arjun, 0.6);
-          moves.talk(B.vikram, t, 3.7, 6.0);
-          moves.jump(B.arjun, t, 6.2, 7.0);
-        },
-      },
-      {
-        stage: C,
-        sky: DUSK,
-        label: '⚡  Karan · a bill due in 15 days',
-        setup() {
-          C.karan.setMood('happy');
-          C.karan.root.position.set(-0.3, 0, 0);
-          C.karan.root.rotation.y = 0.3;
-          C.calendar.userData.show(0);
-          say(C, C.karan, 'Electricity bill, due on the 20th. I’ll pay it later.', 6.6);
-        },
-        update(t) {
-          C.bill.visible = true;
-          moves.hold(C.karan, 0.75);
-          C.bill.position.set(C.karan.root.position.x + 0.32, 1.28, 0.35);
-          C.bill.rotation.set(-0.15, -0.4, 0.05);
-          moves.talk(C.karan, t, 6.7, 9.0);
-          // A careless wave of the hand: later.
-          moves.wave(C.karan, t, 9.0, 10.4, 'R');
+          inHand(B.drawing, B.aarav, 0.2 * bump(seg(t, 2.4, 4.4)));
+          moves.hold(B.aarav, 0.8 + 0.4 * bump(seg(t, 2.4, 4.4)));
+          moves.talk(B.aarav, t, 0.9, 4.8);
+          moves.clap(B.mom, t, 3.0, 4.4);
+          moves.talk(B.mom, t, 5.5, 7.4);
         },
       },
     ],
   },
   {
-    // Weeks fly by; everyone is busy; the dates slip away.
+    // Months fly by… and the admissions close.
     panels: [
       {
         stage: A,
-        sky: EVENING,
-        label: '🛍️  Riya',
+        sky: DAY,
+        label: '🚌  Story 1 · missed the trip',
+        still: 'Story 1 · the bus left without him',
         setup() {
-          A.riya.setMood('happy');
-          A.riya.root.position.set(0, 0, 0);
-          say(A, A.riya, 'The sale… when was it again? 🤔', 2.0, { thought: true });
+          A.place('street');
+          A.aarav.setMood('sad');
+          A.aarav.root.position.set(-0.2, 0, 0.35);
+          moves.sad(A.aarav, 1);
         },
-        update(t) {
-          tearPages(A.calendar, t);
-          busyDay(A.riya, t, 3.5);
-          whirl(A.things, t, A.riya.root.position.x);
-        },
+        update() {},
       },
       {
         stage: B,
         sky: EVENING,
-        label: '💍  Arjun',
+        label: '🎨  Story 2 · those months',
         setup() {
-          B.arjun.setMood('happy');
-          B.arjun.root.position.set(0, 0, 0);
-          say(B, B.arjun, 'Vikram’s wedding… which date was it? 🤔', 3.0, { thought: true });
+          B.outside = false;
+          B.mom.setMood('happy');
+          B.mom.root.position.set(0, 0, 0);
+          B.calendar.userData.show(0);
+          say(B, B.mom, 'Admissions… March… I’ll remember.', 0.8, { thought: true, until: 4.4 });
+          say(B, B.aarav, 'Admissions closed on 8 March… we missed it. 😞', 5.6, { until: 8.6 });
+          say(B, B.mom, 'I’m so sorry, beta… I forgot.', 8.8, { gold: true });
         },
         update(t) {
-          tearPages(B.calendar, t);
-          busyDay(B.arjun, t, 4.2);
-          whirl(B.things, t, B.arjun.root.position.x);
-        },
-      },
-      {
-        stage: C,
-        sky: EVENING,
-        label: '⚡  Karan',
-        setup() {
-          C.karan.setMood('happy');
-          C.karan.root.position.set(0, 0, 0);
-          say(C, C.karan, 'That bill… did I pay it? 🤔', 4.0, { thought: true });
-        },
-        update(t) {
-          tearPages(C.calendar, t);
-          busyDay(C.karan, t, 4.9);
-          whirl(C.things, t, C.karan.root.position.x);
+          if (t < 4.5) {
+            tearPages(B.calendar, t);
+            busyDay(B.mom, t, 99);
+            whirl(B.things, t, B.mom.root.position.x);
+            return;
+          }
+          if (goOutside(B, DAY)) {
+            B.things.forEach(th => (th.visible = false));
+            B.aarav.setMood('happy');
+            B.mom.setMood('happy');
+            B.aarav.root.position.set(-0.6, 0, 0.3);
+            B.aarav.root.rotation.y = 0.3;
+            B.mom.root.position.set(-1.25, 0, 0.1);
+            B.mom.root.rotation.y = 0.4;
+            B.closed.visible = true;
+          }
+          const k = t - 4.5;
+          B.closed.position.set(0.6, lerp(3.4, 1.6, ease(seg(k, 0.2, 0.7))) + 0.04 * bump(seg(k, 0.7, 1.0)), 0.1);
+          inHand(B.drawing, B.aarav);
+          moves.hold(B.aarav, 0.7);
+          if (k > 0.9) {
+            B.aarav.setMood('sad');
+            moves.sad(B.aarav, ease(seg(k, 0.9, 1.6)));
+          }
+          if (k > 3.8) B.mom.setMood('sad');
+          moves.think(B.mom, t, 8.4, 99);
         },
       },
     ],
   },
   {
-    // …and they forget.
-    panels: [
-      {
-        stage: A,
-        sky: DUSK,
-        label: '🛍️  Riya · 25 October',
-        setup() {
-          A.riya.setMood('happy');
-          A.riya.root.position.set(-0.55, 0, 0.1);
-          A.riya.root.rotation.y = 0.3;
-          A.calendar.userData.show(4);
-          say(A, A.riya, 'Sold out?! The sale ended yesterday. No gift for Mom… 😞', 1.0);
-        },
-        update(t) {
-          A.soldOut.visible = true;
-          A.soldOut.position.set(0.7, lerp(3.4, 1.6, ease(seg(t, 0.2, 0.7))) + 0.04 * bump(seg(t, 0.7, 1.0)), -0.2);
-          A.soldOut.scale.setScalar(1.15);
-          if (t > 0.6) A.riya.setMood('surprised');
-          moves.shock(A.riya, t, 0.7);
-          if (t > 3.0) {
-            A.riya.setMood('sad');
-            moves.sad(A.riya, ease(seg(t, 3.0, 3.8)));
-          }
-        },
-      },
-      {
-        stage: B,
-        sky: DUSK,
-        label: '💍  Arjun · 13 February',
-        setup() {
-          B.arjun.setMood('happy');
-          B.arjun.root.position.set(-0.45, 0, 0.1);
-          B.arjun.root.rotation.y = 0.35;
-          B.calendar.userData.show(4);
-          B.phone.userData.draw({ type: 'photos', who: 'Vikram posted 3 photos', date: '12 February' });
-          say(B, B.arjun, 'Vikram’s wedding was yesterday?! I missed it… 😢', 4.0);
-        },
-        update(t) {
-          ringPhone(B.phone, t, 99, 99, { x: 0.45, y: 1.3, scale: 0.42 });
-          moves.hold(B.arjun, 0.75);
-          if (t > 3.6) B.arjun.setMood('surprised');
-          moves.shock(B.arjun, t, 3.7);
-          if (t > 6.0) {
-            B.arjun.setMood('sad');
-            moves.sad(B.arjun, ease(seg(t, 6.0, 6.8)));
-          }
-        },
-      },
-      {
-        stage: C,
-        sky: DUSK,
-        label: '⚡  Karan · 21 October',
-        setup() {
-          C.karan.setMood('happy');
-          C.karan.root.position.set(-0.2, 0, 0.1);
-          C.calendar.userData.show(4);
-          say(C, C.karan, 'Power cut?! I forgot to pay the bill! 😱', 7.2);
-        },
-        update(t) {
-          // The lights flicker, then go out.
-          const flicker = t > 6.4 && t < 6.9 ? (Math.sin(t * 60) > 0 ? 1 : 0.2) : 1;
-          C.setPower(t < 6.4 ? 1 : t < 6.9 ? flicker : 0);
-          if (t > 6.8) C.karan.setMood('surprised');
-          moves.shock(C.karan, t, 6.9);
-        },
-      },
-    ],
-  },
-  {
-    // Melo arrives, and all three look up.
+    // Melo arrives.
     stage: M,
     sky: MAGIC,
-    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.1, 0], width: 3.9 },
+    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.0, 0], width: 3.4 },
     setup() {
-      const spots = [
-        [M.riya, -1.45, 0.0, 0.5],
-        [M.karan, -0.55, -0.6, 0.2],
-        [M.arjun, 1.45, 0.0, -0.5],
-      ];
-      for (const [p, x, z, turn] of spots) {
-        p.setMood('sad');
-        p.root.position.set(x, 0, z);
-        p.root.rotation.y = turn;
-      }
-      say(M, M.melo, 'Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on time.', 2.0, { gold: true });
+      M.aarav.setMood('sad');
+      M.mom.setMood('sad');
+      M.aarav.root.position.set(-1.05, 0, 0.1);
+      M.aarav.root.rotation.y = 0.55;
+      M.mom.root.position.set(1.25, 0, -0.1);
+      M.mom.root.rotation.y = -0.55;
+      say(M, M.melo, 'Hi, I’m Melo! Tell Memo once, days or months ahead, and I’ll remind you right on time.', 2.0, { gold: true });
     },
     update(t) {
       const drop = seg(t, 0, 0.9);
       const bounce = drop < 1 ? (1 - ease(drop)) * 3 : Math.abs(Math.sin((t - 0.9) * 9)) * 0.25 * Math.max(0, 1 - (t - 0.9) * 1.6);
       M.melo.visible = true;
-      M.melo.position.set(0.45, bounce, 0.4);
+      M.melo.position.set(0.15, bounce, 0.4);
       M.melo.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0)) - 0.3;
       M.melo.rotation.z = t > 2 ? 0.2 * Math.sin((t - 2) * 7) * Math.max(0, 1 - (t - 2) * 0.25) : 0;
       M.sparkles.visible = true;
       M.sparkles.rotation.y = t * 0.3;
       M.sparkles.material.opacity = 0.9 * seg(t, 0.6, 1.4);
-      [M.riya, M.karan, M.arjun].forEach((p, i) => {
-        if (t > 1.0 + i * 0.15) p.setMood('surprised');
+      for (const [p, i] of [
+        [M.aarav, 0],
+        [M.mom, 1],
+      ]) {
+        if (t > 1.0 + i * 0.2) p.setMood('surprised');
         if (t > 2.6 + i * 0.3) p.setMood('happy');
-        moves.jump(p, t, 2.8 + i * 0.35, 3.8 + i * 0.35);
-      });
+      }
+      moves.jump(M.aarav, t, 2.8, 4.0);
+      moves.clap(M.mom, t, 3.0, 4.6);
     },
   },
   {
-    // This time, they tell Memo, and it rings on the day.
+    // This time Mom tells Memo, and both reminders ring on the day.
     panels: [
       {
         stage: A,
         sky: MORNING,
-        label: '🛍️  Riya · sale day',
+        label: '🚌  Story 1 · with Memo',
         setup() {
-          A.riya.setMood('happy');
-          A.riya.root.position.set(-0.55, 0, 0.1);
-          A.riya.root.rotation.y = 0.3;
-          A.calendar.userData.show(0);
-          A.phone.userData.draw({ type: 'ring', time: '9:00', date: '24 October', emoji: '🛍️', title: 'Sale opens today', sub: 'Buy Mom’s gift' });
-          say(A, A.riya, 'Got Mom’s gift at the sale! 🎁', 2.6);
+          A.outside = false;
+          A.aarav.setMood('happy');
+          A.mom.setMood('happy');
+          A.mom.root.position.set(0.1, 0, 0.1);
+          A.form.userData.sign(false);
+          A.phone.userData.draw({ type: 'ring', time: '8:00', date: 'Wednesday', emoji: '✍️', title: 'Sign Aarav’s trip form', sub: 'Due today' });
+          say(A, A.mom, 'Signed, right on time! ✍️', 2.6, { gold: true, until: 4.0 });
+          say(A, A.aarav, 'See you, Mom! 👋', 4.6);
         },
         update(t) {
-          ringPhone(A.phone, t, 0.4, 1.9, { x: 0.35, y: 1.35, scale: 0.5 * (1 - ease(seg(t, 2.0, 2.4))) + 0.001 });
-          A.bags.visible = t > 2.1;
-          A.bags.scale.setScalar(0.001 + ease(seg(t, 2.1, 2.5)));
-          A.bags.position.set(0.25, 0, 0.35);
-          moves.jump(A.riya, t, 2.4, 3.4);
-          A.confetti.visible = t > 2.4;
-          if (A.confetti.visible) A.confetti.userData.update(t - 2.4);
+          if (t < 4.0) {
+            ringPhone(A.phone, t, 0.3, 1.8, { x: 0.65, y: 1.4, scale: 0.5 * (1 - ease(seg(t, 1.9, 2.2))) + 0.001 });
+            inHand(A.form, A.mom);
+            moves.hold(A.mom, 1);
+            if (t > 2.3 && !A.form.userData.signed) {
+              A.form.userData.sign(true);
+              A.form.userData.signed = true;
+            }
+            moves.talk(A.mom, t, 2.7, 3.9);
+            return;
+          }
+          if (goOutside(A, DAY)) {
+            A.phone.visible = false;
+            A.form.visible = false;
+            A.bus.visible = true;
+            A.mom.root.position.set(1.2, 0, 0.3);
+            A.mom.root.rotation.y = -0.6;
+          }
+          const k = t - 4.0;
+          A.bus.position.z = -0.75;
+          A.bus.userData.drive(lerp(0.3, 5.5, ease(seg(k, 2.6, 4.6))), t);
+          // Aarav waves, climbs aboard, and the bus pulls away.
+          A.aarav.visible = k < 2.4;
+          A.aarav.root.visible = k < 2.4;
+          A.aarav.root.position.set(lerp(-0.6, 0.0, ease(seg(k, 1.4, 2.4))), 0, lerp(0.35, -0.4, ease(seg(k, 1.4, 2.4))));
+          A.aarav.root.rotation.y = k > 1.4 ? Math.PI : 0.3;
+          moves.wave(A.aarav, t, 4.4, 5.4, 'R');
+          moves.wave(A.mom, t, 6.6, 9.0, 'R');
+          A.confetti.visible = k > 2.6;
+          if (A.confetti.visible) A.confetti.userData.update(k - 2.6);
         },
       },
       {
         stage: B,
         sky: MORNING,
-        label: '💍  Arjun · 12 February',
+        label: '🎨  Story 2 · with Memo',
         setup() {
-          B.arjun.setMood('happy');
-          B.vikram.setMood('happy');
-          B.arjun.root.position.set(-0.55, 0, 0.1);
-          B.arjun.root.rotation.y = 0.35;
-          B.calendar.userData.show(0);
-          B.phone.userData.draw({ type: 'ring', time: '8:00', date: '12 February', emoji: '💍', title: 'Vikram’s wedding', sub: 'Today · get ready!' });
-          say(B, B.arjun, 'I made it, Vikram! 💍', 6.4);
+          B.outside = false;
+          B.aarav.setMood('happy');
+          B.mom.setMood('happy');
+          B.aarav.root.position.set(-0.55, 0, 0);
+          B.aarav.root.rotation.y = 0.4;
+          B.mom.root.position.set(0.6, 0, 0);
+          B.mom.root.rotation.y = -0.4;
+          B.phone.userData.draw({ type: 'ring', time: '9:00', date: '1 March', emoji: '🎨', title: 'Art school admissions', sub: 'Open today · apply now' });
+          say(B, B.aarav, 'I got in! Thank you, Mom! 🎨', 10.2);
         },
         update(t) {
-          ringPhone(B.phone, t, 3.4, 4.9, { x: 0.35, y: 1.35, scale: 0.5 * (1 - ease(seg(t, 5.0, 5.4))) + 0.001 });
-          B.arch.visible = t > 5.0;
-          B.arch.scale.setScalar(0.001 + ease(seg(t, 5.0, 5.6)));
-          moves.walk(B.vikram, t, 5.2, 6.1, 2.4, 0.5, -0.4);
-          moves.hug(B.arjun, t, 6.2, 8.6);
-          moves.hug(B.vikram, t, 6.2, 8.6);
-          B.confetti.visible = t > 6.2;
-          if (B.confetti.visible) B.confetti.userData.update(t - 6.2);
-        },
-      },
-      {
-        stage: C,
-        sky: DUSK,
-        label: '⚡  Karan · 19 October',
-        setup() {
-          C.karan.setMood('happy');
-          C.karan.root.position.set(-0.45, 0, 0.1);
-          C.karan.root.rotation.y = 0.3;
-          C.calendar.userData.show(0);
-          C.phone.userData.draw({ type: 'ring', time: '7:00', date: '19 October', emoji: '⚡', title: 'Pay electricity bill', sub: 'Due tomorrow · ₹2,340' });
-          say(C, C.karan, 'Paid on time. The lights stay on! 💡', 8.7);
-        },
-        update(t) {
-          if (t > 8.0 && C.phone.userData.paid !== true) {
-            C.phone.userData.draw({ type: 'paid' });
-            C.phone.userData.paid = true;
+          inHand(B.drawing, B.aarav);
+          moves.hold(B.aarav, 0.7);
+          if (t < 6.8) return;
+          if (t < 9.0) {
+            ringPhone(B.phone, t, 7.1, 8.6, { x: 0.15, y: 1.45, scale: 0.5 * (1 - ease(seg(t, 8.6, 8.95))) + 0.001 });
+            return;
           }
-          ringPhone(C.phone, t, 6.5, 7.9, { x: 0.35, y: 1.35, scale: 0.5 });
-          // A warm glow as the bill is paid.
-          C.setPower(1 + 0.25 * bump(seg(t, 8.0, 9.0)));
-          moves.jump(C.karan, t, 8.3, 9.3);
-          C.confetti.visible = t > 8.3;
-          if (C.confetti.visible) C.confetti.userData.update(t - 8.3);
+          if (goOutside(B, DAY)) {
+            B.phone.visible = false;
+            B.confirmed.visible = true;
+            B.mom.root.position.set(-1.05, 0, 0.1);
+            B.mom.root.rotation.y = 0.4;
+          }
+          const k = t - 9.0;
+          B.confirmed.position.set(0.6, lerp(3.4, 1.6, ease(seg(k, 0.1, 0.6))), 0.1);
+          inHand(B.drawing, B.aarav, 0.25 * bump(seg(k, 0.8, 2.2)));
+          moves.jump(B.aarav, t, 9.8, 11.0);
+          moves.clap(B.mom, t, 10.0, 11.8);
+          B.confetti.visible = k > 0.8;
+          if (B.confetti.visible) B.confetti.userData.update(k - 0.8);
         },
       },
     ],
   },
   {
-    // Everyone waves with Melo: the closing shot behind the app's feature list.
+    // Aarav, Mom and Melo wave: the closing shot behind the app's feature list.
     stage: F,
     sky: NIGHT,
-    camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 4.2 },
+    camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.4 },
     setup() {
-      const line = [
-        [F.riya, -1.65, 0.35],
-        [F.karan, -0.85, 0.15],
-        [F.arjun, 0.95, -0.15],
-        [F.vikram, 1.7, -0.35],
-      ];
-      for (const [p, x, turn] of line) {
-        p.setMood('happy');
-        p.root.position.set(x, 0, 0.1);
-        p.root.rotation.y = turn;
-      }
+      F.aarav.setMood('happy');
+      F.mom.setMood('happy');
+      F.aarav.root.position.set(-1.0, 0, 0.3);
+      F.aarav.root.rotation.y = 0.25;
+      F.mom.root.position.set(1.1, 0, 0);
+      F.mom.root.rotation.y = -0.25;
     },
     update(t) {
-      F.arch.visible = true;
       F.melo.visible = true;
       F.melo.position.set(0, Math.abs(Math.sin(t * 2.2)) * 0.12, 0.45);
       F.melo.rotation.z = 0.12 * Math.sin(t * 3);
-      moves.wave(F.riya, t % 3, 0, 2.2, 'L');
-      moves.wave(F.karan, (t + 0.6) % 3, 0, 2.2, 'L');
-      moves.wave(F.arjun, (t + 1.2) % 3, 0, 2.2, 'R');
-      moves.wave(F.vikram, (t + 1.8) % 3, 0, 2.2, 'R');
+      moves.wave(F.aarav, t % 3, 0, 2.2, 'L');
+      moves.wave(F.mom, (t + 1.2) % 3, 0, 2.2, 'R');
       F.confetti.visible = true;
       F.confetti.userData.update(t);
     },
   },
 ];
+
 
 /** A calendar page tears off about every second, as weeks go by. */
 function tearPages(calendar, t) {
@@ -1449,7 +1571,12 @@ let current = -1;
 let startedAt = 0;
 
 function resetStage(stage) {
-  for (const key of ['phone', 'soldOut', 'bags', 'invite', 'arch', 'bill', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
+  for (const key of ['phone', 'form', 'bus', 'drawing', 'closed', 'confirmed', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
+  stage.outside = false;
+  if (stage.form) {
+    stage.form.userData.sign(false);
+    stage.form.userData.signed = false;
+  }
   if (stage.things) stage.things.forEach(th => (th.visible = false));
   if (stage.phone) stage.phone.userData.paid = undefined;
   if (stage.calendar) stage.calendar.userData.show(0);
@@ -1472,7 +1599,7 @@ function layout() {
     stage.camera.updateProjectionMatrix();
   };
   if (s.panels) {
-    const bandH = (h - TOP - BOTTOM - GAP * 2) / 3;
+    const bandH = (h - TOP - BOTTOM - GAP * (s.panels.length - 1)) / s.panels.length;
     s.panels.forEach((panel, i) => fit(panel.stage, PANEL_CAM, { x: 0, y: TOP + i * (bandH + GAP), w, h: bandH, small: true }));
   } else {
     fit(s.stage, s.camera, { x: 0, y: 0, w, h, small: false });
@@ -1488,6 +1615,7 @@ function show(index) {
   for (const p of PEOPLE) {
     p.root.position.set(-9, 0, 0);
     p.root.rotation.set(0, 0, 0);
+    p.root.visible = true;
   }
   const entries = s.panels ?? [s];
   for (const e of entries) {
@@ -1498,6 +1626,7 @@ function show(index) {
   for (const e of entries) {
     if (s.panels) label(e.stage, e.label);
     e.setup();
+    if (e.still) dim(e.stage, e.still);
   }
   // Each new scene fades up from dark.
   canvas.style.transition = 'none';
@@ -1531,6 +1660,9 @@ function frame(now) {
   const t = (now - startedAt) / 1000;
   const s = SCENES[current];
   PEOPLE.forEach((p, i) => rest(p, now / 1000 + i * 0.7));
+  // Each panel's background sets the clear color; reset it, so the space
+  // around the panels stays see-through.
+  renderer.setClearColor(0x000000, 0);
   renderer.setScissorTest(false);
   renderer.clear();
   renderer.setScissorTest(true);

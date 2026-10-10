@@ -145,7 +145,7 @@ export function VaultEntryScreen() {
           icon="trash"
           destructive
           title="Delete this note?"
-          message="You can still restore it from Deleted notes."
+          message="It moves to the bin. You can restore it there for 30 days."
           confirmLabel="Delete"
           loading={flagging}
           onConfirm={() => moveToDeleted(false)}

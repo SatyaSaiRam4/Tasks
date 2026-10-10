@@ -103,6 +103,12 @@ MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY", "").strip()
 MSG91_WHATSAPP_INTEGRATED_NUMBER = os.getenv("MSG91_WHATSAPP_INTEGRATED_NUMBER", "").strip()
 MSG91_WHATSAPP_TEMPLATE_NAME = os.getenv("MSG91_WHATSAPP_TEMPLATE_NAME", "").strip()
 MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
+# Which approved template the reminder uses (see PROJECT.md, "Messages"):
+#   "single"   one variable {{1}}: the whole reminder in one line (the
+#              original template).
+#   "detailed" four variables: {{1}} first name, {{2}} reminder, {{3}} date
+#              and time, {{4}} note.
+MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "single").strip().lower()
 
 # How often the reminder worker polls for due WhatsApp sends.
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
@@ -148,11 +154,13 @@ STREAK_FINALIZE_MINUTES = int(os.getenv("STREAK_FINALIZE_MINUTES", "15"))
 # Actions workflow in .github/workflows/daily-cleanup.yml. The caller must send
 # this secret in the X-Cron-Secret header; with it unset the endpoint is off.
 # Plans and tasks are deleted this many days after their end date, completed
-# reminders this many days after they were marked done. The Vault is never
-# touched.
+# reminders this many days after they were marked done. Of the Vault, only
+# notes in the bin are removed (after VAULT_BIN_DAYS).
 # ---------------------------------------------------------------------------
 CRON_SECRET = os.getenv("CRON_SECRET", "").strip()
 CLEANUP_AFTER_DAYS = int(os.getenv("CLEANUP_AFTER_DAYS", "7"))
+# Vault notes in the bin are deleted for good this many days after deletion.
+VAULT_BIN_DAYS = int(os.getenv("VAULT_BIN_DAYS", "30"))
 
 # Limits on what one account can create.
 MAX_ACTIVE_PLANS = 10
