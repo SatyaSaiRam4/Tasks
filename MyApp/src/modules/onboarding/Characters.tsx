@@ -3,7 +3,7 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 
 
 /**
  * The welcome story's cast, drawn in SVG so they stay sharp at any size and
- * need no image files: a woman in a kurta (any colors), with a few moods.
+ * need no image files: Aarav (a boy) and a woman in a kurta, each with a few moods.
  */
 export type Mood = 'happy' | 'sad' | 'worried' | 'surprised';
 
@@ -43,6 +43,47 @@ function Face({ cx, cy, mood }: { cx: number; cy: number; mood: Mood }) {
         <Path d={`M${cx - 7} ${cy + 15} Q${cx} ${cy + 12} ${cx + 7} ${cy + 15}`} stroke={LIP} strokeWidth={3} strokeLinecap="round" fill="none" />
       )}
     </G>
+  );
+}
+
+/** The boy: blue hoodie, messy dark hair. `wave` raises his right arm. */
+export function Kid({ size = 150, mood = 'happy', wave = false }: { size?: number; mood?: Mood; wave?: boolean }) {
+  const skin = '#F3C9A6';
+  return (
+    <Svg width={size * (120 / 190)} height={size} viewBox="0 0 120 190">
+      <Defs>
+        <LinearGradient id="kidHoodie" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#5B9BFF" />
+          <Stop offset="1" stopColor="#2F5FD0" />
+        </LinearGradient>
+      </Defs>
+      <Ellipse cx={60} cy={184} rx={34} ry={5} fill="#000" opacity={0.25} />
+      <Rect x={44} y={138} width={13} height={42} rx={6} fill="#26345E" />
+      <Rect x={63} y={138} width={13} height={42} rx={6} fill="#26345E" />
+      <Ellipse cx={50} cy={180} rx={11} ry={5} fill="#EDEDED" />
+      <Ellipse cx={70} cy={180} rx={11} ry={5} fill="#EDEDED" />
+      <Rect x={22} y={96} width={14} height={44} rx={7} fill="url(#kidHoodie)" />
+      {wave ? (
+        <G transform="rotate(-150 90 100)">
+          <Rect x={84} y={96} width={14} height={44} rx={7} fill="url(#kidHoodie)" />
+          <Circle cx={91} cy={142} r={7} fill={skin} />
+        </G>
+      ) : (
+        <G>
+          <Rect x={84} y={96} width={14} height={44} rx={7} fill="url(#kidHoodie)" />
+          <Circle cx={91} cy={142} r={7} fill={skin} />
+        </G>
+      )}
+      <Circle cx={29} cy={142} r={7} fill={skin} />
+      <Rect x={30} y={86} width={60} height={62} rx={22} fill="url(#kidHoodie)" />
+      <Path d="M48 88 Q60 100 72 88" stroke="#fff" strokeWidth={2} opacity={0.5} fill="none" />
+      <Circle cx={30} cy={60} r={6} fill={skin} />
+      <Circle cx={90} cy={60} r={6} fill={skin} />
+      <Circle cx={60} cy={58} r={30} fill={skin} />
+      <Path d="M29 56 C27 22 93 22 91 56 C86 42 74 36 60 39 C46 36 34 42 29 56 Z" fill={INK} />
+      <Path d="M52 30 L58 20 L62 31 L70 22 L70 34 Z" fill={INK} />
+      <Face cx={60} cy={60} mood={mood} />
+    </Svg>
   );
 }
 

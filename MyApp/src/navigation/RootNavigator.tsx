@@ -46,6 +46,7 @@ import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScre
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
 import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
+import { SheetHost } from '../components/SheetHost';
 import { hideReloadCover, REOPEN_SCREEN_KEY } from '../utils/appReload';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
@@ -400,7 +401,9 @@ export function RootNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme} onReady={() => setActive(activeTab())} onStateChange={() => setActive(activeTab())}>
       <RailContext.Provider value={hasRail}>
-        {hasRail ? (
+        {/* Bottom sheets draw here, in the main window, so they can rise above the keyboard. */}
+        <SheetHost>
+          {hasRail ? (
           <View style={styles.railLayout}>
             <NavRail active={active} onPress={goToTab} />
             <View style={styles.flex}>{navigator}</View>
@@ -410,7 +413,8 @@ export function RootNavigator() {
             {navigator}
             {isAuthenticated && !keyboardOpen ? <FloatingTabBar active={active} onPress={goToTab} /> : null}
           </>
-        )}
+          )}
+        </SheetHost>
       </RailContext.Provider>
       {showTour ? <SatyaTour goToTab={goToTab} /> : null}
       {isAuthenticated && storyOpen ? <WelcomeStory onDone={closeStory} /> : null}

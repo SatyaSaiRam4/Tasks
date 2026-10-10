@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Easing,
   Keyboard,
   Modal,
@@ -19,6 +20,7 @@ import { Gradient, Sheen } from './Gradient';
 import { useMotion } from '../hooks/useMotion';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
+import { useHasSheetHost, useHostedNode } from './SheetHost';
 
 interface SheetProps {
   visible: boolean;
@@ -58,6 +60,17 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
   const keyboard = useKeyboardHeight();
+  const hosted = useHasSheetHost();
+
+  // In the host there's no Modal to catch Android's back button.
+  useEffect(() => {
+    if (!hosted || !visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (dismissable) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [hosted, visible, dismissable, onClose]);
 
   useEffect(() => {
     if (visible) {
@@ -75,15 +88,10 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
     }
   }, [visible, mounted, progress, reduced]);
 
-  if (!mounted) return null;
-
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 40 : 460, 0] });
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 0.96 : 1, 1] });
-  return (
-    <Modal transparent visible animationType="none" onRequestClose={() => {
-      if (dismissable) onClose();
-    }} statusBarTranslucent>
-      <View style={[styles.flex, isTablet && styles.center, { paddingBottom: keyboard }]}>
+  const content = (
+    <View style={[styles.flex, isTablet && styles.center, { paddingBottom: keyboard }]}>
         <Animated.View style={[styles.backdrop, { opacity: progress }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -111,7 +119,18 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           {children}
         </Animated.View>
-      </View>
+    </View>
+  );
+
+  // Drawn in the SheetHost (main window) when there is one, so the sheet can
+  // move above the keyboard; otherwise in a Modal.
+  useHostedNode(mounted ? content : null, mounted && hosted);
+  if (!mounted || hosted) return null;
+  return (
+    <Modal transparent visible animationType="none" onRequestClose={() => {
+      if (dismissable) onClose();
+    }} statusBarTranslucent>
+      {content}
     </Modal>
   );
 }

@@ -5,6 +5,8 @@
   * Tasks CLEANUP_AFTER_DAYS after their own end date, or after deletion.
   * Reminders CLEANUP_AFTER_DAYS after they were marked done (the app's
     "Done" tab) or cancelled.
+  * Vault notes VAULT_BIN_DAYS after they were put in the bin. Notes that
+    are not in the bin are never touched.
 
 Every user's ended days are finalized first, so streak points, history and
 the wallet are settled before anything they were built from is removed.
@@ -22,6 +24,7 @@ from app.modules.auth.models import User
 from app.modules.reminders.models import Reminder, ReminderStatus
 from app.modules.streaks.engine import finalize_user
 from app.modules.tracks.models import Track
+from app.modules.vault.models import VaultEntry
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +59,15 @@ def run_cleanup(db: Session) -> dict[str, int]:
             )
         )
     ).rowcount
+    bin_cutoff = now - timedelta(days=config.VAULT_BIN_DAYS)
+    notes = db.execute(delete(VaultEntry).where(VaultEntry.deleted_at < bin_cutoff)).rowcount
     db.commit()
-    result = {"users_finalized": finalized, "plans_deleted": plans, "tasks_deleted": tasks, "reminders_deleted": reminders}
+    result = {
+        "users_finalized": finalized,
+        "plans_deleted": plans,
+        "tasks_deleted": tasks,
+        "reminders_deleted": reminders,
+        "bin_notes_deleted": notes,
+    }
     logger.info("Daily cleanup: %s", result)
     return result
