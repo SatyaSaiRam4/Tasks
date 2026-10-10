@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { brand, colors, font, gradients, radius, spacing } from '../../theme';
 import { Gradient } from '../../components/Gradient';
 import { Button } from '../../components/Button';
-import { Icon, type IconName } from '../../components/Icon';
 import { RealIcon, type RealIconName } from '../../components/RealIcon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
@@ -13,15 +12,17 @@ import { Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): Riya's best friend invites her to a wedding two
- * months away and Riya plans to shop the big sale in ten days; weeks fly by
- * and she misses both. Melo arrives, and this time Memo reminds her of both,
- * months ahead. Ends on what the app does. Plays like a phone "story": it moves on by itself; tap the right
- * side for next and the left side for back.
+ * again from Settings): three real-life stories at once, in three panels.
+ * Riya waits for a sale to buy Mom's gift, Arjun's friend is getting married
+ * in two months, Karan has a bill due in 15 days. Life gets busy and all
+ * three forget. Melo arrives; this time they tell Memo once, months ahead,
+ * and all three make it. Ends on what the app does. Plays like a phone
+ * "story": it moves on by itself; tap the right side for next, the left for
+ * back.
  *
  * The scenes play in 3D (assets/web/story, built from web/story/story.js)
  * in a WebView behind the captions. If the phone can't run it, the same
- * story plays with the flat SVG characters instead.
+ * stories play as flat illustrated panels instead.
  */
 
 interface Scene {
@@ -33,15 +34,18 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Riya.', duration: 7800, Body: AskScene },
-  { caption: 'But two months is a long time…', duration: 7000, Body: BusyScene },
-  { caption: '15 December…', duration: 7000, Body: ForgotScene },
-  { caption: 'That’s why Memo is here.', duration: 6500, Body: SatyaScene },
-  { caption: 'This time, Riya tells Memo.', duration: 8200, Body: RemindScene },
+  { caption: 'Three people. Three things to remember.', duration: 11500, Body: IntroScene },
+  { caption: 'But life gets busy…', duration: 7500, Body: BusyScene },
+  { caption: '…and they forget.', duration: 11000, Body: ForgotScene },
+  { caption: 'That’s why Memo is here.', duration: 8000, Body: SatyaScene },
+  { caption: 'This time, they tell Memo.', duration: 12000, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
 const STORY_PAGE = 'file:///android_asset/web/story/index.html';
+/** Room for the progress bars and caption above the panels, and the hint below. */
+const CAPTION_SPACE = 150;
+const HINT_SPACE = 64;
 const LOAD_TIMEOUT_MS = 9000;
 type Mode = 'loading' | '3d' | 'flat';
 
@@ -106,7 +110,10 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
       {mode !== 'flat' ? (
         <WebView
           ref={web}
-          source={{ uri: `${STORY_PAGE}?motion=${reduced ? 'reduced' : 'full'}&scene=0` }}
+          source={{
+            // The panels fit between the caption at the top and the hint at the bottom.
+            uri: `${STORY_PAGE}?motion=${reduced ? 'reduced' : 'full'}&scene=0&top=${Math.round(insets.top + CAPTION_SPACE)}&bottom=${Math.round(insets.bottom + HINT_SPACE)}`,
+          }}
           style={[StyleSheet.absoluteFill, styles.web, mode !== '3d' && styles.hidden]}
           containerStyle={[StyleSheet.absoluteFill, styles.web]}
           originWhitelist={['file://*']}
@@ -196,46 +203,6 @@ function useAppear(delay = 0, duration = 600) {
   return value;
 }
 
-/** A gentle up-and-down loop, so characters feel alive. */
-function useBob(period = 2400, offset = 0) {
-  const { reduced } = useMotion();
-  const value = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (reduced) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(offset),
-        Animated.timing(value, { toValue: 1, duration: period / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(value, { toValue: 0, duration: period / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [period, offset, reduced, value]);
-  return value;
-}
-
-/** A character that walks in from one side and then breathes in place. */
-function Actor({ from, delay = 0, children }: { from: 'left' | 'right' | 'bottom'; delay?: number; children: React.ReactNode }) {
-  const enter = useAppear(delay, 800);
-  const bob = useBob(2600, delay);
-  const start = from === 'left' ? -120 : from === 'right' ? 120 : 0;
-  return (
-    <Animated.View
-      style={{
-        opacity: enter,
-        transform: [
-          { translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [start, 0] }) },
-          { translateY: from === 'bottom' ? enter.interpolate({ inputRange: [0, 1], outputRange: [80, 0] }) : 0 },
-          { translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) },
-        ],
-      }}
-    >
-      {children}
-    </Animated.View>
-  );
-}
-
 /** A speech bubble that pops in after `delay`. */
 function Speech({ text, delay = 0, side = 'left', tone = 'light' }: { text: string; delay?: number; side?: 'left' | 'right'; tone?: 'light' | 'gold' }) {
   const pop = useAppear(delay, 500);
@@ -255,89 +222,77 @@ function Speech({ text, delay = 0, side = 'left', tone = 'light' }: { text: stri
 
 // ---- Scenes ------------------------------------------------------------------------
 
-function AskScene() {
+interface Line {
+  who: string;
+  color: [string, string];
+  text: string;
+  mood: 'happy' | 'sad' | 'worried' | 'surprised';
+  thought?: boolean;
+}
+
+/** The flat version of a three-panel scene: one row per story, each with its person and line. */
+function Trio({ lines }: { lines: Line[] }) {
   return (
-    <View style={styles.scene}>
-      <View style={styles.speechArea}>
-        <Speech text="Riya! I’m getting married on 14 December. You have to be there!" delay={500} side="right" tone="gold" />
-        <Speech text="I’ll be there! I’ll buy my dress in the big sale. It opens in 10 days!" delay={2900} side="left" />
-      </View>
-      <View style={styles.cast}>
-        <Actor from="left">
-          <Mom size={200} mood="happy" colors={['#3FBFAE', '#1F7A6F']} />
-        </Actor>
-        <Actor from="right" delay={200}>
-          <Mom size={210} mood="happy" colors={['#D9334F', '#8C0F25']} />
-        </Actor>
-      </View>
+    <View style={styles.trio}>
+      {lines.map((line, i) => (
+        <TrioRow key={line.who} line={line} index={i} />
+      ))}
     </View>
   );
 }
 
-const BUSY: IconName[] = ['clock', 'message', 'list', 'bell', 'calendar', 'repeat'];
+function TrioRow({ line, index }: { line: Line; index: number }) {
+  const enter = useAppear(300 + index * 1800, 600);
+  return (
+    <Animated.View style={[styles.trioRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
+      <Mom size={96} mood={line.mood} colors={line.color} />
+      <View style={styles.flex}>
+        <Text style={styles.trioWho}>{line.who}</Text>
+        <View style={[styles.speech, styles.speechLeft, line.thought && styles.trioThought]}>
+          <Text style={[styles.speechText, line.thought && styles.trioThoughtText]}>{line.text}</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+const TEAL: [string, string] = ['#3FBFAE', '#1F7A6F'];
+const BLUE: [string, string] = ['#5B8DEF', '#2F5FD0'];
+const GREY: [string, string] = ['#A3A9B3', '#6B717C'];
+
+function IntroScene() {
+  return (
+    <Trio
+      lines={[
+        { who: '🛍️ Riya', color: TEAL, mood: 'happy', text: 'The big sale opens in 10 days. I’ll buy Mom’s birthday gift then!' },
+        { who: '💍 Arjun', color: BLUE, mood: 'happy', text: 'My friend Vikram’s wedding is on 12 February. I have to be there!' },
+        { who: '⚡ Karan', color: GREY, mood: 'happy', text: 'Electricity bill, due on the 20th. I’ll pay it later.' },
+      ]}
+    />
+  );
+}
 
 function BusyScene() {
-  const spin = useBob(3000);
-  const swap = useAppear(2600, 700);
   return (
-    <View style={styles.scene}>
-      <View style={styles.speechArea}>
-        <View style={styles.thought}>
-          <Animated.Text style={[styles.thoughtText, { opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-            The sale… the wedding… 🛍️💍
-          </Animated.Text>
-          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…wait, what was coming up? 🤔</Animated.Text>
-        </View>
-        <View style={styles.thoughtDots}>
-          <View style={[styles.thoughtDot, styles.thoughtDotBig]} />
-          <View style={styles.thoughtDot} />
-        </View>
-      </View>
-      <View style={styles.cast}>
-        <View>
-          {BUSY.map((icon, i) => {
-            const angle = (i / BUSY.length) * Math.PI * 2;
-            return (
-              <Animated.View
-                key={icon}
-                style={[
-                  styles.busyIcon,
-                  {
-                    left: 50 + Math.cos(angle) * 120,
-                    top: 90 + Math.sin(angle) * 95,
-                    transform: [{ translateY: spin.interpolate({ inputRange: [0, 1], outputRange: [i % 2 ? -8 : 8, i % 2 ? 8 : -8] }) }],
-                  },
-                ]}
-              >
-                <Icon name={icon} size={20} color={brand.champagneLight} />
-              </Animated.View>
-            );
-          })}
-          <Actor from="bottom">
-            <Mom size={230} mood="worried" colors={['#3FBFAE', '#1F7A6F']} />
-          </Actor>
-        </View>
-      </View>
-    </View>
+    <Trio
+      lines={[
+        { who: '🛍️ Riya', color: TEAL, mood: 'worried', thought: true, text: 'The sale… when was it again? 🤔' },
+        { who: '💍 Arjun', color: BLUE, mood: 'worried', thought: true, text: 'Vikram’s wedding… which date was it? 🤔' },
+        { who: '⚡ Karan', color: GREY, mood: 'worried', thought: true, text: 'That bill… did I pay it? 🤔' },
+      ]}
+    />
   );
 }
 
 function ForgotScene() {
   return (
-    <View style={styles.scene}>
-      <View style={styles.speechArea}>
-        <Speech text="Ananya’s wedding was yesterday?! I missed it… and the sale too. 😢" delay={400} side="left" />
-        
-      </View>
-      <View style={styles.cast}>
-        <Actor from="left">
-          <Mom size={210} mood="sad" colors={['#3FBFAE', '#1F7A6F']} />
-        </Actor>
-        <Actor from="right" delay={200}>
-          <View />
-        </Actor>
-      </View>
-    </View>
+    <Trio
+      lines={[
+        { who: '🛍️ Riya', color: TEAL, mood: 'sad', text: 'Sold out?! The sale ended yesterday. No gift for Mom… 😞' },
+        { who: '💍 Arjun', color: BLUE, mood: 'sad', text: 'Vikram’s wedding was yesterday?! I missed it… 😢' },
+        { who: '⚡ Karan', color: GREY, mood: 'surprised', text: 'Power cut?! I forgot to pay the bill! 😱' },
+      ]}
+    />
   );
 }
 
@@ -345,7 +300,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remember for you." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on time." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />
@@ -355,39 +310,14 @@ function SatyaScene() {
 }
 
 function RemindScene() {
-  const ring = useBob(220);
-  const ringing = useAppear(2000, 300);
-  const shake = Animated.multiply(ringing, ring.interpolate({ inputRange: [0, 1], outputRange: [-1, 1] }));
   return (
-    <View style={styles.scene}>
-      <View style={styles.speechArea}>
-        <Speech text="Memo reminded me, weeks ahead! 💍" delay={3200} side="left" />
-      </View>
-      <View style={styles.cast}>
-        <Actor from="left">
-          <Mom size={200} mood="happy" colors={['#F06A9B', '#B0305F']} />
-        </Actor>
-        <Actor from="right" delay={300}>
-          <Animated.View style={{ transform: [{ rotate: shake.interpolate({ inputRange: [-1, 1], outputRange: ['-6deg', '6deg'] }) }] }}>
-            <View style={styles.phone}>
-              <View style={styles.notch} />
-              <Text style={styles.phoneTime}>9:00</Text>
-              <View style={styles.alarmCard}>
-                <RealIcon name="bell" size={30} />
-                <Text style={styles.alarmTitle}>Ananya’s wedding 💍</Text>
-                <Text style={styles.alarmMeta}>Today · 14 December</Text>
-                <View style={styles.alarmPill}>
-                  <Text style={styles.alarmPillText}>Alarm</Text>
-                </View>
-              </View>
-              <View style={styles.stopButton}>
-                <Text style={styles.stopText}>Stop</Text>
-              </View>
-            </View>
-          </Animated.View>
-        </Actor>
-      </View>
-    </View>
+    <Trio
+      lines={[
+        { who: '🛍️ Riya', color: TEAL, mood: 'happy', text: '“Sale opens today” — got Mom’s gift! 🎁' },
+        { who: '💍 Arjun', color: BLUE, mood: 'happy', text: '“Vikram’s wedding today” — I made it! 💍' },
+        { who: '⚡ Karan', color: GREY, mood: 'happy', text: '“Pay the bill, due tomorrow” — paid on time! 💡' },
+      ]}
+    />
   );
 }
 
@@ -522,133 +452,32 @@ const styles = StyleSheet.create({
   speechTextGold: {
     color: brand.midnight,
   },
-  cast: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    paddingBottom: spacing.lg,
-  },
   castCenter: {
     alignItems: 'center',
     paddingBottom: spacing.xl,
   },
-  thought: {
-    alignSelf: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderRadius: 40,
-    backgroundColor: 'rgba(239,233,220,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,233,220,0.25)',
-  },
-  thoughtText: {
-    ...font.semibold,
-    fontSize: 17,
-    color: colors.heroText,
-    textAlign: 'center',
-  },
-  thoughtOver: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: spacing.lg,
-  },
-  thoughtDots: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  thoughtDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(239,233,220,0.18)',
-  },
-  thoughtDotBig: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  busyIcon: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
+  trio: {
+    flex: 1,
     justifyContent: 'center',
-    backgroundColor: 'rgba(239,233,220,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,233,220,0.22)',
+    gap: spacing.lg,
   },
-  phone: {
-    width: 130,
-    height: 230,
-    borderRadius: 26,
-    borderWidth: 3,
-    borderColor: '#3A3F52',
-    backgroundColor: '#0B1122',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+  trioRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.md,
   },
-  notch: {
-    width: 44,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3A3F52',
-    marginTop: spacing.sm,
+  trioWho: {
+    ...font.bold,
+    fontSize: 13,
+    color: brand.champagne,
+    marginBottom: spacing.xs,
   },
-  phoneTime: {
-    ...font.serif,
-    fontSize: 30,
+  trioThought: {
+    backgroundColor: 'rgba(239,233,220,0.14)',
+  },
+  trioThoughtText: {
     color: colors.heroText,
-    marginTop: spacing.sm,
-  },
-  alarmCard: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(239,233,220,0.1)',
-  },
-  alarmTitle: {
-    ...font.bold,
-    fontSize: 12.5,
-    color: colors.heroText,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  alarmMeta: {
-    ...font.medium,
-    fontSize: 10.5,
-    color: colors.heroTextSecondary,
-    marginTop: 2,
-  },
-  alarmPill: {
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: brand.ember,
-  },
-  alarmPillText: {
-    ...font.bold,
-    fontSize: 10,
-    color: '#fff',
-  },
-  stopButton: {
-    position: 'absolute',
-    bottom: spacing.md,
-    left: spacing.md,
-    right: spacing.md,
-    paddingVertical: 6,
-    borderRadius: 14,
-    alignItems: 'center',
-    backgroundColor: brand.champagne,
-  },
-  stopText: {
-    ...font.bold,
-    fontSize: 12,
-    color: brand.midnight,
+    fontStyle: 'italic',
   },
   features: {
     flex: 1,

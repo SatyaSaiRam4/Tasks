@@ -23,7 +23,10 @@ const DIRECTIONS = {
  * A view with an SVG linear-gradient background (no extra native gradient lib
  * needed). The SVG is drawn at the view's measured size: a "100%" SVG can keep
  * the size of its first layout pass on Android, leaving a view that later
- * grows only partly filled.
+ * grows only partly filled. It is drawn a pixel larger than the view (the
+ * view's rounded, clipped frame trims the extra): measured sizes are often
+ * fractional, and Android rounds the drawing down, which otherwise leaves a
+ * thin unfilled strip along the right and bottom edges.
  */
 export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], style, children, borderRadius = 0 }: GradientProps) {
   const id = useId().replace(/:/g, '');
@@ -36,14 +39,19 @@ export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], sty
   return (
     <View style={[{ borderRadius, overflow: 'hidden' }, style]} onLayout={onLayout}>
       {size.width > 0 && size.height > 0 ? (
-        <Svg key={`${size.width}x${size.height}`} width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+        <Svg
+          key={`${size.width}x${size.height}`}
+          width={Math.ceil(size.width) + 1}
+          height={Math.ceil(size.height) + 1}
+          style={styles.fill}
+        >
           <Defs>
             <LinearGradient id={`g${id}`} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}>
               <Stop offset="0" stopColor={colors[0]} stopOpacity={opacity[0]} />
               <Stop offset="1" stopColor={colors[1]} stopOpacity={opacity[1]} />
             </LinearGradient>
           </Defs>
-          <Rect width={size.width} height={size.height} fill={`url(#g${id})`} />
+          <Rect width={Math.ceil(size.width) + 1} height={Math.ceil(size.height) + 1} fill={`url(#g${id})`} />
         </Svg>
       ) : null}
       {children}
@@ -82,6 +90,11 @@ export function Sheen({ color, inset = '16%', style }: { color?: [string, string
 }
 
 const styles = StyleSheet.create({
+  fill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
   flex: {
     flex: 1,
   },

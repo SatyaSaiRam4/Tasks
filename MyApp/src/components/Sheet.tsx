@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -29,8 +29,25 @@ interface SheetProps {
   dismissable?: boolean;
 }
 
+/** The on-screen keyboard's height (0 when it's closed), on both platforms. */
+function useKeyboardHeight() {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, e => setHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
+
 /**
- * A bottom sheet on a dimmed backdrop; glides up with a soft landing, or
+ * A bottom sheet on a dimmed backdrop; it rides up above the keyboard, so
+ * what's being typed always stays in view; glides up with a soft landing, or
  * fades under reduced motion. On tablets and desktops it floats as a
  * centered dialog instead.
  */
@@ -40,6 +57,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
   const { isTablet } = useLayout();
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
+  const keyboard = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -65,7 +83,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
     <Modal transparent visible animationType="none" onRequestClose={() => {
       if (dismissable) onClose();
     }} statusBarTranslucent>
-      <KeyboardAvoidingView style={[styles.flex, isTablet && styles.center]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.flex, isTablet && styles.center, { paddingBottom: keyboard }]}>
         <Animated.View style={[styles.backdrop, { opacity: progress }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -77,7 +95,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
         <Animated.View
           style={[
             styles.sheet,
-            isTablet ? styles.dialog : { paddingBottom: insets.bottom + spacing.xl },
+            isTablet ? styles.dialog : { paddingBottom: (keyboard ? 0 : insets.bottom) + spacing.xl },
             { opacity: isTablet ? progress : 1, transform: [{ translateY }, { scale }] },
           ]}
           accessibilityViewIsModal
@@ -93,7 +111,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           {children}
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

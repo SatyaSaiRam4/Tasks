@@ -10,7 +10,6 @@ import { FadeIn } from '../../../components/Feedback';
 import { Screen } from '../../../components/Screen';
 import { TopBar } from '../../../components/ScreenHeader';
 import { Fab, IconButton, Segmented } from '../../../components/Controls';
-import { Checkbox } from '../../../components/Checkbox';
 import { DateStrip, type DayMark } from '../../../components/DateStrip';
 import { EmptyState, ErrorState, SkeletonList } from '../../../components/Feedback';
 import { ConfirmSheet, Sheet } from '../../../components/Sheet';
@@ -22,7 +21,6 @@ import { cancelReminderNotification, scheduleReminderNotification } from '../../
 import {
   useDeleteReminderMutation,
   useListRemindersQuery,
-  useSetReminderCompletedMutation,
   useSnoozeReminderMutation,
   type Reminder,
 } from '../remindersApi';
@@ -31,24 +29,27 @@ import { categoryColor } from '../../routines/components';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Tab = 'all' | 'sent' | 'failed' | 'done';
+type Tab = 'all' | 'upcoming' | 'done' | 'failed';
 
 const dayOf = (r: Reminder) => toDateKey(new Date(r.remind_at));
 const isPast = (r: Reminder) => new Date(r.remind_at).getTime() <= Date.now();
+/** A reminder is done once its time has come (the server marks it a moment later). */
+const isDone = (r: Reminder) => Boolean(r.completed_at) || isPast(r);
+const isFailed = (r: Reminder) => r.whatsapp_status === 'FAILED';
 
 /** Which reminders each tab shows. Done ones live only in "Done" (the bin). */
 const TABS: { value: Tab; label: string; match: (r: Reminder) => boolean }[] = [
-  { value: 'all', label: 'All', match: r => !r.completed_at },
-  { value: 'sent', label: 'Sent', match: r => !r.completed_at && isPast(r) && r.whatsapp_status !== 'FAILED' },
-  { value: 'failed', label: 'Failed', match: r => !r.completed_at && r.whatsapp_status === 'FAILED' },
-  { value: 'done', label: 'Done', match: r => Boolean(r.completed_at) },
+  { value: 'all', label: 'All', match: () => true },
+  { value: 'upcoming', label: 'Upcoming', match: r => !isDone(r) },
+  { value: 'done', label: 'Done', match: r => isDone(r) && !isFailed(r) },
+  { value: 'failed', label: 'Failed', match: r => isFailed(r) },
 ];
 
 const EMPTY: Record<Tab, { title: string; message: string }> = {
   all: { title: 'No reminders this day', message: 'Tap + to add one. Pick a time, and Memo reminds you.' },
-  sent: { title: 'Nothing sent this day', message: 'Reminders show here once their time has come.' },
+  upcoming: { title: 'Nothing coming up this day', message: 'Tap + to add a reminder.' },
+  done: { title: 'Nothing done this day', message: 'Reminders move here by themselves once their time comes.' },
   failed: { title: 'Nothing failed', message: 'If a WhatsApp message can’t be sent, it shows here.' },
-  done: { title: 'Nothing done this day', message: 'Tick a reminder when it’s done. It stays here for 7 days.' },
 };
 
 function dayHeading(key: string, todayKey: string) {
@@ -57,9 +58,9 @@ function dayHeading(key: string, todayKey: string) {
 
 /**
  * Reminders by day: pick a day on the strip (today by default) or from the
- * calendar, then the tabs narrow that day's reminders: All (not done yet),
- * Sent (their time has come), Failed (WhatsApp couldn't send) and Done, the
- * bin, where finished reminders wait 7 days before the daily cleanup.
+ * calendar, then the tabs narrow that day's reminders: All, Upcoming, Done
+ * (a reminder moves there by itself once its time comes; the daily cleanup
+ * deletes it 7 days later) and Failed (WhatsApp couldn't send).
  */
 export function RemindersScreen() {
   const navigation = useNavigation<Nav>();
@@ -76,7 +77,7 @@ export function RemindersScreen() {
       const key = dayOf(r);
       const m = out[key] ?? { required: 0, completed: 0, status: 'PENDING' };
       m.required += 1;
-      if (r.completed_at) m.completed += 1;
+      if (isDone(r)) m.completed += 1;
       m.status = m.completed === m.required ? 'SUCCESS' : 'PENDING';
       out[key] = m;
     }
@@ -84,7 +85,6 @@ export function RemindersScreen() {
   }, [data]);
   const [menuFor, setMenuFor] = useState<Reminder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Reminder | null>(null);
-  const [setCompleted] = useSetReminderCompletedMutation();
   const [snooze] = useSnoozeReminderMutation();
   const [remove, { isLoading: deleting }] = useDeleteReminderMutation();
 
@@ -101,20 +101,6 @@ export function RemindersScreen() {
     const match = TABS.find(x => x.value === tab)!.match;
     return ofDay.filter(match).sort((a, b) => a.remind_at.localeCompare(b.remind_at));
   }, [ofDay, tab]);
-
-  const toggleDone = async (r: Reminder) => {
-    try {
-      const updated = await setCompleted({ id: r.id, completed: !r.completed_at }).unwrap();
-      if (updated.completed_at) {
-        cancelReminderNotification(r.id).catch(() => undefined);
-        Toast.info('Moved to Done.', 1.2);
-      } else if (new Date(updated.remind_at).getTime() > Date.now()) {
-        scheduleReminderNotification(r.id, r.title, r.note, new Date(updated.remind_at), r.alarm_enabled).catch(() => undefined);
-      }
-    } catch (err) {
-      Toast.fail(getErrorMessage(err), 2);
-    }
-  };
 
   const doSnooze = async (r: Reminder, minutes: number) => {
     setMenuFor(null);
@@ -193,7 +179,7 @@ export function RemindersScreen() {
             {tab === 'done' ? (
               <View style={styles.binNote}>
                 <Icon name="trash" size={14} color={colors.textTertiary} />
-                <Text style={t.caption}>Done reminders are deleted automatically after 7 days.</Text>
+                <Text style={t.caption}>Done reminders are deleted automatically 7 days later.</Text>
               </View>
             ) : null}
             {items.map((r, i) => (
@@ -203,7 +189,6 @@ export function RemindersScreen() {
                   category={r.track_id ? trackNames.get(r.track_id) : undefined}
                   last={i === items.length - 1}
                   onPress={() => navigation.navigate('ReminderEditor', { reminderId: r.id })}
-                  onToggle={() => toggleDone(r)}
                   onMore={() => setMenuFor(r)}
                 />
               </FadeIn>
@@ -213,7 +198,7 @@ export function RemindersScreen() {
       </View>
 
       <Sheet visible={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor?.title}>
-        {menuFor && !menuFor.completed_at ? (
+        {menuFor && !isFailed(menuFor) ? (
           <>
             <Button label="Edit" icon="edit" variant="secondary" onPress={() => {
               const id = menuFor.id;
@@ -262,27 +247,25 @@ function ReminderRow({
   category,
   last,
   onPress,
-  onToggle,
   onMore,
 }: {
   reminder: Reminder;
   category?: string;
   last: boolean;
   onPress: () => void;
-  onToggle: () => void;
   onMore: () => void;
 }) {
-  const done = Boolean(r.completed_at);
-  const late = !done && new Date(r.remind_at).getTime() < Date.now();
+  const done = isDone(r);
+  const failed = isFailed(r);
   const [clock, meridiem] = formatClock(r.remind_at).split(' ');
   return (
     <View style={styles.line}>
       <View style={styles.timeCol}>
-        <Text style={[styles.time, late && { color: colors.danger }, done && styles.timeDone]}>{clock}</Text>
+        <Text style={[styles.time, failed && { color: colors.danger }, done && styles.timeDone]}>{clock}</Text>
         {meridiem ? <Text style={styles.meridiem}>{meridiem}</Text> : null}
       </View>
       <View style={styles.thread}>
-        <View style={[styles.node, done && styles.nodeDone, late && styles.nodeLate]} />
+        <View style={[styles.node, done && styles.nodeDone, failed && styles.nodeLate]} />
         {last ? null : <View style={styles.threadLine} />}
       </View>
       <Pressable
@@ -301,9 +284,9 @@ function ReminderRow({
               {r.note}
             </Text>
           ) : null}
-          {category || r.whatsapp_number || r.alarm_enabled || r.priority === 'HIGH' || late ? (
+          {category || r.whatsapp_number || r.alarm_enabled || r.priority === 'HIGH' || done ? (
             <View style={styles.tags}>
-              {late ? <Tag label="Time passed" color={colors.warning} /> : null}
+              {done && !failed ? <Tag label="Done ✓" color={colors.success} /> : null}
               {r.alarm_enabled ? <Tag label="Alarm" color={colors.danger} /> : null}
               {r.priority === 'HIGH' ? <Tag label="Priority" color={colors.streak} /> : null}
               {category ? <Tag label={category} color={categoryColor(category)} dot /> : null}
@@ -312,7 +295,6 @@ function ReminderRow({
           ) : null}
         </View>
         <IconButton icon="more" variant="plain" size={18} color={colors.textTertiary} accessibilityLabel="More options" onPress={onMore} />
-        <Checkbox checked={done} onPress={onToggle} accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'} />
       </Pressable>
     </View>
   );

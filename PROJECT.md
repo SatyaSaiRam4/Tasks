@@ -187,12 +187,13 @@ component names still say "category", e.g. `CategoryCard`).
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  Riya is invited to her best friend's wedding two months away and plans to
-  shop a sale in ten days; weeks fly by and she misses both. Melo arrives,
-  and this time Memo reminds her of both, months ahead. It plays in 3D
-  (three.js, `web/story`), with the SVG characters in
-  `modules/onboarding/Characters.tsx` as the fallback; Melo narrates. It plays once
-  per account on a device, then Melo's tour runs; both replay from Settings.
+  three real-life stories play at once in three 3D panels (three.js,
+  `web/story`): Riya waits for a sale to buy Mom's gift, Arjun's friend
+  Vikram marries in two months, Karan has an electricity bill due. Life gets
+  busy and they forget (sold out, missed wedding, power cut); Melo arrives,
+  they tell Memo, and the reminders ring on the day. Flat illustrated panels
+  are the fallback. It plays once per account on a device, then Melo's tour
+  runs; both replay from Settings.
 - Melo's tour has nine steps with a title, typed-out text and a gesture
   each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
@@ -344,3 +345,17 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
   underneath, and fade it out once Settings is drawn, so nothing flickers.
 - The biggest remaining cost is distance: the database is in Mumbai, so the
   Render service should run in Singapore.
+
+## Reminders, Vault and feedback
+
+- A reminder moves to Done by itself once its time has passed (the server's
+  reminder worker marks it, after any WhatsApp send); there is no tick box.
+  Tabs: All, Upcoming, Done, Failed. The server also runs the daily cleanup
+  itself at 02:00 IST (done reminders and ended plans 7 days later), in
+  addition to the GitHub Actions job.
+- Vault: All notes (grouped by day) or By date (date strip and calendar). The
+  icon beside the search box selects notes for deleting (to Deleted notes;
+  there, restore or delete for good). There is no "delete all".
+- Ticking a task shows a spinner in its box until the server confirms; the
+  tick then appears at once. Reaching a new badge shows a one-time
+  congratulations. Bottom sheets rise above the keyboard on both platforms.

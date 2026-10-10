@@ -26,7 +26,9 @@ export function ProgressRing({
 }) {
   const { reduced } = useMotion();
   const id = useId().replace(/:/g, '');
-  const r = (size - stroke) / 2;
+  // Leave room for the fine halo ring (4px outside the track), so neither
+  // ring is clipped at the edges of the drawing.
+  const r = (size - stroke) / 2 - 4;
   const circumference = 2 * Math.PI * r;
   const value = useRef(new Animated.Value(reduced ? progress : 0)).current;
 

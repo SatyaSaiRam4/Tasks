@@ -10,6 +10,8 @@ import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
+import { selectCurrentUser } from '../auth/authSlice';
+import { celebrateNewTier } from '../streaks/Tiers';
 
 interface Target {
   actionId: string;
@@ -20,9 +22,11 @@ interface Target {
 interface CompletionApi {
   /** Opens the confirmation for a task due today. */
   request: (target: Target) => void;
+  /** The task being saved right now, so its box can show a spinner. */
+  pendingId: string | null;
 }
 
-const CompletionContext = createContext<CompletionApi>({ request: () => undefined });
+const CompletionContext = createContext<CompletionApi>({ request: () => undefined, pendingId: null });
 
 export function useCompletion() {
   return useContext(CompletionContext);
@@ -34,15 +38,18 @@ export function useCompletion() {
  */
 export function CompletionProvider({ children }: { children: React.ReactNode }) {
   const mode = useAppSelector(s => s.preferences.confirmationMode);
+  const user = useAppSelector(selectCurrentUser);
   const { celebrate } = useCelebration();
   const [target, setTarget] = useState<Target | null>(null);
   const [complete, { isLoading: completing }] = useCompleteActionMutation();
   const [uncomplete, { isLoading: undoing }] = useUncompleteActionMutation();
 
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const close = useCallback(() => setTarget(null), []);
 
   const confirm = async (current: Target | null = target) => {
     if (!current) return;
+    setPendingId(current.actionId);
     try {
       const result = await complete({ id: current.actionId, method: mode }).unwrap();
       close();
@@ -65,22 +72,28 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
         const left = result.today_required - result.today_completed;
         Toast.success(left > 0 ? `Done. ${left} left today.` : 'Done.', 1.2);
       }
+      if (user) celebrateNewTier(user.id, result.best_streak, celebrate).catch(() => undefined);
       for (const a of result.new_achievements) {
         celebrate({ icon: 'award', tone: 'primary', eyebrow: 'Achievement unlocked', title: a.title, subtitle: a.description });
       }
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
+    } finally {
+      setPendingId(null);
     }
   };
 
   const undo = async () => {
     if (!target) return;
+    setPendingId(target.actionId);
     try {
       await uncomplete(target.actionId).unwrap();
       close();
       Toast.info('Marked as not done.', 1.2);
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
+    } finally {
+      setPendingId(null);
     }
   };
 
@@ -90,8 +103,9 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo(
     () => ({
       request: (next: Target) => (mode === 'QUICK' && !next.isCompleted ? confirmRef.current(next) : setTarget(next)),
+      pendingId,
     }),
-    [mode],
+    [mode, pendingId],
   );
 
   return (

@@ -210,13 +210,42 @@ export const routinesApi = baseApi.injectEndpoints({
     completeAction: builder.mutation<CompletionResult, { id: string; method: 'STANDARD' | 'QUICK' }>({
       query: ({ id, method }) => ({ url: `/actions/${id}/complete`, method: 'POST', body: { confirmed: true, method } }),
       invalidatesTags: [...COMPLETION_TAGS],
+      onQueryStarted: ({ id }, api) => markToday(api, id, 'DONE'),
     }),
     uncompleteAction: builder.mutation<CompletionResult, string>({
       query: id => ({ url: `/actions/${id}/uncomplete`, method: 'POST', body: {} }),
       invalidatesTags: [...COMPLETION_TAGS],
+      onQueryStarted: (id, api) => markToday(api, id, 'TODO'),
     }),
   }),
 });
+
+/**
+ * Once the server confirms a tick (or untick), shows it in every cached plan
+ * table straight away, so the box goes from spinner to tick without waiting
+ * for the table to reload.
+ */
+async function markToday(
+  api: { dispatch: (action: unknown) => unknown; getState: () => unknown; queryFulfilled: Promise<unknown> },
+  actionId: string,
+  cell: GridCell,
+) {
+  try {
+    await api.queryFulfilled;
+  } catch {
+    return;
+  }
+  const state = api.getState() as Parameters<typeof routinesApi.util.selectCachedArgsForQuery>[0];
+  for (const trackId of routinesApi.util.selectCachedArgsForQuery(state, 'trackGrid')) {
+    api.dispatch(
+      routinesApi.util.updateQueryData('trackGrid', trackId, grid => {
+        const row = grid.rows.find(r => r.action_id === actionId);
+        const today = grid.days.indexOf(grid.today);
+        if (row && today >= 0) row.cells[today] = cell;
+      }),
+    );
+  }
+}
 
 export const {
   useListTracksQuery,
