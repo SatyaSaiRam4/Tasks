@@ -106,8 +106,8 @@ MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
 # Which approved template the reminder uses (see PROJECT.md, "Messages"):
 #   "single"   one variable {{1}}: the whole reminder in one line (the
 #              original template).
-#   "detailed" four variables: {{1}} first name, {{2}} reminder, {{3}} date
-#              and time, {{4}} note.
+#   "detailed" three variables: {{1}} first name, {{2}} reminder, {{3}} date
+#              and time.
 MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "single").strip().lower()
 
 # How often the reminder worker polls for due WhatsApp sends.
