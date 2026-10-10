@@ -14,14 +14,17 @@ import { selectVaultUnlocked } from '../vaultSlice';
 import { touchVault } from '../VaultAutoLock';
 import {
   useCreateVaultEntryMutation,
+  useDeleteVaultAudioMutation,
   useDeleteVaultEntryMutation,
   useFlagVaultEntryMutation,
   useGetVaultEntryQuery,
   useUpdateVaultEntryMutation,
+  useUploadVaultAudioMutation,
 } from '../vaultApi';
+import { VoiceNote, type Recording } from '../VoiceNote';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
-/** A private note: a title and the text. Deleted notes can be restored. */
+/** A private note: a title, the text and an optional voice recording. Deleted notes can be restored. */
 export function VaultEntryScreen() {
   const navigation = useNavigation();
   const params = useRoute<RouteProp<RootStackParamList, 'VaultEntry'>>().params;
@@ -32,6 +35,10 @@ export function VaultEntryScreen() {
   const [update, { isLoading: updating }] = useUpdateVaultEntryMutation();
   const [flag, { isLoading: flagging }] = useFlagVaultEntryMutation();
   const [remove, { isLoading: erasing }] = useDeleteVaultEntryMutation();
+  const [uploadAudio, { isLoading: uploading }] = useUploadVaultAudioMutation();
+  const [deleteAudio] = useDeleteVaultAudioMutation();
+  const [recording, setRecording] = useState<Recording | null>(null);
+  const [audioRemoved, setAudioRemoved] = useState(false);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -54,11 +61,14 @@ export function VaultEntryScreen() {
 
   const save = async () => {
     setError(null);
-    if (!content.trim() && !title.trim()) return setError('Write something to save.');
-    const body = { title: title.trim() || null, content: content || title.trim() };
+    const hasVoice = Boolean(recording) || (Boolean(existing.data?.has_audio) && !audioRemoved);
+    if (!content.trim() && !title.trim() && !hasVoice) return setError('Write something or record a voice note to save.');
+    const body = { title: title.trim() || (hasVoice && !content.trim() ? 'Voice note' : null), content: content || title.trim() };
     try {
-      if (entryId) await update({ id: entryId, ...body }).unwrap();
-      else await create(body).unwrap();
+      const saved = entryId ? await update({ id: entryId, ...body }).unwrap() : await create(body).unwrap();
+      // The recording goes up once the note exists.
+      if (recording) await uploadAudio({ id: saved.id, uri: recording.uri, seconds: recording.seconds }).unwrap();
+      else if (audioRemoved && existing.data?.has_audio) await deleteAudio(saved.id).unwrap();
       Toast.success('Saved.', 1);
       navigation.goBack();
     } catch (err) {
@@ -126,6 +136,22 @@ export function VaultEntryScreen() {
               editable={!deleted}
             />
 
+            <VoiceNote
+              entryId={entryId}
+              savedSeconds={existing.data?.has_audio ? existing.data.audio_seconds ?? 1 : null}
+              recording={recording}
+              removed={audioRemoved}
+              onRecorded={r => {
+                setRecording(r);
+                setAudioRemoved(false);
+              }}
+              onRemove={() => {
+                setRecording(null);
+                setAudioRemoved(true);
+              }}
+              disabled={deleted}
+            />
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {deleted ? (
               <View style={styles.actions}>
@@ -134,7 +160,7 @@ export function VaultEntryScreen() {
               </View>
             ) : (
               <View style={styles.actions}>
-                <Button label="Save" size="lg" onPress={save} loading={creating || updating} />
+                <Button label="Save" size="lg" onPress={save} loading={creating || updating || uploading} />
                 {entryId ? <Button label="Delete" icon="trash" variant="dangerGhost" onPress={() => setConfirm('delete')} /> : null}
               </View>
             )}

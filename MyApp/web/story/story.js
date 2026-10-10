@@ -2,8 +2,8 @@
 /**
  * Memo's welcome story, in 3D. Aarav tells Mom the art school admissions
  * open on 1 March, four months away. The months fly by, she forgets, and the
- * admissions close. Melo arrives: an alarm rings at a time of day, but Memo
- * remembers a date months ahead. This time Mom saves it in Memo once; on
+ * admissions close. Melo arrives: tell Memo once, even months ahead, and it
+ * reminds you on the day. This time Mom saves it in Memo once; on
  * 1 March it reminds her, and Aarav gets in.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
@@ -1180,7 +1180,7 @@ const SCENES = [
     },
   },
   {
-    // Melo arrives, and says what Memo does that an alarm can't.
+    // Melo arrives: tell Memo once, even months ahead.
     stage: M,
     sky: MAGIC,
     camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.0, 0], width: 3.4 },
@@ -1191,7 +1191,7 @@ const SCENES = [
       M.aarav.root.rotation.y = 0.55;
       M.mom.root.position.set(1.25, 0, -0.1);
       M.mom.root.rotation.y = -0.55;
-      say(M, M.melo, 'Hi, I’m Melo! An alarm only knows a time. Memo remembers the date, even months ahead.', 2.0, { gold: true });
+      say(M, M.melo, 'Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on the day.', 2.0, { gold: true });
     },
     update(t) {
       const drop = seg(t, 0, 0.9);

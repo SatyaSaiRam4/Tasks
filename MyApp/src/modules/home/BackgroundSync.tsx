@@ -14,6 +14,7 @@ import { useGetDashboardQuery } from '../streaks/streaksApi';
 import { useGetAgendaQuery, type Agenda } from '../routines/routinesApi';
 import { useListRemindersQuery } from '../reminders/remindersApi';
 import { walletApi } from '../wallet/walletApi';
+import { updateWidget } from '../../widget';
 import { streaksApi } from '../streaks/streaksApi';
 
 function planned(agenda: Agenda | undefined): PlannedAction[] {
@@ -63,6 +64,19 @@ export function BackgroundSync() {
     });
     return () => sub.remove();
   }, [dashboard, me]);
+
+  // Keep the home-screen widget in step with Home.
+  useEffect(() => {
+    const d = dashboard.data;
+    if (!d) return;
+    const next = d.upcoming_reminders[0];
+    updateWidget({
+      streak: d.streak.current_streak,
+      done: Math.min(d.streak.today.completed, d.streak.today.required),
+      total: d.streak.today.required,
+      next: next ? { title: next.title, at: next.remind_at } : null,
+    });
+  }, [dashboard.data]);
 
   useEffect(() => {
     if (!dashboard.data) return;

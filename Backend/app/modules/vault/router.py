@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit, security
@@ -112,6 +112,31 @@ def update_entry(
     entry_id: UUID, payload: VaultEntryUpdate, user: User = Depends(get_vault_user), db: Session = Depends(get_db)
 ):
     return service.update_entry(db, user, entry_id, payload.model_dump(exclude_unset=True))
+
+
+@router.put("/entries/{entry_id}/audio", response_model=VaultEntryOut)
+async def put_audio(
+    entry_id: UUID,
+    file: UploadFile = File(...),
+    seconds: int = Form(...),
+    user: User = Depends(get_vault_user),
+    db: Session = Depends(get_db),
+):
+    """Attaches a voice recording to a note (replacing any earlier one)."""
+    data = await file.read(service.MAX_AUDIO_BYTES + 1)
+    return service.set_audio(db, user, entry_id, data, (file.content_type or "").split(";")[0].strip(), seconds)
+
+
+@router.get("/entries/{entry_id}/audio")
+def get_audio(entry_id: UUID, user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
+    data, mime = service.get_audio(db, user, entry_id)
+    # Private and decrypted on the fly: never cached anywhere along the way.
+    return Response(content=data, media_type=mime, headers={"Cache-Control": "no-store"})
+
+
+@router.delete("/entries/{entry_id}/audio", response_model=VaultEntryOut)
+def delete_audio(entry_id: UUID, user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
+    return service.delete_audio(db, user, entry_id)
 
 
 _FLAG_ROUTES = {

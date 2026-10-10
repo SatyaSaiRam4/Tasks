@@ -240,6 +240,7 @@ function UnlockedVault() {
                             </Text>
                             <Text style={[t.caption, styles.preview]} numberOfLines={1}>
                               {formatClock(e.created_at)}
+                              {e.has_audio ? ` · 🎙 ${Math.floor((e.audio_seconds ?? 0) / 60)}:${String((e.audio_seconds ?? 0) % 60).padStart(2, '0')}` : ''}
                               {e.preview ? ` · ${e.preview}` : ''}
                             </Text>
                           </View>

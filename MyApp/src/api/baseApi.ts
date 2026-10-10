@@ -19,9 +19,12 @@ export interface TokenResponse {
   user: AuthUser;
 }
 
+/** Endpoints that send a file (multipart form): fetch sets their content type. */
+const UPLOAD_ENDPOINTS = new Set(['uploadVaultAudio']);
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
-  prepareHeaders: (headers, { getState }) => {
+  prepareHeaders: (headers, { getState, endpoint }) => {
     const state = getState() as RootState;
     const token = state.auth.accessToken;
     if (token) {
@@ -31,7 +34,7 @@ const rawBaseQuery = fetchBaseQuery({
     if (state.vault.token) {
       headers.set('x-vault-token', state.vault.token);
     }
-    headers.set('content-type', 'application/json');
+    if (!UPLOAD_ENDPOINTS.has(endpoint)) headers.set('content-type', 'application/json');
     return headers;
   },
 });

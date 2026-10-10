@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { alarmChanged, storyOpened } from '../../../app/preferencesSlice';
 import {
   ACCENTS,
+  brand,
   colors,
   DEFAULT_ACCENT,
   DEFAULT_THEME,
@@ -179,6 +180,18 @@ export function SettingsScreen() {
             {me.data.email}
           </Text>
         </View>
+      </Card>
+
+      {/* Up top so it's easy to find: what makes Memo different. */}
+      <Card tone="hero" onPress={() => navigation.navigate('WhyMemo')} style={styles.whyWrap} contentStyle={styles.whyCard} accessibilityLabel="Why Memo? See how Memo compares with alarms and to-do apps.">
+        <View style={styles.whyIcon}>
+          <Icon name="sparkles" size={20} color={brand.champagneLight} strokeWidth={1.7} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.whyTitle}>Why Memo?</Text>
+          <Text style={styles.whyText}>See how Memo compares with alarms and other to-do apps</Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.heroTextTertiary} />
       </Card>
 
       <SectionHeader title="Account" />
@@ -442,6 +455,35 @@ const styles = StyleSheet.create({
   },
   mtXs: {
     marginTop: 4,
+  },
+  whyWrap: {
+    marginTop: spacing.md,
+  },
+  whyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  whyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(243,220,166,0.14)',
+  },
+  whyTitle: {
+    ...font.serif,
+    fontSize: 20,
+    lineHeight: 24,
+    color: colors.heroText,
+  },
+  whyText: {
+    ...font.medium,
+    fontSize: 12.5,
+    color: colors.heroTextSecondary,
+    marginTop: 2,
   },
   mtMd: {
     marginTop: spacing.md,

@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
@@ -29,5 +30,17 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+      <!-- Memo's home-screen widget (MemoWidgetProvider). -->
+      <receiver
+        android:name=".MemoWidgetProvider"
+        android:label="Memo"
+        android:exported="false">
+        <intent-filter>
+          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/memo_widget_info" />
+      </receiver>
     </application>
 </manifest>

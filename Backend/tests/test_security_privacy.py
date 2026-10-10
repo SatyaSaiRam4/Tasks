@@ -249,3 +249,32 @@ def test_cleanup_empties_only_old_bin_notes(client, auth, db, monkeypatch, clock
     assert client.get(f"{API}/vault/entries/{old['id']}", headers=vh).status_code == 404
     assert client.get(f"{API}/vault/entries/{recent['id']}", headers=vh).status_code == 200
     assert client.get(f"{API}/vault/entries/{kept['id']}", headers=vh).status_code == 200
+
+
+def test_vault_voice_note_is_encrypted_and_private(client, auth, db):
+    vh = unlock_headers(client, auth)
+    note = client.post(f"{API}/vault/entries", json={"title": "Voice memo"}, headers=vh).json()
+    assert note["has_audio"] is False
+    audio = b"\x00\x00\x00\x18ftypM4A fake recording bytes" * 10
+    res = client.put(
+        f"{API}/vault/entries/{note['id']}/audio",
+        files={"file": ("voice.m4a", audio, "audio/mp4")},
+        data={"seconds": "7"},
+        headers=vh,
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["has_audio"] is True and res.json()["audio_seconds"] == 7
+
+    stored = db.execute(text("SELECT audio FROM vault_entries WHERE id = :id"), {"id": note["id"]}).scalar()
+    assert audio not in bytes(stored)  # encrypted at rest
+
+    got = client.get(f"{API}/vault/entries/{note['id']}/audio", headers=vh)
+    assert got.status_code == 200 and got.content == audio and got.headers["content-type"] == "audio/mp4"
+    listed = client.get(f"{API}/vault/entries", headers=vh).json()
+    assert listed[0]["has_audio"] is True
+
+    # Without the Vault session there is no way in.
+    assert client.get(f"{API}/vault/entries/{note['id']}/audio", headers=auth).status_code in (401, 403)
+    bad = client.put(f"{API}/vault/entries/{note['id']}/audio", files={"file": ("x.txt", b"hi", "text/plain")}, data={"seconds": "1"}, headers=vh)
+    assert bad.status_code == 415
+    assert client.delete(f"{API}/vault/entries/{note['id']}/audio", headers=vh).json()["has_audio"] is False

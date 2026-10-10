@@ -284,6 +284,20 @@ const ICONS = {
     </>
   ),
   play: <Polyline points="6 3 20 12 6 21 6 3" />,
+  pause: (
+    <>
+      <Rect x="6" y="4" width="4" height="16" rx="1" />
+      <Rect x="14" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  stop: <Rect x="5" y="5" width="14" height="14" rx="2" />,
+  mic: (
+    <>
+      <Rect x="9" y="2" width="6" height="12" rx="3" />
+      <Path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <Line x1="12" y1="18" x2="12" y2="22" />
+    </>
+  ),
   copy: (
     <>
       <Rect x="9" y="9" width="12" height="12" rx="2" />
