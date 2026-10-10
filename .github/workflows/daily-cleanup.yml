@@ -3,7 +3,7 @@
 # past their end. The Vault is never touched.
 #
 # Needs two repository secrets (Settings → Secrets and variables → Actions):
-#   API_URL      e.g. https://tasks-xxbg.onrender.com
+#   API_URL      e.g. https://tasks-singapore.onrender.com
 #   CRON_SECRET  the same value as CRON_SECRET on the server
 name: Daily cleanup
 
