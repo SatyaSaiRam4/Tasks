@@ -187,13 +187,12 @@ component names still say "category", e.g. `CategoryCard`).
   `lookRight`, `cheer`) the app triggers through `SatyaModel`'s `gesture`
   prop. Turning orbits the camera, because the model's origin is off-center.
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`):
-  two stories of Aarav and his mom play one after the other in two 3D panels
-  (three.js, `web/story`). Story 1, days ahead: Mom forgets to sign the
-  school-trip form and the bus leaves without him. Story 2, months ahead: she
-  forgets the art school admissions. Melo arrives; Mom tells Memo, both
-  reminders ring on the day, Aarav boards the bus and gets into art school.
-  Flat illustrated panels are the fallback. It plays once per account on a
-  device, then Melo's tour runs; both replay from Settings.
+  the night before his exam Aarav asks Mom to wake him at 6; she forgets and
+  he oversleeps. Melo arrives, and before the next exam Memo's alarm wakes
+  him at dawn. It plays in 3D (three.js, `web/story`): a living room and a
+  bedroom with a sunbeam, floating Zzz, a dawn that brightens and slow camera
+  moves; flat illustrated scenes are the fallback. It plays once per account
+  on a device, then Melo's tour runs; both replay from Settings.
 - Melo's tour has nine steps with a title, typed-out text and a gesture
   each, plus Back and Skip.
 - Loading speed: RTK Query keeps data for 5 minutes after a screen closes
@@ -350,10 +349,11 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
 
 - A reminder moves to Done by itself once its time has passed (the server's
   reminder worker marks it, after any WhatsApp send); there is no tick box.
-  Tabs: All, Upcoming, Done, Failed. The server also runs the daily cleanup
+  Tabs: Upcoming (the default), Done, Failed, All. The server also runs the daily cleanup
   itself at 02:00 IST (done reminders and ended plans 7 days later), in
   addition to the GitHub Actions job.
-- Vault: All notes (grouped by day) or By date (date strip and calendar).
+- Vault: All notes (grouped by day) or By date (date strip). The search box
+  and the calendar button share the top row.
   Deleting a note moves it to the bin (icon beside the lock); it can be
   restored or deleted for good from there, and the daily cleanup deletes bin
   notes after 30 days (`VAULT_BIN_DAYS`). Notes outside the bin are never
@@ -361,8 +361,11 @@ From `MyApp/`, run `npm test` for Jest tests and `npm run lint` for ESLint.
 - Ticking a task shows a spinner in its box until the server confirms; the
   tick then appears at once. Reaching a new badge shows a one-time
   congratulations. Bottom sheets are drawn in the main window
-  (`components/SheetHost.tsx`), not in a Modal, so they rise above the
-  keyboard (a Modal's own Android window never hears keyboard events).
+  (`components/SheetHost.tsx`), not in a Modal. When a text field in a sheet
+  is focused, the sheet moves to the top of the screen, clear of the
+  keyboard.
+- Profile and the streak screen show badges only; the older achievements
+  list is no longer linked or announced.
 
 ## Messages
 

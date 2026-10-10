@@ -73,9 +73,6 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
         Toast.success(left > 0 ? `Done. ${left} left today.` : 'Done.', 1.2);
       }
       if (user) celebrateNewTier(user.id, result.best_streak, celebrate).catch(() => undefined);
-      for (const a of result.new_achievements) {
-        celebrate({ icon: 'award', tone: 'primary', eyebrow: 'Achievement unlocked', title: a.title, subtitle: a.description });
-      }
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
     } finally {
