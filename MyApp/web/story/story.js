@@ -1191,7 +1191,7 @@ const SCENES = [
       M.aarav.root.rotation.y = 0.55;
       M.mom.root.position.set(1.25, 0, -0.1);
       M.mom.root.rotation.y = -0.55;
-      say(M, M.melo, 'Hi, I’m Melo! An alarm only knows a time. Memo remembers the date, even months ahead.', 2.0, { gold: true });
+      say(M, M.melo, 'Hi, I’m Melo! An alarm just rings. Memo remembers what matters and when, even months ahead.', 2.0, { gold: true });
     },
     update(t) {
       const drop = seg(t, 0, 0.9);

@@ -327,6 +327,17 @@ export function SettingsScreen() {
         />
       </ListGroup>
 
+      <SectionHeader title="About Memo" />
+      <ListGroup>
+        <ListRow
+          icon="sparkles"
+          title="Why Memo?"
+          subtitle="How Memo compares with alarms and to-do apps"
+          onPress={() => navigation.navigate('WhyMemo')}
+          last
+        />
+      </ListGroup>
+
       <SectionHeader title="Melo" />
       <ListGroup>
         {toggle('satya_enabled', 'Melo on Home', 'Short tips from your guide', false, 'sparkles')}

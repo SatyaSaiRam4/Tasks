@@ -14,8 +14,8 @@ import { Kid, Mom } from './Characters';
  * The welcome story, shown once to new users right after they sign in (and
  * again from Settings): Aarav tells Mom the art school admissions open on
  * 1 March, four months away. The months fly by, she forgets, and they miss
- * it. Melo explains what Memo does that an alarm can't: remember a date
- * months ahead. This time Mom saves it in Memo once; on 1 March it reminds
+ * it. Melo explains what Memo adds to a plain alarm: it remembers what the
+ * reminder is for, and when, even months ahead. This time Mom saves it in Memo once; on 1 March it reminds
  * her, and Aarav gets in. Ends on what the app does. Plays like a phone
  * "story": it moves on by itself; tap the right side for next, the left for
  * back.
@@ -36,7 +36,7 @@ interface Scene {
 const SCENES: Scene[] = [
   { caption: 'Meet Aarav. Something big is 4 months away.', duration: 9500, Body: ArtAskScene },
   { caption: 'Four months fly by… and then…', duration: 12000, Body: ArtMissedScene },
-  { caption: 'An alarm can’t remember a date. Memo can.', duration: 8000, Body: SatyaScene },
+  { caption: 'An alarm just rings. Memo remembers what matters.', duration: 8000, Body: SatyaScene },
   { caption: 'This time, Mom tells Memo, months ahead.', duration: 13500, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
@@ -280,7 +280,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Melo! An alarm only knows a time. Memo remembers the date, even months ahead." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! An alarm just rings. Memo remembers what matters and when, even months ahead." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />

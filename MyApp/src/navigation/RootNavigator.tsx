@@ -61,6 +61,7 @@ import { VaultEntryScreen } from '../modules/vault/screens/VaultEntryScreen';
 import { ProfileScreen } from '../modules/profile/screens/ProfileScreen';
 import { DiscoverScreen } from '../modules/discover/screens/DiscoverScreen';
 import { SettingsScreen } from '../modules/settings/screens/SettingsScreen';
+import { WhyMemoScreen } from '../modules/settings/screens/WhyMemoScreen';
 import { ChangePasswordScreen } from '../modules/settings/screens/ChangePasswordScreen';
 import { AdminDashboardScreen } from '../modules/admin/screens/AdminDashboardScreen';
 import { AdminUsersScreen } from '../modules/admin/screens/AdminUsersScreen';
@@ -91,6 +92,7 @@ export type RootStackParamList = {
   VaultEntry: { entryId?: string; folder?: string } | undefined;
   Discover: undefined;
   Settings: undefined;
+  WhyMemo: undefined;
   ChangePassword: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
@@ -389,6 +391,7 @@ export function RootNavigator() {
           <RootStack.Screen name="VaultEntry" component={VaultEntryScreen} options={{ animation: 'slide_from_bottom' }} />
           <RootStack.Screen name="Discover" component={DiscoverScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="WhyMemo" component={WhyMemoScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
           <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ animation: 'slide_from_right' }} />

@@ -189,7 +189,8 @@ component names still say "category", e.g. `CategoryCard`).
 - New users first see a welcome story (`modules/onboarding/WelcomeStory.tsx`)
   that shows what an alarm can't do: Aarav tells Mom the art school
   admissions open on 1 March, four months away; the months fly by and she
-  forgets. Melo explains that Memo remembers dates months ahead; Mom saves
+  forgets. Melo explains that Memo remembers what matters and when, even
+  months ahead; Mom saves
   the reminder once, it rings on 1 March, and Aarav gets in. It plays in 3D
   (three.js, `web/story`); flat illustrated scenes are the fallback. It plays
   once per account on a device, then Melo's tour runs; both replay from
@@ -406,3 +407,13 @@ picks the shape (`Backend/app/integrations/messages.py`):
   Sample values: `Satya`, `Call the electrician`, `Sat, 10 Oct at 6:30 PM`. Create and get it approved in MSG91, set
   `MSG91_WHATSAPP_TEMPLATE_NAME` to its name and
   `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed` on Render.
+
+## Why Memo?
+
+Settings → About Memo → **Why Memo?** (`modules/settings/screens/WhyMemoScreen.tsx`)
+compares Memo with a phone alarm and typical to-do apps in a small diagram and
+a yes / some / no table. "Some" means some apps or phones do it, often on a
+paid plan. It was checked in October 2026 against Google and Samsung Clock and
+Google Tasks, Microsoft To Do, Todoist and TickTick (for example, Google Clock
+8.0 can schedule an alarm for a future date, Todoist Karma and TickTick habits
+have streaks). Keep it honest: update the table when those apps change.
