@@ -17,7 +17,8 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
 
-from app.core.config import REMINDER_POLL_SECONDS, STREAK_FINALIZE_MINUTES
+from app.core.config import MSG91_WHATSAPP_TEMPLATE_STYLE, REMINDER_POLL_SECONDS, STREAK_FINALIZE_MINUTES
+from app.integrations.messages import whatsapp_variables
 from app.db.session import SessionLocal
 from app.integrations.msg91 import is_configured, send_whatsapp_reminder
 from app.modules.reminders import service as reminders_service
@@ -32,9 +33,19 @@ def _poll_due_reminders() -> None:
     try:
         whatsapp_ready = is_configured()
         if whatsapp_ready:
+            from app.modules.auth.models import User
+
             for reminder in reminders_service.get_due_whatsapp_reminders(db):
-                message = reminder.title if not reminder.note else f"{reminder.title} — {reminder.note}"
-                sent = send_whatsapp_reminder(reminder.whatsapp_number, message)
+                user = db.get(User, reminder.user_id)
+                variables = whatsapp_variables(
+                    MSG91_WHATSAPP_TEMPLATE_STYLE,
+                    user.display_name if user else "",
+                    reminder.title,
+                    reminder.note,
+                    reminder.remind_at,
+                    user.timezone if user else None,
+                )
+                sent = send_whatsapp_reminder(reminder.whatsapp_number, variables)
                 reminders_service.mark_whatsapp_result(db, reminder.id, sent)
                 if not sent:
                     logger.warning("WhatsApp send failed for reminder %s", reminder.id)

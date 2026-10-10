@@ -49,11 +49,11 @@ def is_configured() -> bool:
     )
 
 
-def send_whatsapp_reminder(to_number: str, message: str) -> bool:
-    """Sends `message` as the single body variable of the configured
-    template to `to_number` (E.164, e.g. +919876543210). Returns True on a
-    2xx response from MSG91, False otherwise (never raises, so a WhatsApp
-    outage never breaks the reminder itself)."""
+def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
+    """Sends the configured template to `to_number` (E.164, e.g.
+    +919876543210), with `variables` filling its {{1}}, {{2}}… in order.
+    Returns True on a 2xx response from MSG91, False otherwise (never raises,
+    so a WhatsApp outage never breaks the reminder itself)."""
     if not is_configured():
         return False
 
@@ -71,7 +71,9 @@ def send_whatsapp_reminder(to_number: str, message: str) -> bool:
                 "to_and_components": [
                     {
                         "to": [bare_number],
-                        "components": {"body_1": {"type": "text", "value": message}},
+                        "components": {
+                            f"body_{i}": {"type": "text", "value": value} for i, value in enumerate(variables, start=1)
+                        },
                     }
                 ],
             },

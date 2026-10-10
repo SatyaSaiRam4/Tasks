@@ -226,3 +226,26 @@ def test_reminders_move_to_done_once_their_time_passes(client, auth, clock, db):
     done = client.get(f"{API}/reminders/{r1['id']}", headers=auth).json()
     assert datetime.fromisoformat(done["completed_at"]) == datetime.fromisoformat(r1["remind_at"]).astimezone(timezone.utc)
     assert client.get(f"{API}/reminders/{r2['id']}", headers=auth).json()["completed_at"] is None
+
+
+def test_cleanup_empties_only_old_bin_notes(client, auth, db, monkeypatch, clock):
+    from app.core import config
+
+    monkeypatch.setattr(config, "CRON_SECRET", "s3cret")
+    vh = unlock_headers(client, auth)
+    old = client.post(f"{API}/vault/entries", json={"title": "Old", "content": "binned long ago"}, headers=vh).json()
+    recent = client.post(f"{API}/vault/entries", json={"title": "Recent", "content": "binned today"}, headers=vh).json()
+    kept = client.post(f"{API}/vault/entries", json={"title": "Kept", "content": "never binned"}, headers=vh).json()
+    client.post(f"{API}/vault/entries/{old['id']}/trash", headers=vh)
+    client.post(f"{API}/vault/entries/{recent['id']}/trash", headers=vh)
+    long_ago = clock.now - timedelta(days=31)
+    db.execute(text("UPDATE vault_entries SET deleted_at = :t WHERE id = :id"), {"t": long_ago, "id": old["id"]})
+    db.execute(text("UPDATE vault_entries SET deleted_at = :t WHERE id = :id"), {"t": clock.now, "id": recent["id"]})
+    db.execute(text("UPDATE vault_entries SET created_at = :t WHERE id = :id"), {"t": clock.now - timedelta(days=400), "id": kept["id"]})
+    db.commit()
+
+    res = client.post(f"{API}/maintenance/cleanup", headers={"X-Cron-Secret": "s3cret"}).json()
+    assert res["bin_notes_deleted"] == 1
+    assert client.get(f"{API}/vault/entries/{old['id']}", headers=vh).status_code == 404
+    assert client.get(f"{API}/vault/entries/{recent['id']}", headers=vh).status_code == 200
+    assert client.get(f"{API}/vault/entries/{kept['id']}", headers=vh).status_code == 200

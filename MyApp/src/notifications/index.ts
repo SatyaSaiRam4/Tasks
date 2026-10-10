@@ -108,8 +108,8 @@ export async function testAlarm(prefs: AlarmPreferences): Promise<void> {
   await initNotifications();
   await notifee.displayNotification({
     id: 'alarm-test',
-    title: 'Alarm test',
-    body: `${ALARM_SOUNDS.find(x => x.id === prefs.sound)?.label ?? 'Alarm'} · rings for ${prefs.seconds} seconds`,
+    title: '⏰ Test alarm',
+    body: `This is how your alarms sound: ${ALARM_SOUNDS.find(x => x.id === prefs.sound)?.label ?? 'Classic'}, for ${prefs.seconds} seconds. Press Stop to end it.`,
     android: { ...alarmAndroid(prefs), smallIcon: 'ic_notification', color: NOTIFICATION_TINT, largeIcon: 'ic_launcher', pressAction: { id: 'default' } },
     ios: { sound: 'default' },
   });
@@ -219,8 +219,28 @@ export async function scheduleReminderNotification(
   at: Date,
   alarm = false,
 ): Promise<void> {
-  const body = note?.trim() || `${alarm ? 'Alarm' : 'Reminder'} · ${formatClock(at)}`;
-  await schedule(reminderId, CHANNELS.reminders.id, title, body, at, alarm);
+  const message = reminderMessage(title, note, at, alarm);
+  await schedule(reminderId, CHANNELS.reminders.id, message.title, message.body, at, alarm);
+}
+
+/**
+ * The words of a reminder on the phone. A notification is a quiet nudge; an
+ * alarm is loud and asks to be stopped, so it says so.
+ *
+ *   🔔 Call the electrician          ⏰ Call the electrician
+ *   6:30 PM · Bring the warranty     It's 6:30 PM. Bring the warranty card.
+ *                                    Press Stop when you're on it.
+ */
+export function reminderMessage(title: string, note: string | null | undefined, at: Date, alarm: boolean) {
+  const time = formatClock(at);
+  const extra = note?.trim();
+  if (alarm) {
+    return {
+      title: `⏰ ${title}`,
+      body: `It’s ${time}.${extra ? ` ${extra}` : ''} Press Stop when you’re on it.`,
+    };
+  }
+  return { title: `🔔 ${title}`, body: extra ? `${time} · ${extra}` : `Memo reminder for ${time}` };
 }
 
 export async function cancelReminderNotification(reminderId: string): Promise<void> {
@@ -244,7 +264,7 @@ export async function syncActionNotifications(actions: PlannedAction[]): Promise
   for (const a of actions) {
     const [y, m, d] = a.dateKey.split('-').map(Number);
     const [hh, mm] = a.timeOfDay.split(':').map(Number);
-    await schedule(`${ACTION_PREFIX}${a.id}-${a.dateKey}`, CHANNELS.actions.id, a.title, `${a.trackName} · planned for now`, new Date(y, m - 1, d, hh, mm));
+    await schedule(`${ACTION_PREFIX}${a.id}-${a.dateKey}`, CHANNELS.actions.id, `✅ ${a.title}`, `Time for this task in “${a.trackName}”. Tick it in Memo when it’s done.`, new Date(y, m - 1, d, hh, mm));
   }
 }
 
@@ -261,8 +281,8 @@ export async function syncStreakWarning(opts: { dateKey: string; streak: number;
   await schedule(
     `${STREAK_PREFIX}${opts.dateKey}`,
     CHANNELS.streak.id,
-    `Don’t lose streak points`,
-    `${opts.remaining} ${plural} left today. Each unfinished plan costs 1 point.`,
+    `🔥 ${opts.remaining} ${plural} left today`,
+    `Finish them before midnight to keep your streak growing. A plan left unfinished costs 1 point.`,
     at,
   );
 }

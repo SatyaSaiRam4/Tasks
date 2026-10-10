@@ -8,17 +8,17 @@ import { Button } from '../../components/Button';
 import { RealIcon, type RealIconName } from '../../components/RealIcon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
-import { Mom } from './Characters';
+import { Kid, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): three real-life stories at once, in three panels.
- * Riya waits for a sale to buy Mom's gift, Arjun's friend is getting married
- * in two months, Karan has a bill due in 15 days. Life gets busy and all
- * three forget. Melo arrives; this time they tell Memo once, months ahead,
- * and all three make it. Ends on what the app does. Plays like a phone
- * "story": it moves on by itself; tap the right side for next, the left for
- * back.
+ * again from Settings): two stories of Aarav and his mom, one after the
+ * other, in two panels. Story 1 (days ahead): Mom forgets to sign the
+ * school-trip form and the bus leaves without him. Story 2 (months ahead):
+ * she forgets the art school admissions. Melo arrives; this time Mom tells
+ * Memo once, and both reminders ring on the day. Ends on what the app does.
+ * Plays like a phone "story": it moves on by itself; tap the right side for
+ * next, the left for back.
  *
  * The scenes play in 3D (assets/web/story, built from web/story/story.js)
  * in a WebView behind the captions. If the phone can't run it, the same
@@ -34,11 +34,12 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Three people. Three things to remember.', duration: 11500, Body: IntroScene },
-  { caption: 'But life gets busy…', duration: 7500, Body: BusyScene },
-  { caption: '…and they forget.', duration: 11000, Body: ForgotScene },
+  { caption: 'Story 1: a promise for this week.', duration: 9500, Body: TripAskScene },
+  { caption: 'A busy week… and on Friday…', duration: 12000, Body: TripMissedScene },
+  { caption: 'Story 2: a promise for four months away.', duration: 8500, Body: ArtAskScene },
+  { caption: 'Months fly by… and then…', duration: 12000, Body: ArtMissedScene },
   { caption: 'That’s why Memo is here.', duration: 8000, Body: SatyaScene },
-  { caption: 'This time, they tell Memo.', duration: 12000, Body: RemindScene },
+  { caption: 'This time, Mom tells Memo.', duration: 14000, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -223,29 +224,28 @@ function Speech({ text, delay = 0, side = 'left', tone = 'light' }: { text: stri
 // ---- Scenes ------------------------------------------------------------------------
 
 interface Line {
-  who: string;
-  color: [string, string];
+  who: 'Aarav' | 'Mom';
   text: string;
   mood: 'happy' | 'sad' | 'worried' | 'surprised';
   thought?: boolean;
 }
 
-/** The flat version of a three-panel scene: one row per story, each with its person and line. */
-function Trio({ lines }: { lines: Line[] }) {
+/** The flat version of a panel: Aarav and Mom, each with their line, one after the other. */
+function Duo({ lines }: { lines: Line[] }) {
   return (
     <View style={styles.trio}>
       {lines.map((line, i) => (
-        <TrioRow key={line.who} line={line} index={i} />
+        <DuoRow key={`${line.who}${i}`} line={line} index={i} />
       ))}
     </View>
   );
 }
 
-function TrioRow({ line, index }: { line: Line; index: number }) {
-  const enter = useAppear(300 + index * 1800, 600);
+function DuoRow({ line, index }: { line: Line; index: number }) {
+  const enter = useAppear(300 + index * 2600, 600);
   return (
     <Animated.View style={[styles.trioRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
-      <Mom size={96} mood={line.mood} colors={line.color} />
+      {line.who === 'Aarav' ? <Kid size={120} mood={line.mood} /> : <Mom size={130} mood={line.mood} />}
       <View style={styles.flex}>
         <Text style={styles.trioWho}>{line.who}</Text>
         <View style={[styles.speech, styles.speechLeft, line.thought && styles.trioThought]}>
@@ -256,41 +256,45 @@ function TrioRow({ line, index }: { line: Line; index: number }) {
   );
 }
 
-const TEAL: [string, string] = ['#3FBFAE', '#1F7A6F'];
-const BLUE: [string, string] = ['#5B8DEF', '#2F5FD0'];
-const GREY: [string, string] = ['#A3A9B3', '#6B717C'];
-
-function IntroScene() {
+function TripAskScene() {
   return (
-    <Trio
+    <Duo
       lines={[
-        { who: '🛍️ Riya', color: TEAL, mood: 'happy', text: 'The big sale opens in 10 days. I’ll buy Mom’s birthday gift then!' },
-        { who: '💍 Arjun', color: BLUE, mood: 'happy', text: 'My friend Vikram’s wedding is on 12 February. I have to be there!' },
-        { who: '⚡ Karan', color: GREY, mood: 'happy', text: 'Electricity bill, due on the 20th. I’ll pay it later.' },
+        { who: 'Aarav', mood: 'happy', text: 'Mom, please sign my school-trip form by Wednesday! The trip is on Friday.' },
+        { who: 'Mom', mood: 'happy', text: 'Of course, beta. I’ll sign it.' },
       ]}
     />
   );
 }
 
-function BusyScene() {
+function TripMissedScene() {
   return (
-    <Trio
+    <Duo
       lines={[
-        { who: '🛍️ Riya', color: TEAL, mood: 'worried', thought: true, text: 'The sale… when was it again? 🤔' },
-        { who: '💍 Arjun', color: BLUE, mood: 'worried', thought: true, text: 'Vikram’s wedding… which date was it? 🤔' },
-        { who: '⚡ Karan', color: GREY, mood: 'worried', thought: true, text: 'That bill… did I pay it? 🤔' },
+        { who: 'Aarav', mood: 'sad', text: 'My form isn’t signed… the bus is leaving without me! 😢' },
+        { who: 'Mom', mood: 'surprised', text: 'Oh no… I forgot to sign it!' },
       ]}
     />
   );
 }
 
-function ForgotScene() {
+function ArtAskScene() {
   return (
-    <Trio
+    <Duo
       lines={[
-        { who: '🛍️ Riya', color: TEAL, mood: 'sad', text: 'Sold out?! The sale ended yesterday. No gift for Mom… 😞' },
-        { who: '💍 Arjun', color: BLUE, mood: 'sad', text: 'Vikram’s wedding was yesterday?! I missed it… 😢' },
-        { who: '⚡ Karan', color: GREY, mood: 'surprised', text: 'Power cut?! I forgot to pay the bill! 😱' },
+        { who: 'Aarav', mood: 'happy', text: 'Mom, art school admissions open on 1 March! That’s 4 months away.' },
+        { who: 'Mom', mood: 'happy', text: 'Four months? I’ll remember, don’t worry.' },
+      ]}
+    />
+  );
+}
+
+function ArtMissedScene() {
+  return (
+    <Duo
+      lines={[
+        { who: 'Aarav', mood: 'sad', text: 'Admissions closed on 8 March… we missed it. 😞' },
+        { who: 'Mom', mood: 'sad', text: 'I’m so sorry, beta… I forgot.' },
       ]}
     />
   );
@@ -300,7 +304,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remind you right on time." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! Tell Memo once, days or months ahead, and I’ll remind you right on time." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />
@@ -311,11 +315,10 @@ function SatyaScene() {
 
 function RemindScene() {
   return (
-    <Trio
+    <Duo
       lines={[
-        { who: '🛍️ Riya', color: TEAL, mood: 'happy', text: '“Sale opens today” — got Mom’s gift! 🎁' },
-        { who: '💍 Arjun', color: BLUE, mood: 'happy', text: '“Vikram’s wedding today” — I made it! 💍' },
-        { who: '⚡ Karan', color: GREY, mood: 'happy', text: '“Pay the bill, due tomorrow” — paid on time! 💡' },
+        { who: 'Mom', mood: 'happy', text: '“Sign Aarav’s trip form · due today” — signed, right on time! ✍️' },
+        { who: 'Aarav', mood: 'happy', text: '“Art school admissions open today” — I got in! 🎨' },
       ]}
     />
   );
