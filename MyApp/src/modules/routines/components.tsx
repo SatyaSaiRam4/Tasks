@@ -2,12 +2,11 @@ import React, { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, font, gradients, radius, spacing, TRACK_COLORS, type as t, withAlpha } from '../../theme';
 import { Card } from '../../components/Card';
-import { Checkbox } from '../../components/Checkbox';
 import { Pill } from '../../components/Controls';
 import { Icon, type IconName } from '../../components/Icon';
 import { RealIcon } from '../../components/RealIcon';
 import { ProgressBar } from '../../components/Progress';
-import { fromDateKey, WEEKDAY_SHORT } from '../../utils/date';
+import { fromDateKey, MONTH_SHORT, WEEKDAY_SHORT } from '../../utils/date';
 import { routinesApi, type GridCell, type Track, type TrackGrid } from './routinesApi';
 
 /** "Day 3 of 30", "Starts soon" or "Finished": where a plan is in its period. */
@@ -129,56 +128,6 @@ export function HowItWorks({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-/**
- * Today's tasks as a plain checklist: tap the circle when done, tap the name
- * to rename or delete. The clearest way in for someone new; the table below
- * it keeps the history.
- */
-export function TodayChecklist({
-  grid,
-  onToggle,
-  onTaskPress,
-  subtitle,
-}: {
-  grid: TrackGrid;
-  onToggle: (row: TrackGrid['rows'][number], isDone: boolean) => void;
-  onTaskPress: (row: TrackGrid['rows'][number]) => void;
-  /** The line under a task's name when it is due and not done, e.g. "Every day". */
-  subtitle?: (row: TrackGrid['rows'][number]) => string;
-}) {
-  const todayIndex = grid.days.indexOf(grid.today);
-  return (
-    <Card padded={false}>
-      {grid.rows.map((row, i) => {
-        const cell = todayIndex >= 0 ? row.cells[todayIndex] : 'FUTURE';
-        const done = cell === 'DONE';
-        const canTick = todayIndex >= 0 && cell !== 'NONE' && cell !== 'FUTURE';
-        return (
-          <View key={row.action_id} style={[styles.checkRow, i < grid.rows.length - 1 && styles.bottomLine]}>
-            {canTick ? (
-              <Checkbox checked={done} onPress={() => onToggle(row, done)} accessibilityLabel={`${row.title}, ${done ? 'done' : 'not done yet'}`} />
-            ) : (
-              <View style={[styles.box, styles.boxFuture]} />
-            )}
-            <Pressable
-              onPress={() => onTaskPress(row)}
-              style={({ pressed }) => [styles.flex, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`${row.title}. Tap to rename or delete.`}
-            >
-              <Text style={[t.bodyStrong, done && styles.doneText]} numberOfLines={2}>
-                {row.title}
-              </Text>
-              <Text style={[t.caption, styles.cardMeta]}>{done ? 'Done today ✓' : canTick ? subtitle?.(row) ?? 'Every day' : 'Not due today'}</Text>
-            </Pressable>
-            <Icon name="edit" size={15} color={colors.textTertiary} />
-          </View>
-        );
-      })}
-    </Card>
-  );
-}
-
 /** The key under the history table. */
 export function TableLegend() {
   return (
@@ -214,10 +163,13 @@ export function CategoryTable({
   grid,
   onToggle,
   onTaskPress,
+  subtitle,
 }: {
   grid: TrackGrid;
   onToggle: (row: TrackGrid['rows'][number], isDone: boolean) => void;
   onTaskPress: (row: TrackGrid['rows'][number]) => void;
+  /** A short line under a task's name, e.g. "until 12 Oct". */
+  subtitle?: (row: TrackGrid['rows'][number]) => string | undefined;
 }) {
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const todayIndex = grid.days.indexOf(grid.today);
@@ -227,7 +179,7 @@ export function CategoryTable({
       {/* Fixed first column: task names */}
       <View style={styles.nameCol}>
         <View style={[styles.headerCell, styles.nameCell, styles.bottomLine]}>
-          <Text style={t.micro}>Task</Text>
+          <Text style={t.micro}>{MONTH_SHORT[fromDateKey(grid.days[Math.max(todayIndex, 0)] ?? grid.today).getMonth()]}</Text>
         </View>
         {grid.rows.map((row, i) => (
           <Pressable
@@ -237,9 +189,14 @@ export function CategoryTable({
             accessibilityRole="button"
             accessibilityLabel={`${row.title}. Tap to rename or delete.`}
           >
-            <Text style={styles.taskName} numberOfLines={2}>
+            <Text style={styles.taskName} numberOfLines={subtitle?.(row) ? 1 : 2}>
               {row.title}
             </Text>
+            {subtitle?.(row) ? (
+              <Text style={styles.taskUntil} numberOfLines={1}>
+                {subtitle(row)}
+              </Text>
+            ) : null}
           </Pressable>
         ))}
       </View>
@@ -419,6 +376,12 @@ const styles = StyleSheet.create({
   todayCol: {
     backgroundColor: colors.goldSoft,
   },
+  taskUntil: {
+    ...font.medium,
+    fontSize: 11,
+    color: colors.textTertiary,
+    marginTop: 1,
+  },
   taskName: {
     ...font.semibold,
     fontSize: 13.5,
@@ -485,17 +448,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.gold,
     includeFontPadding: false,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  doneText: {
-    color: colors.textSecondary,
-    textDecorationLine: 'line-through',
   },
   legend: {
     flexDirection: 'row',

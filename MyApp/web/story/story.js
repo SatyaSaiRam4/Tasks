@@ -2,9 +2,10 @@
 /**
  * Memo's welcome story, in 3D.
  *
- * Aarav asks his mom to remind him to call Grandma on her birthday; Mom has a
- * busy day and forgets; Grandma waits all day for the call. Then Satya shows
- * up, and next year Memo rings an alarm in the morning so Aarav remembers.
+ * The night before his final exam, Aarav asks Mom to wake him at 6 so he can
+ * revise. Mom has so much to do that it slips her mind, and Aarav oversleeps
+ * and runs late. Then Melo shows up, and before the next exam Aarav sets an
+ * alarm in Memo: it rings at 6, he is up on time, and everyone cheers.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
  * and drives it with window.story.show(sceneIndex); captions, progress and
@@ -12,7 +13,7 @@
  * the speaker's head.
  *
  * Aarav and Mom are built from simple shapes with jointed arms, legs and head,
- * so they can walk, wave, talk, slump and jump. Satya is the app's own GLB.
+ * so they can walk, wave, talk, slump and jump. Melo is the app's own GLB.
  *
  * Build (from MyApp/): npm run build:story → assets/web/story/story.bundle.js
  */
@@ -209,7 +210,7 @@ function rest(p, t) {
   p.legR.rotation.set(0, 0, 0);
   p.mouth.scale.set(1, 1, 1);
   // Blink every few seconds.
-  const blink = (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.15 : 1;
+  const blink = p.asleep || (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.12 : 1;
   p.eyes.forEach(e => (e.scale.y = blink));
 }
 
@@ -281,6 +282,45 @@ const moves = {
     p.armL.rotation.z = -0.15 - 0.45 * c + 0.6;
     p.armR.rotation.z = 0.15 + 0.45 * c - 0.6;
   },
+  /** Lying asleep on the bed, then (from `wake`) sitting up and hopping out to `standX`. */
+  sleepAndWake(p, t, wake, standX) {
+    const bedTop = 0.52;
+    const k = wake === undefined ? 0 : ease(seg(t, wake, wake + 0.9));
+    p.asleep = k === 0;
+    const lyingX = bed.position.x - 0.55;
+    p.root.rotation.set(0, 0, lerp(-Math.PI / 2, 0, k));
+    p.root.position.set(lerp(lyingX, standX, k), lerp(bedTop + 0.06, 0, k) + 0.35 * bump(k), lerp(bed.position.z + 0.05, 0.1, k));
+    if (k === 0) {
+      // Slow sleepy breathing.
+      p.body.scale.y = 1 + 0.03 * Math.sin(t * 1.6);
+      // Lying on the side, arms rest along the body.
+      p.armL.rotation.z = 0.08;
+      p.armR.rotation.z = -0.08;
+    }
+    bed.userData.blanket.position.y = 0.5 + 0.12 * (1 - k);
+    bed.userData.blanket.scale.set(1, 1 + (1 - k) * 0.6, 1);
+  },
+  /** Arms up in a big morning stretch. */
+  stretch(p, t, a, b) {
+    const k = bump(seg(t, a, b));
+    p.armL.rotation.z = -(0.12 + 2.7 * k);
+    p.armR.rotation.z = 0.12 + 2.7 * k;
+    p.body.rotation.x -= 0.12 * k;
+  },
+  /** Running in a panic: fast legs, hands on head. */
+  panic(p, t, a, b, x0, x1) {
+    const k = seg(t, a, b);
+    if (k <= 0 || k >= 1) return;
+    const run = Math.sin((t - a) * 16);
+    const back = Math.sin((t - a) * 2.6);
+    p.root.position.x = lerp(x0, x1, 0.5 + 0.5 * back);
+    p.root.rotation.y = Math.cos((t - a) * 2.6) > 0 ? 1.1 : -1.1;
+    p.legL.rotation.x = 0.8 * run;
+    p.legR.rotation.x = -0.8 * run;
+    p.hips.position.y += 0.05 * Math.abs(run);
+    p.armL.rotation.set(0, 0, -2.6);
+    p.armR.rotation.set(0, 0, 2.6);
+  },
   busy(p, t) {
     // Hurrying: quick arm work and a restless head.
     p.armL.rotation.x = -0.9 + 0.5 * Math.sin(t * 7);
@@ -317,12 +357,15 @@ function makeRoom() {
   room.userData.sky = sky;
   room.add(sky);
 
-  // Sofa.
+  // Sofa (the living room; the bedroom swaps it for the bed).
+  const sofa = new THREE.Group();
+  room.add(sofa);
+  room.userData.sofa = sofa;
   const sofaMat = mat(0x2f6f73, { roughness: 0.95 });
-  room.add(mesh(new THREE.BoxGeometry(1.8, 0.35, 0.7), sofaMat, { x: 1.4, y: 0.3, z: -1.7 }));
-  room.add(mesh(new THREE.BoxGeometry(1.8, 0.6, 0.18), sofaMat, { x: 1.4, y: 0.7, z: -2.0 }));
-  for (const side of [-1, 1]) room.add(mesh(new THREE.BoxGeometry(0.18, 0.5, 0.7), sofaMat, { x: 1.4 + side * 0.9, y: 0.45, z: -1.7 }));
-  room.add(mesh(new THREE.BoxGeometry(0.4, 0.35, 0.12), mat(0xe7c17a), { x: 1.0, y: 0.62, z: -1.85 }));
+  sofa.add(mesh(new THREE.BoxGeometry(1.8, 0.35, 0.7), sofaMat, { x: 1.4, y: 0.3, z: -1.7 }));
+  sofa.add(mesh(new THREE.BoxGeometry(1.8, 0.6, 0.18), sofaMat, { x: 1.4, y: 0.7, z: -2.0 }));
+  for (const side of [-1, 1]) sofa.add(mesh(new THREE.BoxGeometry(0.18, 0.5, 0.7), sofaMat, { x: 1.4 + side * 0.9, y: 0.45, z: -1.7 }));
+  sofa.add(mesh(new THREE.BoxGeometry(0.4, 0.35, 0.12), mat(0xe7c17a), { x: 1.0, y: 0.62, z: -1.85 }));
 
   // Lamp and a plant.
   room.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.5, 8), mat(0x222222), { x: -2.4, y: 0.75, z: -1.6 }));
@@ -385,21 +428,21 @@ function makePhone() {
   c.fillStyle = '#efe9dc';
   c.textAlign = 'center';
   c.font = '600 120px Georgia, serif';
-  c.fillText('7:00', 210, 210);
+  c.fillText('6:00', 210, 210);
   c.font = '500 30px sans-serif';
   c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Saturday, 14 June', 210, 260);
+  c.fillText('Monday · Exam day', 210, 260);
   c.fillStyle = 'rgba(239,233,220,0.12)';
   roundRect(c, 40, 320, 340, 250, 32);
   c.fill();
   c.font = '72px sans-serif';
-  c.fillText('🎂', 210, 410);
+  c.fillText('⏰', 210, 410);
   c.fillStyle = '#efe9dc';
   c.font = '700 40px sans-serif';
-  c.fillText('Call Grandma', 210, 475);
+  c.fillText('Wake up, Aarav!', 210, 475);
   c.font = '500 28px sans-serif';
   c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Her birthday · Alarm', 210, 520);
+  c.fillText('Final exam today · Alarm', 210, 520);
   c.fillStyle = '#d4af6a';
   roundRect(c, 70, 650, 280, 80, 40);
   c.fill();
@@ -434,7 +477,7 @@ function roundRect(c, x, y, w, h, r) {
   c.closePath();
 }
 
-/** Golden sparkles that drift around Satya. */
+/** Golden sparkles that drift around Melo. */
 function makeSparkles(count = 70) {
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -449,6 +492,85 @@ function makeSparkles(count = 70) {
     new THREE.PointsMaterial({ color: 0xf3dca6, size: 0.05, transparent: true, opacity: 0.9, depthWrite: false }),
   );
   return points;
+}
+
+/** Aarav's bed, along the back wall, with a pillow, a blanket and his school bag. */
+function makeBed() {
+  const g = new THREE.Group();
+  const wood = mat(0x8a5a3c, { roughness: 0.8 });
+  g.add(mesh(new THREE.BoxGeometry(1.7, 0.28, 0.95), wood, { y: 0.2 }));
+  g.add(mesh(new THREE.BoxGeometry(0.1, 0.75, 0.95), wood, { x: 0.88, y: 0.42 }));
+  g.add(mesh(new THREE.BoxGeometry(0.1, 0.45, 0.95), wood, { x: -0.88, y: 0.3 }));
+  g.add(mesh(new THREE.BoxGeometry(1.6, 0.14, 0.88), mat(0xf4efe6, { roughness: 1 }), { y: 0.41 }));
+  g.add(mesh(new THREE.BoxGeometry(0.34, 0.1, 0.55), mat(0xffffff, { roughness: 1 }), { x: 0.62, y: 0.53 }));
+  const blanket = mesh(new THREE.BoxGeometry(1.05, 0.12, 0.92), mat(0x5b8def, { roughness: 1 }), { x: -0.25, y: 0.5 });
+  g.add(blanket);
+  g.userData.blanket = blanket;
+  // School bag and books by the bed.
+  const bag = new THREE.Group();
+  bag.add(mesh(new THREE.BoxGeometry(0.34, 0.4, 0.18), mat(0xe2574c), { y: 0.2 }));
+  bag.add(mesh(new THREE.BoxGeometry(0.26, 0.16, 0.04), mat(0xb8433a), { y: 0.16, z: 0.1 }));
+  bag.position.set(1.2, 0, 0.2);
+  bag.rotation.y = -0.4;
+  g.add(bag);
+  g.position.set(-0.45, 0, -1.25);
+  return g;
+}
+
+/** A wall clock whose hands can be set, or spun to show time racing by. */
+function makeWallClock() {
+  const g = new THREE.Group();
+  const face = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 40), mat(0xfaf6ee), { shadow: false });
+  face.rotation.x = Math.PI / 2;
+  g.add(face);
+  g.add(mesh(new THREE.TorusGeometry(0.28, 0.03, 10, 40), mat(0xd4af6a, { metalness: 0.6, roughness: 0.3 }), { shadow: false }));
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.add(mesh(new THREE.BoxGeometry(0.02, i % 3 ? 0.03 : 0.06, 0.01), mat(0x333333), { x: Math.sin(a) * 0.22, y: Math.cos(a) * 0.22, z: 0.025, shadow: false }));
+  }
+  const hand = (length, width, color) => {
+    const pivot = new THREE.Group();
+    pivot.position.z = 0.03;
+    pivot.add(mesh(new THREE.BoxGeometry(width, length, 0.01), mat(color), { y: length / 2, shadow: false }));
+    g.add(pivot);
+    return pivot;
+  };
+  const hour = hand(0.13, 0.03, 0x222222);
+  const minute = hand(0.2, 0.018, 0x222222);
+  g.userData.set = (hours, minutes) => {
+    minute.rotation.z = -(minutes / 60) * Math.PI * 2;
+    hour.rotation.z = -((hours % 12) / 12 + minutes / 720) * Math.PI * 2;
+  };
+  g.position.set(1.05, 2.25, -2.15);
+  return g;
+}
+
+/** Confetti for the happy endings: little paper squares that tumble down. */
+function makeConfetti(count = 160) {
+  const colors = [0xd4af6a, 0xe2574c, 0x5b9bff, 0x4fc38a, 0xc24dff, 0xffffff];
+  const geometry = new THREE.PlaneGeometry(0.05, 0.03);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const confetti = new THREE.InstancedMesh(geometry, material, count);
+  const color = new THREE.Color();
+  const seeds = [];
+  for (let i = 0; i < count; i++) {
+    confetti.setColorAt(i, color.set(colors[i % colors.length]));
+    seeds.push({ x: (Math.random() - 0.5) * 3.4, z: (Math.random() - 0.3) * 1.6, speed: 0.5 + Math.random() * 0.6, phase: Math.random() * 6, delay: Math.random() * 0.8 });
+  }
+  const dummy = new THREE.Object3D();
+  confetti.userData.update = t => {
+    seeds.forEach((sd, i) => {
+      const k = Math.max(0, t - sd.delay);
+      dummy.position.set(sd.x + 0.15 * Math.sin(k * 2 + sd.phase), 3.2 - ((k * sd.speed) % 3.4), sd.z);
+      dummy.rotation.set(k * 3 + sd.phase, k * 2, k * 4);
+      dummy.scale.setScalar(t > sd.delay ? 1 : 0);
+      dummy.updateMatrix();
+      confetti.setMatrixAt(i, dummy.matrix);
+    });
+    confetti.instanceMatrix.needsUpdate = true;
+  };
+  confetti.frustumCulled = false;
+  return confetti;
 }
 
 // ---- Stage ------------------------------------------------------------------------------
@@ -504,8 +626,14 @@ const phone = makePhone();
 scene.add(phone);
 const sparkles = makeSparkles();
 scene.add(sparkles);
+const bed = makeBed();
+scene.add(bed);
+const wallClock = makeWallClock();
+scene.add(wallClock);
+const confetti = makeConfetti();
+scene.add(confetti);
 
-// Satya, loaded from the app's own GLB and scaled to stand about 1.1 tall.
+// Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
 const satya = new THREE.Group();
 scene.add(satya);
 let satyaModel = null;
@@ -578,10 +706,14 @@ function placeBubbles(t) {
 
 // ---- Scenes -----------------------------------------------------------------------------
 
-/** Each scene sets things up once, then poses everyone for time t (seconds). */
+/**
+ * Each scene sets things up once, then poses everyone for time t (seconds).
+ * `place` picks the room: the living room (sofa) or Aarav's bedroom (bed).
+ */
 const SCENES = [
   {
-    // Aarav asks Mom to remind him about Grandma's birthday.
+    // The night before the exam: Aarav asks Mom to wake him at 6.
+    place: 'living',
     sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 6 },
     camera: { x: 0, y: 1.05, z: 4.6, look: [0, 1.1, 0], width: 2.6 },
     setup() {
@@ -589,31 +721,36 @@ const SCENES = [
       mom.setMood('happy');
       mom.root.position.set(0.7, 0, 0);
       mom.root.rotation.y = -0.45;
-      say(aarav, 'Mom, tomorrow is Grandma’s birthday! Please remind me to call her in the morning.', 1.4);
-      say(mom, 'Of course, beta. I won’t forget!', 4.2);
+      wallClock.userData.set(21, 0);
+      say(aarav, 'Mom, my final exam is tomorrow! Please wake me up at 6, so I can revise.', 1.4, { until: 4.3 });
+      say(mom, 'Don’t worry, beta. I’ll wake you at 6!', 4.4);
     },
     update(t) {
       moves.walk(aarav, t, 0, 1.4, -2.6, -0.55, 0.45);
-      moves.wave(aarav, t, 1.3, 2.6, 'L');
-      moves.talk(aarav, t, 1.5, 3.9);
-      moves.nod(mom, t, 2.2, 3.4);
-      moves.talk(mom, t, 4.3, 5.8);
-      moves.wave(mom, t, 5.4, 6.4);
+      moves.wave(aarav, t, 1.3, 2.5, 'L');
+      moves.talk(aarav, t, 1.5, 4.0);
+      moves.nod(mom, t, 2.4, 3.6);
+      moves.talk(mom, t, 4.5, 6.2);
+      moves.wave(mom, t, 6.0, 7.2, 'R');
     },
   },
   {
-    // Mom's busy day: things whirl around her and the reminder slips away.
-    sky: { bg: 0x241b33, window: 0x5a3b6e, moon: false, lamp: 3 },
+    // That night Mom has endless chores, the clock races, and 6 AM slips away.
+    place: 'living',
+    sky: { bg: 0x241b33, window: 0x5a3b6e, moon: true, lamp: 3 },
     camera: { x: 0, y: 1.2, z: 5.0, look: [0, 1.3, 0], width: 2.6 },
     setup() {
       mom.setMood('happy');
       mom.root.position.set(0, 0, 0);
       aarav.root.position.set(-9, 0, 0);
-      say(mom, 'Call Grandma… call Grandma…', 0.6, { thought: true, until: 3.0 });
-      say(mom, '…what was I supposed to remember? 🤔', 3.2, { thought: true });
+      say(mom, 'Wake Aarav at 6… at 6…', 0.6, { thought: true, until: 3.2 });
+      say(mom, '…was it 6, or 7? 🤔', 3.4, { thought: true });
     },
     update(t) {
-      if (t < 3) {
+      // Hours fly by on the wall clock.
+      const minutes = 21 * 60 + 360 * ease(seg(t, 0, 5.5));
+      wallClock.userData.set(Math.floor(minutes / 60), minutes % 60);
+      if (t < 3.2) {
         const dir = Math.sin(t * 1.6);
         mom.root.position.x = 0.5 * dir;
         mom.root.rotation.y = Math.cos(t * 1.6) > 0 ? 0.9 : -0.9;
@@ -624,13 +761,12 @@ const SCENES = [
       } else {
         mom.root.rotation.y = lerp(mom.root.rotation.y, 0, 0.1);
         mom.setMood('worried');
-        moves.think(mom, t, 3.0, 99);
+        moves.think(mom, t, 3.2, 99);
       }
       things.forEach((thing, i) => {
         const a = t * 1.3 + (i / things.length) * Math.PI * 2;
-        const r = 0.95;
         thing.visible = true;
-        thing.position.set(Math.cos(a) * r + mom.root.position.x * 0.5, 1.45 + 0.18 * Math.sin(t * 2 + i), Math.sin(a) * r * 0.5 + 0.3);
+        thing.position.set(Math.cos(a) * 0.95 + mom.root.position.x * 0.5, 1.45 + 0.18 * Math.sin(t * 2 + i), Math.sin(a) * 0.48 + 0.3);
         thing.rotation.set(t * 0.7 + i, t + i, 0);
         if (thing.userData.spin) thing.userData.spin.rotation.z = -t * 6;
         thing.scale.setScalar(0.6 + 0.4 * ease(seg(t, 0.1 * i, 0.1 * i + 0.6)));
@@ -638,30 +774,32 @@ const SCENES = [
     },
   },
   {
-    // The next evening: Grandma waited all day.
-    sky: { bg: 0x1d2236, window: 0x1b2a52, moon: true, lamp: 5 },
-    camera: { x: 0, y: 1.0, z: 4.6, look: [0, 1.1, 0], width: 2.6 },
+    // The morning: Aarav wakes at 8:30 and panics; Mom realizes she forgot.
+    place: 'bedroom',
+    sky: { bg: 0x3a4a6e, window: 0xbfe3ff, sun: true, lamp: 0 },
+    camera: { x: 0, y: 1.1, z: 4.8, look: [0, 1.1, 0], width: 2.8 },
     setup() {
-      aarav.setMood('sad');
-      mom.setMood('happy');
-      aarav.root.position.set(-0.6, 0, 0);
-      aarav.root.rotation.y = 0.35;
-      mom.root.position.set(0.7, 0, 0);
-      mom.root.rotation.y = -0.4;
-      say(aarav, 'Mom… Grandma waited all day for my call. 😢', 0.5);
-      say(mom, 'Oh no… I forgot. I’m so sorry, beta.', 3.3);
+      aarav.setMood('happy');
+      mom.setMood('surprised');
+      mom.root.position.set(2.6, 0, 0.1);
+      wallClock.userData.set(8, 30);
+      say(aarav, 'Zzz…', 0.2, { thought: true, until: 1.6 });
+      say(aarav, 'It’s 8:30! I’m late for my exam! 😱', 2.0, { until: 4.3 });
+      say(mom, 'Oh no… I forgot to wake you!', 4.4);
     },
     update(t) {
-      moves.sad(aarav, 0.7 + 0.3 * Math.sin(t));
-      moves.talk(aarav, t, 0.6, 2.8);
-      if (t > 2.6) mom.setMood('sad');
-      moves.sad(mom, ease(seg(t, 2.6, 3.4)));
-      moves.think(mom, t, 3.0, 99);
-      moves.talk(mom, t, 3.4, 5.4);
+      if (t > 1.6) aarav.setMood('surprised');
+      moves.sleepAndWake(aarav, t, 1.6, -0.5);
+      moves.panic(aarav, t, 2.6, 7.5, -1.0, 0.0);
+      moves.walk(mom, t, 3.4, 4.4, 2.6, 0.9, -0.5);
+      if (t > 4.2) mom.setMood('sad');
+      moves.think(mom, t, 4.5, 99);
+      moves.talk(mom, t, 4.5, 6.2);
     },
   },
   {
-    // Satya arrives.
+    // Melo arrives.
+    place: 'living',
     sky: { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 },
     camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.15, 0], width: 3.4 },
     setup() {
@@ -671,7 +809,7 @@ const SCENES = [
       aarav.root.rotation.y = 0.6;
       mom.root.position.set(1.3, 0, 0.1);
       mom.root.rotation.y = -0.6;
-      say(satya, 'Hi! I’m Satya. Tell Memo once, and I’ll remember it for you.', 2.0);
+      say(satya, 'Hi! I’m Melo. Tell Memo once, and I’ll remember it for you.', 2.0);
     },
     update(t) {
       // Drops in with a bounce, spins once, then wiggles hello.
@@ -693,38 +831,44 @@ const SCENES = [
     },
   },
   {
-    // A year later, Memo rings in the morning and Aarav calls Grandma.
-    sky: { bg: 0x3a4a6e, window: 0x9fd0ff, moon: false, sun: true, lamp: 0 },
-    camera: { x: 0, y: 1.1, z: 5.0, look: [0, 1.3, 0], width: 3.1 },
+    // Before the next exam: the alarm rings at 6, Aarav is up on time.
+    place: 'bedroom',
+    sky: { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 },
+    camera: { x: 0, y: 1.15, z: 4.9, look: [0, 1.2, 0], width: 3.0 },
     setup() {
-      aarav.setMood('surprised');
+      aarav.setMood('happy');
       mom.setMood('happy');
-      aarav.root.position.set(-1.0, 0, 0.2);
-      aarav.root.rotation.y = 0.5;
-      mom.root.position.set(1.1, 0, -0.1);
+      mom.root.position.set(1.15, 0, 0);
       mom.root.rotation.y = -0.5;
-      say(aarav, 'Memo remembered! Happy birthday, Grandma! 🎉', 3.0);
+      wallClock.userData.set(6, 0);
+      say(aarav, 'Up on time! Thank you, Memo! 🎉', 3.6);
     },
     update(t) {
       phone.visible = true;
-      const ringing = t > 0.6 && t < 3.2;
-      const appear = ease(seg(t, 0, 0.7));
-      phone.position.set(0.15, 1.35 + 0.05 * Math.sin(t * 2), 0.6);
-      phone.scale.setScalar(0.4 + 0.6 * appear);
+      const ringing = t > 0.5 && t < 2.6;
+      const appear = ease(seg(t, 0, 0.6));
+      phone.position.set(0.35, 1.55 + 0.05 * Math.sin(t * 2), 0.5);
+      phone.scale.setScalar((0.4 + 0.6 * appear) * (1 - 0.35 * ease(seg(t, 2.8, 3.4))));
+      phone.position.x = lerp(0.35, 0.9, ease(seg(t, 2.8, 3.4)));
+      phone.position.y = lerp(1.55, 2.1, ease(seg(t, 2.8, 3.4)));
       phone.rotation.set(-0.08, -0.15, ringing ? 0.09 * Math.sin(t * 38) : 0);
       phone.userData.rings.forEach((ring, i) => {
-        const k = ((t * 0.9 + i / 3) % 1);
+        const k = (t * 0.9 + i / 3) % 1;
         ring.scale.setScalar(1 + k * 0.6);
         ring.material.opacity = ringing ? 0.5 * (1 - k) : 0;
       });
-      if (t > 2.8) aarav.setMood('happy');
-      moves.jump(aarav, t, 3.0, 4.6);
-      moves.talk(aarav, t, 4.6, 6.3);
-      moves.clap(mom, t, 3.2, 5.0);
+      moves.sleepAndWake(aarav, t, 1.4, -0.7);
+      moves.stretch(aarav, t, 2.3, 3.3);
+      moves.jump(aarav, t, 3.4, 5.0);
+      moves.talk(aarav, t, 5.0, 6.8);
+      moves.clap(mom, t, 3.5, 5.5);
+      confetti.visible = t > 3.4;
+      if (confetti.visible) confetti.userData.update(t - 3.4);
     },
   },
   {
     // Everyone says hello: the closing shot behind the app's feature list.
+    place: 'living',
     sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 5 },
     camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.5 },
     setup() {
@@ -741,6 +885,8 @@ const SCENES = [
       satya.rotation.z = 0.12 * Math.sin(t * 3);
       moves.wave(aarav, t % 3, 0, 2.2, 'L');
       moves.wave(mom, (t + 1.2) % 3, 0, 2.2, 'R');
+      confetti.visible = true;
+      confetti.userData.update(t);
     },
   },
 ];
@@ -758,10 +904,24 @@ function show(index) {
   satya.visible = false;
   sparkles.visible = false;
   phone.visible = false;
+  confetti.visible = false;
   things.forEach(th => (th.visible = false));
   aarav.root.rotation.set(0, 0, 0);
   mom.root.rotation.set(0, 0, 0);
+  aarav.asleep = false;
+  mom.asleep = false;
+  const bedroom = s.place === 'bedroom';
+  bed.visible = bedroom;
+  room.userData.sofa.visible = !bedroom;
+  wallClock.userData.set(9, 0);
   s.setup();
+  // Each new scene fades up from dark.
+  canvas.style.transition = 'none';
+  canvas.style.opacity = '0';
+  requestAnimationFrame(() => {
+    canvas.style.transition = 'opacity 450ms ease';
+    canvas.style.opacity = '1';
+  });
   scene.background = new THREE.Color(s.sky.bg);
   scene.fog.color.set(s.sky.bg);
   room.userData.window.color.set(s.sky.window);
@@ -812,5 +972,7 @@ function frame(now) {
 }
 
 show(Number(params.get('scene') || 0));
+// For checking a moment of a scene in a browser: ?scene=2&at=3 starts 3 s in.
+if (params.get('at')) startedAt -= Number(params.get('at')) * 1000;
 requestAnimationFrame(frame);
 post('loaded');

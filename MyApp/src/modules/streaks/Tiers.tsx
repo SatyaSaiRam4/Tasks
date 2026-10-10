@@ -121,6 +121,40 @@ export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
   );
 }
 
+/**
+ * All six badges as one small, even row (no names), for tight spots like the
+ * Home streak card. Earned ones shine; tap any for its steps.
+ */
+export function BadgeStrip({ best, size = 30 }: { best: number; size?: number }) {
+  const [shown, setShown] = useState<Tier>(TIERS[0]);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <View style={styles.strip}>
+        {TIERS.map(tier => {
+          const earned = best >= tier.days;
+          return (
+            <Pressable
+              key={tier.key}
+              onPress={() => {
+                setShown(tier);
+                setOpen(true);
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${tier.name} badge, ${earned ? 'earned' : `streak ${tier.days} needed`}. Show steps.`}
+              style={({ pressed }) => pressed && styles.pressed}
+            >
+              <TierBadge tier={tier} earned={earned} size={size} />
+            </Pressable>
+          );
+        })}
+      </View>
+      <TierSheet tier={shown} visible={open} best={best} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
 /** The steps for one tier: what it takes, how far along, and the full ladder. */
 function TierSheet({ tier, visible, best, onClose }: { tier: Tier; visible: boolean; best: number; onClose: () => void }) {
   const earned = best >= tier.days;
@@ -174,6 +208,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  strip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   name: {
     ...font.bold,

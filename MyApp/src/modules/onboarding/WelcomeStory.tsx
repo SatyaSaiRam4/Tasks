@@ -13,10 +13,10 @@ import { Kid, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): Aarav asks his mom to remind him to call Grandma on
- * her birthday, she has a busy day and forgets, Grandma waits all day — and
- * a year later Memo rings in the morning so he remembers. Ends on what the
- * app does. Plays like a phone "story": it moves on by itself; tap the right
+ * again from Settings): the night before his final exam, Aarav asks Mom to
+ * wake him at 6; she has so much to do that she forgets, and he oversleeps.
+ * Melo arrives, and before the next exam Memo's alarm wakes him on time.
+ * Ends on what the app does. Plays like a phone "story": it moves on by itself; tap the right
  * side for next and the left side for back.
  *
  * The scenes play in 3D (assets/web/story, built from web/story/story.js)
@@ -34,10 +34,10 @@ interface Scene {
 
 const SCENES: Scene[] = [
   { caption: 'Meet Aarav.', duration: 7500, Body: AskScene },
-  { caption: 'But Mom had a very busy day…', duration: 7000, Body: BusyScene },
-  { caption: 'The next evening…', duration: 7000, Body: ForgotScene },
+  { caption: 'That night, Mom had so much to do…', duration: 7000, Body: BusyScene },
+  { caption: 'The next morning…', duration: 7500, Body: ForgotScene },
   { caption: 'That’s why Memo is here.', duration: 6500, Body: SatyaScene },
-  { caption: 'A year later, on Grandma’s birthday…', duration: 7500, Body: RemindScene },
+  { caption: 'Before his next exam, Aarav sets an alarm.', duration: 7500, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -259,8 +259,8 @@ function AskScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Mom, tomorrow is Grandma’s birthday! Please remind me to call her in the morning." delay={500} side="left" />
-        <Speech text="Of course, beta. I won’t forget!" delay={2600} side="right" tone="gold" />
+        <Speech text="Mom, my final exam is tomorrow! Please wake me up at 6, so I can revise." delay={500} side="left" />
+        <Speech text="Don’t worry, beta. I’ll wake you at 6!" delay={2600} side="right" tone="gold" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
@@ -284,9 +284,9 @@ function BusyScene() {
       <View style={styles.speechArea}>
         <View style={styles.thought}>
           <Animated.Text style={[styles.thoughtText, { opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-            Call Grandma… 🎂
+            Wake Aarav at 6… ⏰
           </Animated.Text>
-          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…what was I supposed to remember? 🤔</Animated.Text>
+          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…was it 6, or 7? 🤔</Animated.Text>
         </View>
         <View style={styles.thoughtDots}>
           <View style={[styles.thoughtDot, styles.thoughtDotBig]} />
@@ -326,12 +326,12 @@ function ForgotScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Mom… Grandma waited all day for my call. 😢" delay={400} side="left" />
-        <Speech text="Oh no… I forgot. I’m so sorry, beta." delay={2600} side="right" tone="gold" />
+        <Speech text="It’s 8:30! I’m late for my exam! 😱" delay={400} side="left" />
+        <Speech text="Oh no… I forgot to wake you!" delay={2600} side="right" tone="gold" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
-          <Kid size={170} mood="sad" />
+          <Kid size={170} mood="surprised" />
         </Actor>
         <Actor from="right" delay={200}>
           <Mom size={220} mood="sad" />
@@ -345,7 +345,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Satya! Tell Memo once, and I’ll remember it for you." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! Tell Memo once, and I’ll remember it for you." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />
@@ -361,7 +361,7 @@ function RemindScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Memo remembered! Happy birthday, Grandma! 🎉" delay={3200} side="left" />
+        <Speech text="Up on time! Thank you, Memo! 🎉" delay={3200} side="left" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
@@ -371,11 +371,11 @@ function RemindScene() {
           <Animated.View style={{ transform: [{ rotate: shake.interpolate({ inputRange: [-1, 1], outputRange: ['-6deg', '6deg'] }) }] }}>
             <View style={styles.phone}>
               <View style={styles.notch} />
-              <Text style={styles.phoneTime}>7:00</Text>
+              <Text style={styles.phoneTime}>6:00</Text>
               <View style={styles.alarmCard}>
                 <RealIcon name="bell" size={30} />
-                <Text style={styles.alarmTitle}>Call Grandma 🎂</Text>
-                <Text style={styles.alarmMeta}>Today · 7:00 AM</Text>
+                <Text style={styles.alarmTitle}>Wake up, Aarav! ⏰</Text>
+                <Text style={styles.alarmMeta}>Exam day · 6:00 AM</Text>
                 <View style={styles.alarmPill}>
                   <Text style={styles.alarmPillText}>Alarm</Text>
                 </View>

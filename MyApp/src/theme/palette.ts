@@ -48,7 +48,7 @@ export const ACCENTS = {
 
 export type AccentName = keyof typeof ACCENTS;
 export const DEFAULT_ACCENT: AccentName = 'amber';
-export const DEFAULT_THEME: ThemeMode = 'dark';
+export const DEFAULT_THEME: ThemeMode = 'light';
 
 export interface Palette {
   background: string;

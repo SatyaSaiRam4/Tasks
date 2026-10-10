@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,27 +9,24 @@ import { ScreenHeader } from '../../../components/ScreenHeader';
 import { TextField } from '../../../components/TextField';
 import { DateField } from '../../../components/PickerFields';
 import { Button } from '../../../components/Button';
-import { Chip, ChipRow, IconButton } from '../../../components/Controls';
+import { Chip, ChipRow } from '../../../components/Controls';
 import { Icon } from '../../../components/Icon';
 import { ConfirmSheet } from '../../../components/Sheet';
 import { Skeleton } from '../../../components/Feedback';
 import { getErrorMessage } from '../../../utils/apiError';
 import { addDays, diffDays, fromDateKey, toDateKey } from '../../../utils/date';
 import { useGetStreakQuery } from '../../streaks/streaksApi';
-import { useCreateActionMutation, useCreateTrackMutation, useGetTrackQuery, useUpdateTrackMutation } from '../routinesApi';
+import { useCreateTrackMutation, useGetTrackQuery, useUpdateTrackMutation } from '../routinesApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-/** A plan can hold up to this many active tasks. */
-const MAX_TASKS = 15;
 
 /** Quick starts for a new plan's name and length. */
 const NAME_IDEAS = ['Fitness', 'Study', 'Reading', 'Meditation', 'Healthy eating'];
 const LENGTHS = [7, 21, 30, 90];
 
 /**
- * Create a plan in three numbered steps (name, length, daily tasks), or edit
+ * Create a plan in two numbered steps (name, then how long), or edit
  * a plan's name and dates.
  */
 export function TrackEditorScreen() {
@@ -41,15 +38,12 @@ export function TrackEditorScreen() {
   const today = streak.data?.today.date ?? toDateKey(new Date());
   const [create, { isLoading: creating }] = useCreateTrackMutation();
   const [update, { isLoading: updating }] = useUpdateTrackMutation();
-  const [createTask, { isLoading: addingTasks }] = useCreateActionMutation();
 
   const [name, setName] = useState('');
   const [start, setStart] = useState<string>(today);
   const [end, setEnd] = useState<string>(toDateKey(addDays(fromDateKey(today), 29)));
   const [error, setError] = useState<string | null>(null);
   const [confirmDates, setConfirmDates] = useState(false);
-  const [tasks, setTasks] = useState<string[]>([]);
-  const [taskName, setTaskName] = useState('');
 
   useEffect(() => {
     const tr = existing.data;
@@ -62,13 +56,6 @@ export function TrackEditorScreen() {
   const days = diffDays(end, start) + 1;
   const datesChanged = editing && existing.data && (existing.data.start_date !== start || existing.data.end_date !== end);
   const hasHistory = Boolean(existing.data && existing.data.start_date < today);
-
-  const addTask = () => {
-    const title = taskName.trim();
-    if (!title || tasks.length >= MAX_TASKS) return;
-    setTasks(list => [...list, title]);
-    setTaskName('');
-  };
 
   const save = async () => {
     setError(null);
@@ -84,17 +71,8 @@ export function TrackEditorScreen() {
         navigation.goBack();
       } else {
         const tr = await create(body).unwrap();
-        // A task still in the box counts too, so nothing typed is lost.
-        const titles = taskName.trim() && tasks.length < MAX_TASKS ? [...tasks, taskName.trim()] : tasks;
-        try {
-          for (const title of titles) {
-            await createTask({ trackId: tr.id, title, repeat_type: 'DAILY' }).unwrap();
-          }
-        } catch (err) {
-          // The plan exists now, so go there rather than risk creating it twice.
-          Toast.fail(getErrorMessage(err, 'Some tasks were not added. Add them here.'), 2);
-        }
-        navigation.replace('TrackDetail', { trackId: tr.id });
+        // Step 2 happens on the plan itself: it opens ready to add tasks.
+        navigation.replace('TrackDetail', { trackId: tr.id, created: true });
       }
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save this plan.'));
@@ -144,45 +122,14 @@ export function TrackEditorScreen() {
       {days > 0 ? <Text style={styles.duration}>{days === 1 ? '1 day' : `${days} days`}</Text> : null}
 
       {editing ? null : (
-        <View style={styles.tasks}>
-          <Step number={3} title="Add daily tasks" hint="Small things you will do every day. You can add more later." />
-          {tasks.length < MAX_TASKS ? (
-            <View style={styles.addRow}>
-              <View style={styles.flex}>
-                <TextField
-                  value={taskName}
-                  onChangeText={setTaskName}
-                  placeholder={tasks.length ? 'Add another task' : 'e.g. Walk 20 minutes'}
-                  onSubmitEditing={addTask}
-                  returnKeyType="done"
-                  blurOnSubmit={false}
-                  maxLength={200}
-                />
-              </View>
-              <IconButton icon="plus" size={22} color={colors.gold} style={styles.addButton} accessibilityLabel="Add task" onPress={addTask} />
-            </View>
-          ) : null}
-          {tasks.map((title, i) => (
-            <View key={`${title}-${i}`} style={styles.taskRow}>
-              <Icon name="check-circle" size={18} color={colors.gold} strokeWidth={1.7} />
-              <Text style={styles.taskTitle} numberOfLines={1}>
-                {title}
-              </Text>
-              <Pressable
-                onPress={() => setTasks(list => list.filter((_, j) => j !== i))}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${title}`}
-                hitSlop={10}
-              >
-                <Icon name="x" size={16} color={colors.textTertiary} />
-              </Pressable>
-            </View>
-          ))}
+        <View style={styles.next}>
+          <Icon name="list" size={16} color={colors.gold} />
+          <Text style={[t.caption, styles.flex]}>Next, you’ll add the daily tasks for this plan.</Text>
         </View>
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button label={editing ? 'Save changes' : 'Create plan'} onPress={save} loading={creating || updating || addingTasks} size="lg" />
+      <Button label={editing ? 'Save changes' : 'Create plan · next: tasks'} onPress={save} loading={creating || updating} size="lg" />
 
       <ConfirmSheet
         visible={confirmDates}
@@ -265,33 +212,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
-  tasks: {
-    marginBottom: spacing.md,
-  },
-  taskRow: {
+  next: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  taskTitle: {
-    ...t.body,
-    flex: 1,
-  },
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: spacing.sm,
-  },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderColor: colors.goldLine,
-    backgroundColor: colors.goldSoft,
+    marginBottom: spacing.lg,
   },
   error: {
     ...font.medium,
