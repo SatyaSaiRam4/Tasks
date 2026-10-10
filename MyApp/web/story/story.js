@@ -2,10 +2,11 @@
 /**
  * Memo's welcome story, in 3D.
  *
- * The night before his final exam, Aarav asks Mom to wake him at 6 so he can
- * revise. Mom has so much to do that it slips her mind, and Aarav oversleeps
- * and runs late. Then Melo shows up, and before the next exam Aarav sets an
- * alarm in Memo: it rings at 6, he is up on time, and everyone cheers.
+ * Riya's best friend Ananya invites her to her wedding, two months away, and
+ * Riya plans to buy her dress at a big sale that opens in ten days. Weeks fly
+ * by, and she misses both. Then Melo shows up: this time Riya tells Memo once,
+ * months ahead, and Memo reminds her of the sale and the wedding day. She
+ * arrives in her new dress, and the friends celebrate under the marigolds.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
  * and drives it with window.story.show(sceneIndex); captions, progress and
@@ -62,12 +63,14 @@ function limb(radius, length, material, endRadius, endMaterial) {
  * A stylized person. Returns the joints the scenes animate: root (position and
  * turn), body (lean), head, arms and legs (rotations), and setMood().
  */
-function makePerson({ kind }) {
+function makePerson({ kind, skinColor = 0xe9b48f, topColor = 0xc95c7a, hairColor = 0x3b2620 }) {
+  // kind: 'kid', 'woman' (ponytail) or 'bride' (bun, veil and jewellery).
   const kid = kind === 'kid';
-  const skin = mat(kid ? 0xf3c9a6 : 0xe9b48f, { roughness: 0.75 });
-  const hair = mat(kid ? 0x2a1e1a : 0x3b2620, { roughness: 0.9 });
-  const top = mat(kid ? 0x3f7cf0 : 0xc95c7a, { roughness: 0.8 });
-  const bottom = mat(kid ? 0x26345e : 0x8e3a5e, { roughness: 0.85 });
+  const bride = kind === 'bride';
+  const skin = mat(kid ? 0xf3c9a6 : skinColor, { roughness: 0.75 });
+  const hair = mat(kid ? 0x2a1e1a : hairColor, { roughness: 0.9 });
+  const top = mat(kid ? 0x3f7cf0 : topColor, { roughness: bride ? 0.55 : 0.8, metalness: bride ? 0.08 : 0.02 });
+  const bottom = mat(kid ? 0x26345e : 0x5a2b3f, { roughness: 0.85 });
   const shoe = mat(kid ? 0xf2f2f2 : 0x5a2b3f);
   const ink = mat(0x1e1512, { roughness: 0.3 });
   const gold = mat(0xe7c17a, { metalness: 0.6, roughness: 0.3 });
@@ -111,6 +114,16 @@ function makePerson({ kind }) {
     dupatta.rotation.set(0.25, 0.2, 2.2);
     dupatta.position.set(0, 0.22 * s, 0.02);
     body.add(dupatta);
+    if (bride) {
+      // A gold border on the lehenga's hem and a necklace.
+      const hem = mesh(new THREE.TorusGeometry(0.295 * s, 0.025 * s, 8, 40), gold, { y: -0.33 * s });
+      hem.rotation.x = Math.PI / 2;
+      body.add(hem);
+      const necklace = mesh(new THREE.TorusGeometry(0.1 * s, 0.018 * s, 8, 24, Math.PI), gold, { y: 0.5 * s, z: 0.06 * s });
+      necklace.rotation.z = Math.PI;
+      necklace.rotation.x = -0.5;
+      body.add(necklace);
+    }
   }
 
   const shoulderY = kid ? torsoH * 0.82 : 0.46 * s;
@@ -133,7 +146,7 @@ function makePerson({ kind }) {
   head.add(mesh(new THREE.SphereGeometry(headR, 32, 24), skin));
   for (const side of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(headR * 0.18, 12, 10), skin, { x: side * headR * 0.98 }));
 
-  // Hair: a cap over the top and back, plus a fringe (kid) or a bun (mom).
+  // Hair: a cap over the top and back, plus a fringe (kid), a ponytail or a bun.
   const cap = mesh(new THREE.SphereGeometry(headR * 1.06, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
   cap.rotation.x = -0.35;
   head.add(cap);
@@ -149,7 +162,26 @@ function makePerson({ kind }) {
       head.add(tuft);
     }
   } else {
-    head.add(mesh(new THREE.SphereGeometry(headR * 0.42, 20, 16), hair, { y: headR * 0.75, z: -headR * 0.55 }));
+    if (kind === 'woman') {
+      // A high ponytail.
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.3, 16, 12), hair, { y: headR * 0.55, z: -headR * 0.85 }));
+      const tail = mesh(new THREE.ConeGeometry(headR * 0.26, headR * 1.1, 14), hair, { y: -headR * 0.05, z: -headR * 1.05 });
+      tail.rotation.x = Math.PI + 0.35;
+      head.add(tail);
+    } else {
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.42, 20, 16), hair, { y: headR * 0.75, z: -headR * 0.55 }));
+    }
+    if (bride) {
+      // A sheer red-gold veil over the head and a forehead jewel.
+      const veil = mesh(
+        new THREE.SphereGeometry(headR * 1.25, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        mat(0xd4384f, { transparent: true, opacity: 0.55, side: THREE.DoubleSide, roughness: 0.6 }),
+        { y: headR * 0.05, z: -headR * 0.15 },
+      );
+      veil.rotation.x = -0.5;
+      head.add(veil);
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.08, 10, 8), gold, { y: headR * 0.55, z: headR * 0.88 }));
+    }
     const back = mesh(new THREE.SphereGeometry(headR * 1.08, 24, 16, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.5), hair);
     back.position.z = -headR * 0.12;
     back.scale.set(1, 1.15, 0.9);
@@ -194,7 +226,7 @@ function makePerson({ kind }) {
   }
   setMood('happy');
 
-  return { root, hips, body, head, armL, armR, legL, legR, mouth, eyes, setMood, height: hips.position.y + head.position.y + headR };
+  return { root, hips, body, head, armL, armR, legL, legR, mouth, eyes, setMood, top, height: hips.position.y + head.position.y + headR };
 }
 
 /** Resets a person to standing still, before a frame's moves are applied. */
@@ -210,7 +242,7 @@ function rest(p, t) {
   p.legR.rotation.set(0, 0, 0);
   p.mouth.scale.set(1, 1, 1);
   // Blink every few seconds.
-  const blink = p.asleep || (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.12 : 1;
+  const blink = (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.12 : 1;
   p.eyes.forEach(e => (e.scale.y = blink));
 }
 
@@ -282,44 +314,23 @@ const moves = {
     p.armL.rotation.z = -0.15 - 0.45 * c + 0.6;
     p.armR.rotation.z = 0.15 + 0.45 * c - 0.6;
   },
-  /** Lying asleep on the bed, then (from `wake`) sitting up and hopping out to `standX`. */
-  sleepAndWake(p, t, wake, standX) {
-    const bedTop = 0.52;
-    const k = wake === undefined ? 0 : ease(seg(t, wake, wake + 0.9));
-    p.asleep = k === 0;
-    const lyingX = bed.position.x - 0.55;
-    p.root.rotation.set(0, 0, lerp(-Math.PI / 2, 0, k));
-    p.root.position.set(lerp(lyingX, standX, k), lerp(bedTop + 0.06, 0, k) + 0.35 * bump(k), lerp(bed.position.z + 0.05, 0.1, k));
-    if (k === 0) {
-      // Slow sleepy breathing.
-      p.body.scale.y = 1 + 0.03 * Math.sin(t * 1.6);
-      // Lying on the side, arms rest along the body.
-      p.armL.rotation.z = 0.08;
-      p.armR.rotation.z = -0.08;
-    }
-    bed.userData.blanket.position.y = 0.5 + 0.12 * (1 - k);
-    bed.userData.blanket.scale.set(1, 1 + (1 - k) * 0.6, 1);
+  /** Both hands to the head: "Oh no!" */
+  shock(p, t, a) {
+    const k = ease(seg(t, a, a + 0.4));
+    p.armL.rotation.set(-0.6 * k, 0, -(0.12 + 2.3 * k));
+    p.armR.rotation.set(-0.6 * k, 0, 0.12 + 2.3 * k);
+    p.head.rotation.x -= 0.15 * k;
   },
-  /** Arms up in a big morning stretch. */
-  stretch(p, t, a, b) {
-    const k = bump(seg(t, a, b));
-    p.armL.rotation.z = -(0.12 + 2.7 * k);
-    p.armR.rotation.z = 0.12 + 2.7 * k;
-    p.body.rotation.x -= 0.12 * k;
+  /** Arms out and around: a hug, held from a to b. */
+  hug(p, t, a, b) {
+    const k = ease(seg(t, a, a + 0.5)) * (1 - ease(seg(t, b - 0.4, b)));
+    p.armL.rotation.set(-1.25 * k, 0, -0.12 + 0.75 * k);
+    p.armR.rotation.set(-1.25 * k, 0, 0.12 - 0.75 * k);
   },
-  /** Running in a panic: fast legs, hands on head. */
-  panic(p, t, a, b, x0, x1) {
-    const k = seg(t, a, b);
-    if (k <= 0 || k >= 1) return;
-    const run = Math.sin((t - a) * 16);
-    const back = Math.sin((t - a) * 2.6);
-    p.root.position.x = lerp(x0, x1, 0.5 + 0.5 * back);
-    p.root.rotation.y = Math.cos((t - a) * 2.6) > 0 ? 1.1 : -1.1;
-    p.legL.rotation.x = 0.8 * run;
-    p.legR.rotation.x = -0.8 * run;
-    p.hips.position.y += 0.05 * Math.abs(run);
-    p.armL.rotation.set(0, 0, -2.6);
-    p.armR.rotation.set(0, 0, 2.6);
+  /** Holding something up in the right hand, e.g. the invitation. */
+  hold(p, amount = 1) {
+    p.armR.rotation.x = -1.3 * amount;
+    p.armR.rotation.z = 0.12 - 0.25 * amount;
   },
   busy(p, t) {
     // Hurrying: quick arm work and a restless head.
@@ -357,7 +368,7 @@ function makeRoom() {
   room.userData.sky = sky;
   room.add(sky);
 
-  // Sofa (the living room; the bedroom swaps it for the bed).
+  // Sofa.
   const sofa = new THREE.Group();
   room.add(sofa);
   room.userData.sofa = sofa;
@@ -410,7 +421,11 @@ function busyThing(kind) {
   return g;
 }
 
-/** The phone that rings with the reminder, its screen drawn on a canvas. */
+/**
+ * The phone, its screen drawn on a canvas. draw(screen) switches between the
+ * wedding photos Riya finds too late, her Memo reminders, and the reminder
+ * ringing on the day.
+ */
 function makePhone() {
   const g = new THREE.Group();
   const w = 0.62;
@@ -420,38 +435,70 @@ function makePhone() {
   canvas.width = 420;
   canvas.height = 800;
   const c = canvas.getContext('2d');
-  const grad = c.createLinearGradient(0, 0, 0, 800);
-  grad.addColorStop(0, '#1b2440');
-  grad.addColorStop(1, '#0b1122');
-  c.fillStyle = grad;
-  c.fillRect(0, 0, 420, 800);
-  c.fillStyle = '#efe9dc';
-  c.textAlign = 'center';
-  c.font = '600 120px Georgia, serif';
-  c.fillText('6:00', 210, 210);
-  c.font = '500 30px sans-serif';
-  c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Monday · Exam day', 210, 260);
-  c.fillStyle = 'rgba(239,233,220,0.12)';
-  roundRect(c, 40, 320, 340, 250, 32);
-  c.fill();
-  c.font = '72px sans-serif';
-  c.fillText('⏰', 210, 410);
-  c.fillStyle = '#efe9dc';
-  c.font = '700 40px sans-serif';
-  c.fillText('Wake up, Aarav!', 210, 475);
-  c.font = '500 28px sans-serif';
-  c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Final exam today · Alarm', 210, 520);
-  c.fillStyle = '#d4af6a';
-  roundRect(c, 70, 650, 280, 80, 40);
-  c.fill();
-  c.fillStyle = '#0b1122';
-  c.font = '700 36px sans-serif';
-  c.fillText('Stop', 210, 702);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   g.add(mesh(new THREE.PlaneGeometry(w * 0.9, h * 0.92), new THREE.MeshBasicMaterial({ map: texture }), { z: 0.031, shadow: false }));
+
+  const text = (value, y, font, color = '#efe9dc') => {
+    c.font = font;
+    c.fillStyle = color;
+    c.fillText(value, 210, y);
+  };
+  g.userData.draw = screen => {
+    const grad = c.createLinearGradient(0, 0, 0, 800);
+    grad.addColorStop(0, '#1b2440');
+    grad.addColorStop(1, '#0b1122');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 420, 800);
+    c.textAlign = 'center';
+    if (screen === 'photos') {
+      text('Ananya posted 3 photos', 90, '600 28px sans-serif', 'rgba(239,233,220,0.75)');
+      c.fillStyle = '#7a1f33';
+      roundRect(c, 40, 130, 340, 380, 28);
+      c.fill();
+      text('💍', 290, '120px sans-serif');
+      text('Our wedding day ✨', 400, '700 36px sans-serif');
+      text('14 December', 450, '500 28px sans-serif', 'rgba(239,233,220,0.75)');
+      text('♥ 248   💬 61', 580, '600 30px sans-serif', 'rgba(239,233,220,0.8)');
+      text('Yesterday', 650, '500 26px sans-serif', 'rgba(239,233,220,0.5)');
+    } else if (screen === 'list') {
+      text('Memo · Reminders', 90, '700 32px sans-serif', '#d4af6a');
+      const row = (y, emoji, title, when) => {
+        c.fillStyle = 'rgba(239,233,220,0.1)';
+        roundRect(c, 30, y, 360, 150, 26);
+        c.fill();
+        c.textAlign = 'left';
+        c.font = '56px sans-serif';
+        c.fillText(emoji, 55, y + 95);
+        c.font = '700 30px sans-serif';
+        c.fillStyle = '#efe9dc';
+        c.fillText(title, 135, y + 65);
+        c.font = '500 25px sans-serif';
+        c.fillStyle = 'rgba(239,233,220,0.7)';
+        c.fillText(when, 135, y + 108);
+        c.textAlign = 'center';
+      };
+      row(150, '🛍️', 'Big sale opens', 'In 10 days · Alarm');
+      row(330, '💍', 'Ananya’s wedding', '14 December · Alarm');
+      text('Memo will remember.', 600, '600 italic 30px Georgia, serif', 'rgba(239,233,220,0.8)');
+    } else {
+      text('9:00', 210, '600 120px Georgia, serif');
+      text('14 December', 262, '500 30px sans-serif', 'rgba(239,233,220,0.7)');
+      c.fillStyle = 'rgba(239,233,220,0.12)';
+      roundRect(c, 40, 320, 340, 250, 32);
+      c.fill();
+      text('💍', 410, '72px sans-serif');
+      text('Ananya’s wedding', 475, '700 38px sans-serif');
+      text('Today · Get ready!', 520, '500 28px sans-serif', 'rgba(239,233,220,0.7)');
+      c.fillStyle = '#d4af6a';
+      roundRect(c, 70, 650, 280, 80, 40);
+      c.fill();
+      text('Stop', 702, '700 36px sans-serif', '#0b1122');
+    }
+    texture.needsUpdate = true;
+  };
+  g.userData.draw('ring');
+
   // Rings of light that pulse out while it rings.
   const rings = [];
   for (let i = 0; i < 3; i++) {
@@ -464,6 +511,98 @@ function makePhone() {
     rings.push(ring);
   }
   g.userData.rings = rings;
+  return g;
+}
+
+/** A wall calendar; flip(t) tears pages off so weeks fly by. */
+function makeCalendar() {
+  const g = new THREE.Group();
+  const page = month => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 300;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#faf6ee';
+    c.fillRect(0, 0, 256, 300);
+    c.fillStyle = '#c0392b';
+    c.fillRect(0, 0, 256, 70);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '700 40px sans-serif';
+    c.fillText(month[0], 128, 50);
+    c.fillStyle = '#2a1e1a';
+    c.font = '700 130px Georgia, serif';
+    c.fillText(month[1], 128, 220);
+    c.font = '500 26px sans-serif';
+    c.fillText(month[2], 128, 270);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+  };
+  const months = [
+    ['OCT', '14', 'Invitation'],
+    ['OCT', '24', 'Sale day'],
+    ['NOV', '15', ''],
+    ['DEC', '1', ''],
+    ['DEC', '14', 'Wedding'],
+    ['DEC', '15', ''],
+  ];
+  const pages = months.map((m, i) => {
+    const sheet = mesh(new THREE.PlaneGeometry(0.42, 0.5), page(m), { z: 0.002 * (months.length - i), shadow: false });
+    g.add(sheet);
+    return sheet;
+  });
+  g.add(mesh(new THREE.BoxGeometry(0.46, 0.06, 0.03), mat(0x2a1e1a), { y: 0.27 }));
+  /** Shows page `index` with every earlier page torn off. `fly` (0..1) animates the last tear. */
+  g.userData.show = (index, fly = 1) => {
+    pages.forEach((sheet, i) => {
+      if (i < index - 1 || (i === index - 1 && fly >= 1)) sheet.visible = false;
+      else if (i === index - 1) {
+        sheet.visible = true;
+        sheet.position.set(0.5 * fly, -0.6 * fly * fly, 0.05 + 0.3 * fly);
+        sheet.rotation.set(0.6 * fly, 0, -1.4 * fly);
+      } else {
+        sheet.visible = true;
+        sheet.position.set(0, 0, 0.002 * (months.length - i));
+        sheet.rotation.set(0, 0, 0);
+      }
+    });
+  };
+  g.userData.show(0);
+  g.position.set(1.05, 2.2, -2.15);
+  return g;
+}
+
+/** The wedding invitation Ananya hands over. */
+function makeInvite() {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.BoxGeometry(0.3, 0.2, 0.015), mat(0x9b1b30)));
+  g.add(mesh(new THREE.BoxGeometry(0.26, 0.16, 0.017), mat(0xd4af6a, { metalness: 0.5, roughness: 0.35 })));
+  g.add(mesh(new THREE.SphereGeometry(0.03, 12, 10), mat(0x9b1b30), { z: 0.012 }));
+  return g;
+}
+
+/** A marigold arch for the wedding: strings of orange and yellow flowers. */
+function makeArch() {
+  const g = new THREE.Group();
+  const orange = mat(0xf28c1b, { roughness: 0.9 });
+  const yellow = mat(0xf7c843, { roughness: 0.9 });
+  const flower = new THREE.SphereGeometry(0.07, 10, 8);
+  for (let i = 0; i <= 40; i++) {
+    const a = Math.PI * (i / 40);
+    g.add(mesh(flower, i % 2 ? orange : yellow, { x: Math.cos(a) * 1.5, y: Math.sin(a) * 1.4 + 0.9, shadow: false }));
+  }
+  for (const side of [-1, 1]) {
+    for (let j = 0; j < 9; j++) g.add(mesh(flower, j % 2 ? yellow : orange, { x: side * 1.5, y: 0.1 * j + 0.05, shadow: false }));
+    g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 10), mat(0xd4af6a, { metalness: 0.5 }), { x: side * 1.5, y: 0.45 }));
+  }
+  // Hanging strings of flowers inside the arch.
+  for (let k = -3; k <= 3; k++) {
+    for (let j = 0; j < 4; j++) {
+      g.add(mesh(flower, (k + j) % 2 ? orange : yellow, { x: k * 0.35, y: 2.25 - j * 0.14 - Math.abs(k) * 0.05, z: 0.02, shadow: false }));
+    }
+  }
+  g.position.set(0, 0, -1.2);
   return g;
 }
 
@@ -492,57 +631,6 @@ function makeSparkles(count = 70) {
     new THREE.PointsMaterial({ color: 0xf3dca6, size: 0.05, transparent: true, opacity: 0.9, depthWrite: false }),
   );
   return points;
-}
-
-/** Aarav's bed, along the back wall, with a pillow, a blanket and his school bag. */
-function makeBed() {
-  const g = new THREE.Group();
-  const wood = mat(0x8a5a3c, { roughness: 0.8 });
-  g.add(mesh(new THREE.BoxGeometry(1.7, 0.28, 0.95), wood, { y: 0.2 }));
-  g.add(mesh(new THREE.BoxGeometry(0.1, 0.75, 0.95), wood, { x: 0.88, y: 0.42 }));
-  g.add(mesh(new THREE.BoxGeometry(0.1, 0.45, 0.95), wood, { x: -0.88, y: 0.3 }));
-  g.add(mesh(new THREE.BoxGeometry(1.6, 0.14, 0.88), mat(0xf4efe6, { roughness: 1 }), { y: 0.41 }));
-  g.add(mesh(new THREE.BoxGeometry(0.34, 0.1, 0.55), mat(0xffffff, { roughness: 1 }), { x: 0.62, y: 0.53 }));
-  const blanket = mesh(new THREE.BoxGeometry(1.05, 0.12, 0.92), mat(0x5b8def, { roughness: 1 }), { x: -0.25, y: 0.5 });
-  g.add(blanket);
-  g.userData.blanket = blanket;
-  // School bag and books by the bed.
-  const bag = new THREE.Group();
-  bag.add(mesh(new THREE.BoxGeometry(0.34, 0.4, 0.18), mat(0xe2574c), { y: 0.2 }));
-  bag.add(mesh(new THREE.BoxGeometry(0.26, 0.16, 0.04), mat(0xb8433a), { y: 0.16, z: 0.1 }));
-  bag.position.set(1.2, 0, 0.2);
-  bag.rotation.y = -0.4;
-  g.add(bag);
-  g.position.set(-0.45, 0, -1.25);
-  return g;
-}
-
-/** A wall clock whose hands can be set, or spun to show time racing by. */
-function makeWallClock() {
-  const g = new THREE.Group();
-  const face = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 40), mat(0xfaf6ee), { shadow: false });
-  face.rotation.x = Math.PI / 2;
-  g.add(face);
-  g.add(mesh(new THREE.TorusGeometry(0.28, 0.03, 10, 40), mat(0xd4af6a, { metalness: 0.6, roughness: 0.3 }), { shadow: false }));
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    g.add(mesh(new THREE.BoxGeometry(0.02, i % 3 ? 0.03 : 0.06, 0.01), mat(0x333333), { x: Math.sin(a) * 0.22, y: Math.cos(a) * 0.22, z: 0.025, shadow: false }));
-  }
-  const hand = (length, width, color) => {
-    const pivot = new THREE.Group();
-    pivot.position.z = 0.03;
-    pivot.add(mesh(new THREE.BoxGeometry(width, length, 0.01), mat(color), { y: length / 2, shadow: false }));
-    g.add(pivot);
-    return pivot;
-  };
-  const hour = hand(0.13, 0.03, 0x222222);
-  const minute = hand(0.2, 0.018, 0x222222);
-  g.userData.set = (hours, minutes) => {
-    minute.rotation.z = -(minutes / 60) * Math.PI * 2;
-    hour.rotation.z = -((hours % 12) / 12 + minutes / 720) * Math.PI * 2;
-  };
-  g.position.set(1.05, 2.25, -2.15);
-  return g;
 }
 
 /** Confetti for the happy endings: little paper squares that tumble down. */
@@ -614,9 +702,9 @@ scene.add(rim);
 
 const room = makeRoom();
 scene.add(room);
-const aarav = makePerson({ kind: 'kid' });
-const mom = makePerson({ kind: 'mom' });
-scene.add(aarav.root, mom.root);
+const riya = makePerson({ kind: 'woman', skinColor: 0xf0c29e, topColor: 0x2a9d8f, hairColor: 0x2b1b16 });
+const ananya = makePerson({ kind: 'bride', skinColor: 0xe6b08a, topColor: 0xb3122e, hairColor: 0x2e1d18 });
+scene.add(riya.root, ananya.root);
 const things = ['clock', 'phone', 'cup', 'book', 'bag'].map(k => {
   const t = busyThing(k);
   scene.add(t);
@@ -626,12 +714,17 @@ const phone = makePhone();
 scene.add(phone);
 const sparkles = makeSparkles();
 scene.add(sparkles);
-const bed = makeBed();
-scene.add(bed);
-const wallClock = makeWallClock();
-scene.add(wallClock);
+const calendar = makeCalendar();
+scene.add(calendar);
+const invite = makeInvite();
+scene.add(invite);
+const arch = makeArch();
+scene.add(arch);
 const confetti = makeConfetti();
 scene.add(confetti);
+/** Riya's everyday kurta, and the dress she buys at the sale. */
+const RIYA_EVERYDAY = 0x2a9d8f;
+const RIYA_FESTIVE = 0xd6457a;
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
 const satya = new THREE.Group();
@@ -673,7 +766,7 @@ const bubbles = [];
 /** A bubble pinned above `who`'s head from `at` seconds into the scene. */
 function say(who, text, at, { thought = false, until = Infinity } = {}) {
   const el = document.createElement('div');
-  el.className = `bubble${thought ? ' thought' : ''}${who === mom || who === satya ? ' gold' : ''}`;
+  el.className = `bubble${thought ? ' thought' : ''}${who === ananya || who === satya ? ' gold' : ''}`;
   el.textContent = text;
   bubbleLayer.appendChild(el);
   bubbles.push({ el, who, at, until });
@@ -706,67 +799,68 @@ function placeBubbles(t) {
 
 // ---- Scenes -----------------------------------------------------------------------------
 
-/**
- * Each scene sets things up once, then poses everyone for time t (seconds).
- * `place` picks the room: the living room (sofa) or Aarav's bedroom (bed).
- */
+/** Each scene sets things up once, then poses everyone for time t (seconds). */
 const SCENES = [
   {
-    // The night before the exam: Aarav asks Mom to wake him at 6.
-    place: 'living',
+    // Ananya brings Riya her wedding invitation.
     sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 6 },
-    camera: { x: 0, y: 1.05, z: 4.6, look: [0, 1.1, 0], width: 2.6 },
+    camera: { x: 0, y: 1.1, z: 4.6, look: [0, 1.15, 0], width: 2.7 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      mom.root.position.set(0.7, 0, 0);
-      mom.root.rotation.y = -0.45;
-      wallClock.userData.set(21, 0);
-      say(aarav, 'Mom, my final exam is tomorrow! Please wake me up at 6, so I can revise.', 1.4, { until: 4.3 });
-      say(mom, 'Don’t worry, beta. I’ll wake you at 6!', 4.4);
+      riya.setMood('happy');
+      ananya.setMood('happy');
+      riya.root.position.set(-0.6, 0, 0);
+      riya.root.rotation.y = 0.45;
+      calendar.userData.show(0);
+      say(ananya, 'Riya! I’m getting married on 14 December. You have to be there!', 1.5, { until: 4.4 });
+      say(riya, 'I’ll be there! I’ll buy my dress in the big sale. It opens in 10 days!', 4.6);
     },
     update(t) {
-      moves.walk(aarav, t, 0, 1.4, -2.6, -0.55, 0.45);
-      moves.wave(aarav, t, 1.3, 2.5, 'L');
-      moves.talk(aarav, t, 1.5, 4.0);
-      moves.nod(mom, t, 2.4, 3.6);
-      moves.talk(mom, t, 4.5, 6.2);
-      moves.wave(mom, t, 6.0, 7.2, 'R');
+      moves.walk(ananya, t, 0, 1.4, 2.6, 0.6, -0.45);
+      const card = ease(seg(t, 1.2, 1.8)) * (1 - ease(seg(t, 3.4, 3.8)));
+      moves.hold(ananya, card);
+      invite.visible = t < 4.2;
+      // The card passes from Ananya's hand to Riya's.
+      const pass = ease(seg(t, 3.0, 3.8));
+      invite.position.set(lerp(ananya.root.position.x - 0.15, riya.root.position.x + 0.3, pass), 1.18 + 0.1 * bump(pass), 0.35);
+      invite.rotation.set(-0.2, lerp(-0.4, 0.4, pass), 0);
+      moves.talk(ananya, t, 1.6, 4.2);
+      if (t > 3.8) riya.setMood('surprised');
+      moves.jump(riya, t, 4.0, 4.9);
+      moves.talk(riya, t, 4.8, 7.2);
+      moves.hug(ananya, t, 5.2, 7.4);
     },
   },
   {
-    // That night Mom has endless chores, the clock races, and 6 AM slips away.
-    place: 'living',
-    sky: { bg: 0x241b33, window: 0x5a3b6e, moon: true, lamp: 3 },
+    // Weeks fly by: the calendar tears away and Riya's days fill up.
+    sky: { bg: 0x241b33, window: 0x5a3b6e, moon: false, lamp: 3 },
     camera: { x: 0, y: 1.2, z: 5.0, look: [0, 1.3, 0], width: 2.6 },
     setup() {
-      mom.setMood('happy');
-      mom.root.position.set(0, 0, 0);
-      aarav.root.position.set(-9, 0, 0);
-      say(mom, 'Wake Aarav at 6… at 6…', 0.6, { thought: true, until: 3.2 });
-      say(mom, '…was it 6, or 7? 🤔', 3.4, { thought: true });
+      riya.setMood('happy');
+      riya.root.position.set(0, 0, 0);
+      ananya.root.position.set(-9, 0, 0);
+      say(riya, 'The sale… the wedding…', 0.6, { thought: true, until: 3.4 });
+      say(riya, '…wait, what was coming up? 🤔', 3.6, { thought: true });
     },
     update(t) {
-      // Hours fly by on the wall clock.
-      const minutes = 21 * 60 + 360 * ease(seg(t, 0, 5.5));
-      wallClock.userData.set(Math.floor(minutes / 60), minutes % 60);
-      if (t < 3.2) {
-        const dir = Math.sin(t * 1.6);
-        mom.root.position.x = 0.5 * dir;
-        mom.root.rotation.y = Math.cos(t * 1.6) > 0 ? 0.9 : -0.9;
+      // A page tears off about every second.
+      const p = Math.min(t / 1.05, 4.999);
+      calendar.userData.show(Math.floor(p) + 1, p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
+      if (t < 3.4) {
+        riya.root.position.x = 0.5 * Math.sin(t * 1.6);
+        riya.root.rotation.y = Math.cos(t * 1.6) > 0 ? 0.9 : -0.9;
         const swing = Math.sin(t * 9);
-        mom.legL.rotation.x = 0.4 * swing;
-        mom.legR.rotation.x = -0.4 * swing;
-        moves.busy(mom, t);
+        riya.legL.rotation.x = 0.4 * swing;
+        riya.legR.rotation.x = -0.4 * swing;
+        moves.busy(riya, t);
       } else {
-        mom.root.rotation.y = lerp(mom.root.rotation.y, 0, 0.1);
-        mom.setMood('worried');
-        moves.think(mom, t, 3.2, 99);
+        riya.root.rotation.y = lerp(riya.root.rotation.y, 0, 0.1);
+        riya.setMood('worried');
+        moves.think(riya, t, 3.4, 99);
       }
       things.forEach((thing, i) => {
         const a = t * 1.3 + (i / things.length) * Math.PI * 2;
         thing.visible = true;
-        thing.position.set(Math.cos(a) * 0.95 + mom.root.position.x * 0.5, 1.45 + 0.18 * Math.sin(t * 2 + i), Math.sin(a) * 0.48 + 0.3);
+        thing.position.set(Math.cos(a) * 0.95 + riya.root.position.x * 0.5, 1.4 + 0.18 * Math.sin(t * 2 + i), Math.sin(a) * 0.48 + 0.3);
         thing.rotation.set(t * 0.7 + i, t + i, 0);
         if (thing.userData.spin) thing.userData.spin.rotation.z = -t * 6;
         thing.scale.setScalar(0.6 + 0.4 * ease(seg(t, 0.1 * i, 0.1 * i + 0.6)));
@@ -774,117 +868,128 @@ const SCENES = [
     },
   },
   {
-    // The morning: Aarav wakes at 8:30 and panics; Mom realizes she forgot.
-    place: 'bedroom',
-    sky: { bg: 0x3a4a6e, window: 0xbfe3ff, sun: true, lamp: 0 },
-    camera: { x: 0, y: 1.1, z: 4.8, look: [0, 1.1, 0], width: 2.8 },
+    // 15 December: Riya finds the wedding photos. She missed it, and the sale.
+    sky: { bg: 0x1d2236, window: 0x1b2a52, moon: true, lamp: 5 },
+    camera: { x: 0, y: 1.1, z: 4.4, look: [0, 1.2, 0], width: 2.4 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('surprised');
-      mom.root.position.set(2.6, 0, 0.1);
-      wallClock.userData.set(8, 30);
-      say(aarav, 'Zzz…', 0.2, { thought: true, until: 1.6 });
-      say(aarav, 'It’s 8:30! I’m late for my exam! 😱', 2.0, { until: 4.3 });
-      say(mom, 'Oh no… I forgot to wake you!', 4.4);
+      riya.setMood('happy');
+      riya.root.position.set(-0.45, 0, 0.1);
+      riya.root.rotation.y = 0.35;
+      calendar.userData.show(5);
+      phone.userData.draw('photos');
+      say(riya, 'Ananya’s wedding was yesterday?! I missed it… and the sale too. 😢', 2.2);
     },
     update(t) {
-      if (t > 1.6) aarav.setMood('surprised');
-      moves.sleepAndWake(aarav, t, 1.6, -0.5);
-      moves.panic(aarav, t, 2.6, 7.5, -1.0, 0.0);
-      moves.walk(mom, t, 3.4, 4.4, 2.6, 0.9, -0.5);
-      if (t > 4.2) mom.setMood('sad');
-      moves.think(mom, t, 4.5, 99);
-      moves.talk(mom, t, 4.5, 6.2);
+      phone.visible = true;
+      phone.scale.setScalar(0.55);
+      phone.position.set(0.45, 1.25 + 0.03 * Math.sin(t * 2), 0.45);
+      phone.rotation.set(-0.1, -0.35, 0);
+      phone.userData.rings.forEach(r => (r.material.opacity = 0));
+      moves.hold(riya, 0.8);
+      if (t > 1.7) riya.setMood('surprised');
+      moves.shock(riya, t, 1.8);
+      if (t > 4.2) {
+        riya.setMood('sad');
+        moves.sad(riya, ease(seg(t, 4.2, 5)));
+      }
+      moves.talk(riya, t, 2.3, 4.6);
     },
   },
   {
     // Melo arrives.
-    place: 'living',
     sky: { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 },
-    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.15, 0], width: 3.4 },
+    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.15, 0], width: 3.0 },
     setup() {
-      aarav.setMood('surprised');
-      mom.setMood('surprised');
-      aarav.root.position.set(-1.25, 0, 0.1);
-      aarav.root.rotation.y = 0.6;
-      mom.root.position.set(1.3, 0, 0.1);
-      mom.root.rotation.y = -0.6;
-      say(satya, 'Hi! I’m Melo. Tell Memo once, and I’ll remember it for you.', 2.0);
+      riya.setMood('sad');
+      riya.root.position.set(-1.0, 0, 0.1);
+      riya.root.rotation.y = 0.6;
+      ananya.root.position.set(-9, 0, 0);
+      say(satya, 'Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remember for you.', 2.0);
     },
     update(t) {
       // Drops in with a bounce, spins once, then wiggles hello.
       const drop = seg(t, 0, 0.9);
       const bounce = drop < 1 ? (1 - ease(drop)) * 3 : Math.abs(Math.sin((t - 0.9) * 9)) * 0.25 * Math.max(0, 1 - (t - 0.9) * 1.6);
-      satya.position.set(0, bounce, 0.3);
-      satya.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0));
+      satya.position.set(0.55, bounce, 0.3);
+      satya.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0)) - 0.4;
       satya.rotation.z = t > 2 ? 0.2 * Math.sin((t - 2) * 7) * Math.max(0, 1 - (t - 2) * 0.25) : 0;
       satya.visible = true;
       sparkles.visible = true;
       sparkles.rotation.y = t * 0.3;
       sparkles.material.opacity = 0.9 * seg(t, 0.6, 1.4);
-      if (t > 1.2) {
-        aarav.setMood('happy');
-        mom.setMood('happy');
-      }
-      moves.jump(aarav, t, 1.3, 2.4);
-      moves.clap(mom, t, 1.4, 3.0);
+      if (t > 1.0) riya.setMood('surprised');
+      if (t > 2.4) riya.setMood('happy');
+      moves.jump(riya, t, 2.6, 3.6);
     },
   },
   {
-    // Before the next exam: the alarm rings at 6, Aarav is up on time.
-    place: 'bedroom',
+    // This time: reminders set months ahead, the sale, the dress, the wedding.
     sky: { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 },
-    camera: { x: 0, y: 1.15, z: 4.9, look: [0, 1.2, 0], width: 3.0 },
+    camera: { x: 0, y: 1.15, z: 4.9, look: [0, 1.25, 0], width: 3.0 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      mom.root.position.set(1.15, 0, 0);
-      mom.root.rotation.y = -0.5;
-      wallClock.userData.set(6, 0);
-      say(aarav, 'Up on time! Thank you, Memo! 🎉', 3.6);
+      riya.setMood('happy');
+      ananya.setMood('happy');
+      riya.root.position.set(-0.75, 0, 0.1);
+      riya.root.rotation.y = 0.35;
+      ananya.root.position.set(2.8, 0, 0);
+      calendar.userData.show(0);
+      phone.userData.draw('list');
+      say(ananya, 'You came! 🥹', 5.0, { until: 6.2 });
+      say(riya, 'Memo reminded me, weeks ahead! 💍', 6.3);
     },
     update(t) {
-      phone.visible = true;
-      const ringing = t > 0.5 && t < 2.6;
-      const appear = ease(seg(t, 0, 0.6));
-      phone.position.set(0.35, 1.55 + 0.05 * Math.sin(t * 2), 0.5);
-      phone.scale.setScalar((0.4 + 0.6 * appear) * (1 - 0.35 * ease(seg(t, 2.8, 3.4))));
-      phone.position.x = lerp(0.35, 0.9, ease(seg(t, 2.8, 3.4)));
-      phone.position.y = lerp(1.55, 2.1, ease(seg(t, 2.8, 3.4)));
-      phone.rotation.set(-0.08, -0.15, ringing ? 0.09 * Math.sin(t * 38) : 0);
+      // 0–2 s: the reminders. 2–3.2 s: weeks fly, the alarm rings. Then the wedding.
+      phone.visible = t < 3.6;
+      if (t > 2.0 && phone.userData.screen !== 'ring') {
+        phone.userData.draw('ring');
+        phone.userData.screen = 'ring';
+      }
+      if (t < 0.1) phone.userData.screen = 'list';
+      const ringing = t > 2.4 && t < 3.4;
+      phone.scale.setScalar(0.62 * ease(seg(t, 0, 0.5)) * (1 - ease(seg(t, 3.2, 3.6))) + 0.001);
+      phone.position.set(0.25, 1.45 + 0.04 * Math.sin(t * 2), 0.5);
+      phone.rotation.set(-0.08, -0.2, ringing ? 0.09 * Math.sin(t * 38) : 0);
       phone.userData.rings.forEach((ring, i) => {
         const k = (t * 0.9 + i / 3) % 1;
         ring.scale.setScalar(1 + k * 0.6);
         ring.material.opacity = ringing ? 0.5 * (1 - k) : 0;
       });
-      moves.sleepAndWake(aarav, t, 1.4, -0.7);
-      moves.stretch(aarav, t, 2.3, 3.3);
-      moves.jump(aarav, t, 3.4, 5.0);
-      moves.talk(aarav, t, 5.0, 6.8);
-      moves.clap(mom, t, 3.5, 5.5);
-      confetti.visible = t > 3.4;
-      if (confetti.visible) confetti.userData.update(t - 3.4);
+      const flip = Math.min(Math.max((t - 2.0) / 0.3, 0), 4.999);
+      calendar.userData.show(Math.floor(flip), 1);
+      // The new dress, bought at the sale, shimmers on.
+      const dressed = seg(t, 3.4, 4.0);
+      riya.top.color.lerpColors(new THREE.Color(RIYA_EVERYDAY), new THREE.Color(RIYA_FESTIVE), dressed);
+      arch.visible = t > 3.6;
+      arch.scale.setScalar(0.001 + ease(seg(t, 3.6, 4.3)));
+      moves.walk(ananya, t, 4.0, 5.0, 2.8, 0.55, -0.4);
+      moves.hug(riya, t, 5.2, 7.6);
+      moves.hug(ananya, t, 5.2, 7.6);
+      moves.talk(riya, t, 6.4, 7.6);
+      confetti.visible = t > 5.0;
+      if (confetti.visible) confetti.userData.update(t - 5.0);
     },
   },
   {
-    // Everyone says hello: the closing shot behind the app's feature list.
-    place: 'living',
+    // The friends and Melo wave: the closing shot behind the app's feature list.
     sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 5 },
     camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.5 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      aarav.root.position.set(-1.1, 0, 0.3);
-      aarav.root.rotation.y = 0.2;
-      mom.root.position.set(1.1, 0, 0);
-      mom.root.rotation.y = -0.2;
+      riya.setMood('happy');
+      ananya.setMood('happy');
+      riya.top.color.set(RIYA_FESTIVE);
+      riya.root.position.set(-1.1, 0, 0.3);
+      riya.root.rotation.y = 0.2;
+      ananya.root.position.set(1.1, 0, 0);
+      ananya.root.rotation.y = -0.2;
     },
     update(t) {
+      arch.visible = true;
+      arch.scale.setScalar(1);
       satya.visible = true;
       satya.position.set(0, Math.abs(Math.sin(t * 2.2)) * 0.12, 0.4);
       satya.rotation.z = 0.12 * Math.sin(t * 3);
-      moves.wave(aarav, t % 3, 0, 2.2, 'L');
-      moves.wave(mom, (t + 1.2) % 3, 0, 2.2, 'R');
+      moves.wave(riya, t % 3, 0, 2.2, 'L');
+      moves.wave(ananya, (t + 1.2) % 3, 0, 2.2, 'R');
       confetti.visible = true;
       confetti.userData.update(t);
     },
@@ -906,14 +1011,15 @@ function show(index) {
   phone.visible = false;
   confetti.visible = false;
   things.forEach(th => (th.visible = false));
-  aarav.root.rotation.set(0, 0, 0);
-  mom.root.rotation.set(0, 0, 0);
-  aarav.asleep = false;
-  mom.asleep = false;
-  const bedroom = s.place === 'bedroom';
-  bed.visible = bedroom;
-  room.userData.sofa.visible = !bedroom;
-  wallClock.userData.set(9, 0);
+  invite.visible = false;
+  arch.visible = false;
+  // Everyone starts offstage; each scene brings on who it needs.
+  riya.root.position.set(-9, 0, 0);
+  ananya.root.position.set(-9, 0, 0);
+  riya.root.rotation.set(0, 0, 0);
+  ananya.root.rotation.set(0, 0, 0);
+  riya.top.color.set(RIYA_EVERYDAY);
+  phone.userData.screen = undefined;
   s.setup();
   // Each new scene fades up from dark.
   canvas.style.transition = 'none';
@@ -958,8 +1064,8 @@ function frame(now) {
   if (current < 0) return;
   const t = (now - startedAt) / 1000;
   const s = SCENES[current];
-  rest(aarav, now / 1000);
-  rest(mom, now / 1000 + 1.3);
+  rest(riya, now / 1000);
+  rest(ananya, now / 1000 + 1.3);
   s.update(t);
   // A slow, gentle drift of the camera keeps every shot alive.
   const base = camera.userData.base;

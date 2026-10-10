@@ -9,14 +9,14 @@ import { Icon, type IconName } from '../../components/Icon';
 import { RealIcon, type RealIconName } from '../../components/RealIcon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
-import { Kid, Mom } from './Characters';
+import { Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
- * again from Settings): the night before his final exam, Aarav asks Mom to
- * wake him at 6; she has so much to do that she forgets, and he oversleeps.
- * Melo arrives, and before the next exam Memo's alarm wakes him on time.
- * Ends on what the app does. Plays like a phone "story": it moves on by itself; tap the right
+ * again from Settings): Riya's best friend invites her to a wedding two
+ * months away and Riya plans to shop the big sale in ten days; weeks fly by
+ * and she misses both. Melo arrives, and this time Memo reminds her of both,
+ * months ahead. Ends on what the app does. Plays like a phone "story": it moves on by itself; tap the right
  * side for next and the left side for back.
  *
  * The scenes play in 3D (assets/web/story, built from web/story/story.js)
@@ -33,11 +33,11 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Aarav.', duration: 7500, Body: AskScene },
-  { caption: 'That night, Mom had so much to do…', duration: 7000, Body: BusyScene },
-  { caption: 'The next morning…', duration: 7500, Body: ForgotScene },
+  { caption: 'Meet Riya.', duration: 7800, Body: AskScene },
+  { caption: 'But two months is a long time…', duration: 7000, Body: BusyScene },
+  { caption: '15 December…', duration: 7000, Body: ForgotScene },
   { caption: 'That’s why Memo is here.', duration: 6500, Body: SatyaScene },
-  { caption: 'Before his next exam, Aarav sets an alarm.', duration: 7500, Body: RemindScene },
+  { caption: 'This time, Riya tells Memo.', duration: 8200, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -259,15 +259,15 @@ function AskScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Mom, my final exam is tomorrow! Please wake me up at 6, so I can revise." delay={500} side="left" />
-        <Speech text="Don’t worry, beta. I’ll wake you at 6!" delay={2600} side="right" tone="gold" />
+        <Speech text="Riya! I’m getting married on 14 December. You have to be there!" delay={500} side="right" tone="gold" />
+        <Speech text="I’ll be there! I’ll buy my dress in the big sale. It opens in 10 days!" delay={2900} side="left" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
-          <Kid size={170} mood="happy" wave />
+          <Mom size={200} mood="happy" colors={['#3FBFAE', '#1F7A6F']} />
         </Actor>
         <Actor from="right" delay={200}>
-          <Mom size={220} mood="happy" />
+          <Mom size={210} mood="happy" colors={['#D9334F', '#8C0F25']} />
         </Actor>
       </View>
     </View>
@@ -284,9 +284,9 @@ function BusyScene() {
       <View style={styles.speechArea}>
         <View style={styles.thought}>
           <Animated.Text style={[styles.thoughtText, { opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-            Wake Aarav at 6… ⏰
+            The sale… the wedding… 🛍️💍
           </Animated.Text>
-          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…was it 6, or 7? 🤔</Animated.Text>
+          <Animated.Text style={[styles.thoughtText, styles.thoughtOver, { opacity: swap }]}>…wait, what was coming up? 🤔</Animated.Text>
         </View>
         <View style={styles.thoughtDots}>
           <View style={[styles.thoughtDot, styles.thoughtDotBig]} />
@@ -314,7 +314,7 @@ function BusyScene() {
             );
           })}
           <Actor from="bottom">
-            <Mom size={230} mood="worried" />
+            <Mom size={230} mood="worried" colors={['#3FBFAE', '#1F7A6F']} />
           </Actor>
         </View>
       </View>
@@ -326,15 +326,15 @@ function ForgotScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="It’s 8:30! I’m late for my exam! 😱" delay={400} side="left" />
-        <Speech text="Oh no… I forgot to wake you!" delay={2600} side="right" tone="gold" />
+        <Speech text="Ananya’s wedding was yesterday?! I missed it… and the sale too. 😢" delay={400} side="left" />
+        
       </View>
       <View style={styles.cast}>
         <Actor from="left">
-          <Kid size={170} mood="surprised" />
+          <Mom size={210} mood="sad" colors={['#3FBFAE', '#1F7A6F']} />
         </Actor>
         <Actor from="right" delay={200}>
-          <Mom size={220} mood="sad" />
+          <View />
         </Actor>
       </View>
     </View>
@@ -345,7 +345,7 @@ function SatyaScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Hi, I’m Melo! Tell Memo once, and I’ll remember it for you." delay={900} side="right" tone="gold" />
+        <Speech text="Hi, I’m Melo! Tell Memo once, even months ahead, and I’ll remember for you." delay={900} side="right" tone="gold" />
       </View>
       <View style={styles.castCenter}>
         <SatyaModel size={250} intro="long" gesture="wave" />
@@ -361,21 +361,21 @@ function RemindScene() {
   return (
     <View style={styles.scene}>
       <View style={styles.speechArea}>
-        <Speech text="Up on time! Thank you, Memo! 🎉" delay={3200} side="left" />
+        <Speech text="Memo reminded me, weeks ahead! 💍" delay={3200} side="left" />
       </View>
       <View style={styles.cast}>
         <Actor from="left">
-          <Kid size={170} mood="happy" />
+          <Mom size={200} mood="happy" colors={['#F06A9B', '#B0305F']} />
         </Actor>
         <Actor from="right" delay={300}>
           <Animated.View style={{ transform: [{ rotate: shake.interpolate({ inputRange: [-1, 1], outputRange: ['-6deg', '6deg'] }) }] }}>
             <View style={styles.phone}>
               <View style={styles.notch} />
-              <Text style={styles.phoneTime}>6:00</Text>
+              <Text style={styles.phoneTime}>9:00</Text>
               <View style={styles.alarmCard}>
                 <RealIcon name="bell" size={30} />
-                <Text style={styles.alarmTitle}>Wake up, Aarav! ⏰</Text>
-                <Text style={styles.alarmMeta}>Exam day · 6:00 AM</Text>
+                <Text style={styles.alarmTitle}>Ananya’s wedding 💍</Text>
+                <Text style={styles.alarmMeta}>Today · 14 December</Text>
                 <View style={styles.alarmPill}>
                   <Text style={styles.alarmPillText}>Alarm</Text>
                 </View>

@@ -46,7 +46,7 @@ import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScre
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
 import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
-import { REOPEN_SCREEN_KEY } from '../utils/appReload';
+import { hideReloadCover, REOPEN_SCREEN_KEY } from '../utils/appReload';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
 import { TrackDetailScreen } from '../modules/routines/screens/TrackDetailScreen';
@@ -341,8 +341,11 @@ export function RootNavigator() {
         if (screen !== 'Settings') return;
         AsyncStorage.removeItem(REOPEN_SCREEN_KEY).catch(() => undefined);
         const open = (tries = 0) => {
-          if (navigationRef.isReady()) navigationRef.navigate('Settings');
-          else if (tries < 40) setTimeout(() => open(tries + 1), 50);
+          if (navigationRef.isReady()) {
+            // Settings fades the snapshot away once it has drawn.
+            navigationRef.navigate('Settings');
+          } else if (tries < 40) setTimeout(() => open(tries + 1), 50);
+          else hideReloadCover();
         };
         open();
       })

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +8,7 @@ import { Screen } from '../../../components/Screen';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { IconButton, SectionHeader } from '../../../components/Controls';
 import { Card } from '../../../components/Card';
+import { Icon } from '../../../components/Icon';
 import { ProgressRing } from '../../../components/Progress';
 import { Button } from '../../../components/Button';
 import { TextField } from '../../../components/TextField';
@@ -57,11 +58,10 @@ export function TrackDetailScreen() {
   const [deleteTask, { isLoading: deletingTask }] = useDeleteActionMutation();
   const [deletePlan, { isLoading: deletingPlan }] = useDeleteTrackMutation();
 
-  const [newTask, setNewTask] = useState('');
-  const [newUntil, setNewUntil] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Row | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editUntil, setEditUntil] = useState<string | null>(null);
+  // One sheet for both adding and editing a task.
+  const [sheet, setSheet] = useState<{ mode: 'new' } | { mode: 'edit'; row: Row } | null>(created ? { mode: 'new' } : null);
+  const [taskName, setTaskName] = useState('');
+  const [taskUntil, setTaskUntil] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const untilById = useMemo(() => new Map((actions.data ?? []).map(a => [a.id, a.end_date])), [actions.data]);
@@ -81,43 +81,51 @@ export function TrackDetailScreen() {
   const today = toDateKey(new Date());
   const taskLimitReached = (tr?.action_count ?? 0) >= MAX_TASKS;
 
-  const add = async () => {
-    const title = newTask.trim();
-    if (!title) return;
-    try {
-      await createTask({ trackId, title, repeat_type: 'DAILY', end_date: newUntil }).unwrap();
-      setNewTask('');
-      setNewUntil(null);
-    } catch (err) {
-      Toast.fail(getErrorMessage(err, 'Could not add this task.'), 2);
+  const openNew = () => {
+    if (taskLimitReached) {
+      Toast.info(`A plan can have up to ${MAX_TASKS} tasks. Delete one to add another.`, 2.5);
+      return;
     }
+    setTaskName('');
+    setTaskUntil(null);
+    setSheet({ mode: 'new' });
   };
 
   const openTask = (row: Row) => {
-    setEditing(row);
-    setEditName(row.title);
-    setEditUntil(untilById.get(row.action_id) ?? null);
+    setTaskName(row.title);
+    setTaskUntil(untilById.get(row.action_id) ?? null);
+    setSheet({ mode: 'edit', row });
   };
 
   const saveTask = async () => {
-    if (!editing || !editName.trim()) return;
+    const title = taskName.trim();
+    if (!sheet || !title) return;
     try {
-      await updateTask({
-        id: editing.action_id,
-        title: editName.trim(),
-        ...(editUntil ? { end_date: editUntil } : { clear_end_date: true }),
-      }).unwrap();
-      setEditing(null);
+      if (sheet.mode === 'new') {
+        await createTask({ trackId, title, repeat_type: 'DAILY', end_date: taskUntil }).unwrap();
+        // Stay open for the next one: most plans get a few tasks at once.
+        setTaskName('');
+        setTaskUntil(null);
+        Toast.success('Task added.', 1);
+        if ((tr?.action_count ?? 0) + 1 >= MAX_TASKS) setSheet(null);
+      } else {
+        await updateTask({
+          id: sheet.row.action_id,
+          title,
+          ...(taskUntil ? { end_date: taskUntil } : { clear_end_date: true }),
+        }).unwrap();
+        setSheet(null);
+      }
     } catch (err) {
-      Toast.fail(getErrorMessage(err), 2);
+      Toast.fail(getErrorMessage(err, 'Could not save this task.'), 2);
     }
   };
 
   const removeTask = async () => {
-    if (!editing) return;
+    if (sheet?.mode !== 'edit') return;
     try {
-      await deleteTask(editing.action_id).unwrap();
-      setEditing(null);
+      await deleteTask(sheet.row.action_id).unwrap();
+      setSheet(null);
     } catch (err) {
       Toast.fail(getErrorMessage(err), 2);
     }
@@ -139,54 +147,6 @@ export function TrackDetailScreen() {
     return until ? `until ${formatDayMonth(until)}` : undefined;
   };
   const firstTask = !rows.length && Boolean(grid.data);
-
-  const addCard = (
-    <Card style={styles.addCard} contentStyle={styles.addContent}>
-      <Text style={t.bodyStrong}>{taskLimitReached ? 'This plan is full' : 'Add a task'}</Text>
-      {taskLimitReached ? (
-        <Text style={[t.caption, styles.mtXs]}>A plan can have up to {MAX_TASKS} tasks. Delete one to add another.</Text>
-      ) : (
-        <>
-          <View style={styles.addRow}>
-            <View style={styles.flex}>
-              <TextField
-                value={newTask}
-                onChangeText={setNewTask}
-                placeholder="e.g. Walk 20 minutes"
-                onSubmitEditing={() => {
-                  if (!adding) add();
-                }}
-                returnKeyType="done"
-                blurOnSubmit={false}
-                maxLength={200}
-                editable={!adding}
-                autoFocus={Boolean(created)}
-              />
-            </View>
-            <IconButton
-              icon="plus"
-              size={22}
-              color={colors.gold}
-              style={styles.addButton}
-              accessibilityLabel="Add task"
-              onPress={() => {
-                if (!adding) add();
-              }}
-            />
-          </View>
-          <DateField
-            label="Until (optional)"
-            value={newUntil}
-            onChange={setNewUntil}
-            placeholder="Every day until the plan ends"
-            minDate={today}
-            maxDate={tr?.end_date ?? undefined}
-            clearable
-          />
-        </>
-      )}
-    </Card>
-  );
 
   return (
     <Screen
@@ -218,15 +178,24 @@ export function TrackDetailScreen() {
         <Skeleton height={112} rounded={20} />
       )}
 
-      {created || firstTask ? (
-        <View style={styles.stepNote}>
-          <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeText}>2</Text>
-          </View>
-          <Text style={[t.bodyStrong, styles.flex]}>Now add the daily tasks for this plan.</Text>
-        </View>
-      ) : null}
-      {created || firstTask ? addCard : null}
+      <View style={styles.addBar}>
+        <Pressable
+          onPress={openNew}
+          style={({ pressed }) => [styles.addPill, taskLimitReached && styles.addPillOff, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Add task"
+        >
+          <Icon name="plus" size={15} color={taskLimitReached ? colors.textTertiary : colors.onPrimary} strokeWidth={2.4} />
+          <Text style={[styles.addPillText, taskLimitReached && styles.addPillTextOff]}>Add task</Text>
+        </Pressable>
+        {firstTask ? (
+          <Text style={[t.caption, styles.flex]}>Step 2: add the daily tasks for this plan.</Text>
+        ) : (
+          <Text style={[t.caption, styles.flex]} numberOfLines={1}>
+            {tr?.action_count ?? rows.length} of {MAX_TASKS} tasks
+          </Text>
+        )}
+      </View>
 
       {rows.length ? (
         <>
@@ -243,21 +212,39 @@ export function TrackDetailScreen() {
         <Skeleton height={160} rounded={20} style={styles.section} />
       ) : null}
 
-      {created || firstTask ? null : addCard}
-
-      <Sheet visible={Boolean(editing)} onClose={() => setEditing(null)} title="Edit task">
-        <TextField label="Task" value={editName} onChangeText={setEditName} placeholder="Task name" maxLength={200} />
+      <Sheet visible={Boolean(sheet)} onClose={() => setSheet(null)} title={sheet?.mode === 'edit' ? 'Edit task' : 'New task'}>
+        <TextField
+          label="Task"
+          value={taskName}
+          onChangeText={setTaskName}
+          placeholder="e.g. Walk 20 minutes"
+          maxLength={200}
+          autoFocus={sheet?.mode === 'new'}
+          returnKeyType="done"
+          onSubmitEditing={saveTask}
+          blurOnSubmit={false}
+        />
         <DateField
           label="Until (optional)"
-          value={editUntil}
-          onChange={setEditUntil}
+          value={taskUntil}
+          onChange={setTaskUntil}
           placeholder="Every day until the plan ends"
           minDate={today}
           maxDate={tr?.end_date ?? undefined}
           clearable
         />
-        <Button label="Save" onPress={saveTask} loading={saving} />
-        <Button label="Delete task" icon="trash" variant="dangerGhost" onPress={removeTask} loading={deletingTask} style={styles.mtSm} />
+        <Button
+          label={sheet?.mode === 'edit' ? 'Save' : 'Add task'}
+          icon={sheet?.mode === 'edit' ? undefined : 'plus'}
+          onPress={saveTask}
+          loading={adding || saving}
+          disabled={!taskName.trim()}
+        />
+        {sheet?.mode === 'edit' ? (
+          <Button label="Delete task" icon="trash" variant="dangerGhost" onPress={removeTask} loading={deletingTask} style={styles.mtSm} />
+        ) : (
+          <Button label="Done" variant="ghost" onPress={() => setSheet(null)} style={styles.mtSm} />
+        )}
       </Sheet>
 
       <ConfirmSheet
@@ -350,51 +337,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  stepNote: {
+  mtSm: {
+    marginTop: spacing.sm,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  addBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
-  stepBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.goldLine,
-    backgroundColor: colors.goldSoft,
-  },
-  stepBadgeText: {
-    ...font.bold,
-    fontSize: 14,
-    color: colors.gold,
-  },
-  addCard: {
-    marginTop: spacing.lg,
-  },
-  addContent: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  addRow: {
+  addPill: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
   },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderColor: colors.goldLine,
-    backgroundColor: colors.goldSoft,
+  addPillOff: {
+    backgroundColor: colors.glassStrong,
   },
-  mtXs: {
-    marginTop: 4,
+  addPillText: {
+    ...font.bold,
+    fontSize: 13.5,
+    color: colors.onPrimary,
   },
-  mtSm: {
-    marginTop: spacing.sm,
+  addPillTextOff: {
+    color: colors.textTertiary,
   },
 });

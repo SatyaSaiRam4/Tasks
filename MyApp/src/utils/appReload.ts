@@ -20,3 +20,9 @@ export async function reloadApp(reopen?: 'Settings'): Promise<boolean> {
   else DevSettings.reload('Appearance changed');
   return true;
 }
+
+/** Fades out the snapshot laid over the screen during a reload (Android). */
+export function hideReloadCover() {
+  const native = NativeModules.AppReload as { hideCover?: () => void } | undefined;
+  native?.hideCover?.();
+}
