@@ -4,6 +4,7 @@ import authReducer, { loggedOut } from '../modules/auth/authSlice';
 import vaultReducer from '../modules/vault/vaultSlice';
 import preferencesReducer from './preferencesSlice';
 import { baseApi } from '../api/baseApi';
+import { persistApiCache } from '../api/persistCache';
 
 const appReducer = combineReducers({
   auth: authReducer,
@@ -27,6 +28,8 @@ export const store = configureStore({
 
 // Enables refetchOnFocus/refetchOnReconnect behavior for RTK Query.
 setupListeners(store.dispatch);
+// Keeps a copy of the last-loaded data on the device for instant screens.
+persistApiCache(store);
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
