@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from app.db.base import Base
 
@@ -27,6 +27,11 @@ class VaultEntry(Base):
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # An optional voice recording, Fernet-encrypted like the text. Loaded only
+    # when asked for, so listing notes never pulls the audio.
+    audio: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
+    audio_mime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    audio_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Trash: soft-deleted entries can be restored until permanently deleted.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

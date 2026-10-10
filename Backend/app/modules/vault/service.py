@@ -12,7 +12,7 @@ from app.core.timeutil import utc_now
 from app.modules.auth.models import User
 from app.modules.users.models import UserSettings
 
-from .crypto import decrypt_payload, encrypt_payload
+from .crypto import decrypt_bytes, decrypt_payload, encrypt_bytes, encrypt_payload
 from .models import VaultCredential, VaultEntry
 from .schemas import VaultEntryOut, VaultEntrySummary, VaultFolderOut, VaultSessionOut, VaultStatusOut
 
@@ -124,6 +124,8 @@ def _summary(entry: VaultEntry, data: dict) -> dict:
         "deleted_at": entry.deleted_at,
         "created_at": entry.created_at,
         "updated_at": entry.updated_at,
+        "has_audio": entry.audio_seconds is not None,
+        "audio_seconds": entry.audio_seconds,
     }
 
 
@@ -251,3 +253,45 @@ def empty_trash(db: Session, user: User) -> int:
         db.delete(entry)
     db.commit()
     return len(entries)
+
+
+# ---- voice recordings ----------------------------------------------------------
+
+MAX_AUDIO_BYTES = 4 * 1024 * 1024  # about 4 minutes of voice
+AUDIO_TYPES = {"audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac", "audio/mpeg", "audio/webm", "audio/ogg"}
+
+
+def set_audio(db: Session, user: User, entry_id: UUID, data: bytes, mime: str, seconds: int) -> VaultEntryOut:
+    """Stores (or replaces) a note's voice recording, encrypted."""
+    entry = _owned_entry(db, user.id, entry_id)
+    if entry.deleted_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Restore this note before changing its recording.")
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The recording is empty.")
+    if len(data) > MAX_AUDIO_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Recordings can be up to about 4 minutes.")
+    if mime not in AUDIO_TYPES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "That doesn't look like a voice recording.")
+    entry.audio = encrypt_bytes(data)
+    entry.audio_mime = mime
+    entry.audio_seconds = max(1, min(int(seconds), 600))
+    db.commit()
+    db.refresh(entry)
+    return _full(entry)
+
+
+def get_audio(db: Session, user: User, entry_id: UUID) -> tuple[bytes, str]:
+    entry = _owned_entry(db, user.id, entry_id)
+    if entry.audio is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This note has no recording.")
+    return decrypt_bytes(entry.audio), entry.audio_mime or "audio/mp4"
+
+
+def delete_audio(db: Session, user: User, entry_id: UUID) -> VaultEntryOut:
+    entry = _owned_entry(db, user.id, entry_id)
+    entry.audio = None
+    entry.audio_mime = None
+    entry.audio_seconds = None
+    db.commit()
+    db.refresh(entry)
+    return _full(entry)

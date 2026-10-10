@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Memo</string>
+    <string name="widget_description">Your streak, today\'s tasks and your next reminder</string>
 </resources>

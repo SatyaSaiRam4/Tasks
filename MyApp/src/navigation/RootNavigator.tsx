@@ -48,6 +48,7 @@ import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
 import { SheetHost } from '../components/SheetHost';
 import { hideReloadCover, REOPEN_SCREEN_KEY } from '../utils/appReload';
+import { clearWidget } from '../widget';
 import { DashboardScreen } from '../modules/home/screens/DashboardScreen';
 import { RoutinesScreen } from '../modules/routines/screens/RoutinesScreen';
 import { TrackDetailScreen } from '../modules/routines/screens/TrackDetailScreen';
@@ -335,6 +336,11 @@ export function RootNavigator() {
       })
       .catch(() => undefined);
   }, [isNewUser, user, dispatch]);
+
+  // Signed out: the home-screen widget stops showing the last account's day.
+  useEffect(() => {
+    if (!isAuthenticated) clearWidget();
+  }, [isAuthenticated]);
 
   // After a theme change restarts the app, go back to where the user was.
   useEffect(() => {

@@ -43,7 +43,8 @@ def _clean_tags(tags: list[str] | None) -> list[str] | None:
 
 class VaultEntryCreate(BaseModel):
     title: str | None = Field(default=None, max_length=160)
-    content: str = Field(min_length=1, max_length=20000)
+    # Empty is fine for a voice note; the recording is uploaded separately.
+    content: str = Field(default="", max_length=20000)
     folder: str | None = Field(default=None, max_length=40)
     tags: list[str] = Field(default_factory=list, max_length=10)
     pinned: bool = False
@@ -57,7 +58,7 @@ class VaultEntryCreate(BaseModel):
 
 class VaultEntryUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=160)
-    content: str | None = Field(default=None, min_length=1, max_length=20000)
+    content: str | None = Field(default=None, max_length=20000)
     folder: str | None = Field(default=None, max_length=40)
     tags: list[str] | None = Field(default=None, max_length=10)
 
@@ -79,6 +80,8 @@ class VaultEntrySummary(BaseModel):
     deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    has_audio: bool = False
+    audio_seconds: int | None = None
 
 
 class VaultEntryOut(VaultEntrySummary):

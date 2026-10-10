@@ -25,6 +25,9 @@ export interface VaultEntrySummary {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  /** A voice recording is attached (fetched separately, never in lists). */
+  has_audio: boolean;
+  audio_seconds: number | null;
 }
 
 export interface VaultEntry extends VaultEntrySummary {
@@ -106,6 +109,20 @@ export const vaultApi = baseApi.injectEndpoints({
       query: () => ({ url: '/vault/trash/empty', method: 'POST' }),
       invalidatesTags: ['VaultEntry'],
     }),
+    /** Attaches a voice recording (a local file) to a note, replacing any earlier one. */
+    uploadVaultAudio: builder.mutation<VaultEntry, { id: string; uri: string; seconds: number }>({
+      query: ({ id, uri, seconds }) => {
+        const form = new FormData();
+        form.append('file', { uri: uri.startsWith('file://') ? uri : `file://${uri}`, name: 'voice.mp4', type: 'audio/mp4' } as unknown as Blob);
+        form.append('seconds', String(Math.max(1, Math.round(seconds))));
+        return { url: `/vault/entries/${id}/audio`, method: 'PUT', body: form };
+      },
+      invalidatesTags: ['VaultEntry'],
+    }),
+    deleteVaultAudio: builder.mutation<VaultEntry, string>({
+      query: id => ({ url: `/vault/entries/${id}/audio`, method: 'DELETE' }),
+      invalidatesTags: ['VaultEntry'],
+    }),
   }),
 });
 
@@ -122,4 +139,6 @@ export const {
   useFlagVaultEntryMutation,
   useDeleteVaultEntryMutation,
   useEmptyVaultTrashMutation,
+  useUploadVaultAudioMutation,
+  useDeleteVaultAudioMutation,
 } = vaultApi;
