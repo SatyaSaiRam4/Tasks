@@ -30,6 +30,11 @@ interface SheetProps {
   subtitle?: string;
   children: React.ReactNode;
   dismissable?: boolean;
+  /**
+   * 'top' opens the sheet from the top of the screen and keeps it there, for
+   * sheets that are mostly typing (the keyboard can never cover them).
+   */
+  placement?: 'bottom' | 'top';
 }
 
 /**
@@ -65,7 +70,7 @@ function useKeyboardHeight() {
  * fades under reduced motion. On tablets and desktops it floats as a
  * centered dialog instead.
  */
-export function Sheet({ visible, onClose, title, subtitle, children, dismissable = true }: SheetProps) {
+export function Sheet({ visible, onClose, title, subtitle, children, dismissable = true, placement = 'bottom' }: SheetProps) {
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
   const { isTablet } = useLayout();
@@ -88,7 +93,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
     [],
   );
   // While typing, the sheet sits at the top of the screen instead of the bottom.
-  const atTop = !isTablet && (typing || keyboard > 0);
+  const atTop = !isTablet && (placement === 'top' || typing || keyboard > 0);
   useEffect(() => {
     if (!visible) setTyping(false);
   }, [visible]);
@@ -119,7 +124,10 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
     }
   }, [visible, mounted, progress, reduced]);
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 40 : 460, 0] });
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [isTablet ? 40 : placement === 'top' ? -460 : 460, 0],
+  });
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 0.96 : 1, 1] });
   const content = (
     <SheetInputContext.Provider value={inputApi}>
@@ -146,7 +154,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
         >
           <Gradient colors={[colors.backgroundRaised, colors.background]} direction="vertical" style={StyleSheet.absoluteFill} />
           <Sheen inset="20%" />
-          {isTablet ? <View style={styles.dialogTop} /> : <View style={styles.handle} />}
+          {isTablet ? <View style={styles.dialogTop} /> : atTop ? <View style={styles.topGap} /> : <View style={styles.handle} />}
           {title ? (
             <Text style={[t.heading, styles.title]} accessibilityRole="header">
               {title}
@@ -336,6 +344,9 @@ const styles = StyleSheet.create({
   },
   dialogTop: {
     height: spacing.lg,
+  },
+  topGap: {
+    height: spacing.sm,
   },
   handle: {
     alignSelf: 'center',

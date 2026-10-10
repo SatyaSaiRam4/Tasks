@@ -1,11 +1,10 @@
 /* eslint-env browser */
 /**
- * Memo's welcome story, in 3D.
- *
- * The night before his final exam, Aarav asks Mom to wake him at 6 so he can
- * revise. Mom has so much to do that it slips her mind, and Aarav oversleeps
- * and runs late. Then Melo shows up, and before the next exam Aarav sets an
- * alarm in Memo: it rings at 6, he is up on time, and everyone cheers.
+ * Memo's welcome story, in 3D. Aarav tells Mom the art school admissions
+ * open on 1 March, four months away. The months fly by, she forgets, and the
+ * admissions close. Melo arrives: an alarm rings at a time of day, but Memo
+ * remembers a date months ahead. This time Mom saves it in Memo once; on
+ * 1 March it reminds her, and Aarav gets in.
  *
  * The app shows this page in a WebView (src/modules/onboarding/WelcomeStory.tsx)
  * and drives it with window.story.show(sceneIndex); captions, progress and
@@ -62,13 +61,27 @@ function limb(radius, length, material, endRadius, endMaterial) {
  * A stylized person. Returns the joints the scenes animate: root (position and
  * turn), body (lean), head, arms and legs (rotations), and setMood().
  */
-function makePerson({ kind }) {
+function makePerson({
+  kind,
+  skinColor = 0xe9b48f,
+  topColor = 0xc95c7a,
+  hairColor = 0x3b2620,
+  bottomColor = 0x2b3550,
+  glasses = false,
+  mustache = false,
+}) {
+  // kind: 'kid', 'woman' (kurta, ponytail), 'bride' (bun, veil, jewellery),
+  // 'man' (shirt and trousers) or 'groom' (sherwani and turban).
   const kid = kind === 'kid';
-  const skin = mat(kid ? 0xf3c9a6 : 0xe9b48f, { roughness: 0.75 });
-  const hair = mat(kid ? 0x2a1e1a : 0x3b2620, { roughness: 0.9 });
-  const top = mat(kid ? 0x3f7cf0 : 0xc95c7a, { roughness: 0.8 });
-  const bottom = mat(kid ? 0x26345e : 0x8e3a5e, { roughness: 0.85 });
-  const shoe = mat(kid ? 0xf2f2f2 : 0x5a2b3f);
+  const bride = kind === 'bride';
+  const man = kind === 'man';
+  const groom = kind === 'groom';
+  const male = man || groom;
+  const skin = mat(kid ? 0xf3c9a6 : skinColor, { roughness: 0.75 });
+  const hair = mat(kid ? 0x2a1e1a : hairColor, { roughness: 0.9 });
+  const top = mat(kid ? 0x3f7cf0 : topColor, { roughness: bride ? 0.55 : 0.8, metalness: bride ? 0.08 : 0.02 });
+  const bottom = mat(kid ? 0x26345e : male ? bottomColor : 0x5a2b3f, { roughness: 0.85 });
+  const shoe = mat(kid ? 0xf2f2f2 : male ? 0x2a1d17 : 0x5a2b3f);
   const ink = mat(0x1e1512, { roughness: 0.3 });
   const gold = mat(0xe7c17a, { metalness: 0.6, roughness: 0.3 });
 
@@ -91,7 +104,35 @@ function makePerson({ kind }) {
   const body = new THREE.Group();
   hips.add(body);
   const torsoH = 0.5 * s;
-  if (kid) {
+  if (man) {
+    // A shirt with a collar and buttons.
+    body.add(mesh(new THREE.CapsuleGeometry(0.2, 0.2, 8, 16), top, { y: 0.3 }));
+    for (const side of [-1, 1]) {
+      const collar = mesh(new THREE.BoxGeometry(0.09, 0.05, 0.02), mat(0xffffff), { x: side * 0.05, y: 0.55, z: 0.15 });
+      collar.rotation.z = side * 0.5;
+      body.add(collar);
+    }
+    for (let i = 0; i < 3; i++) body.add(mesh(new THREE.SphereGeometry(0.012, 8, 6), mat(0xf2f2f2), { y: 0.45 - i * 0.1, z: 0.2 }, false));
+  } else if (groom) {
+    // A long cream sherwani with a gold border and a red stole.
+    const coat = [
+      [0.0, -0.3],
+      [0.24, -0.3],
+      [0.22, 0.0],
+      [0.2, 0.3],
+      [0.21, 0.5],
+      [0.12, 0.58],
+      [0.0, 0.6],
+    ].map(([r, y]) => new THREE.Vector2(r, y));
+    body.add(mesh(new THREE.LatheGeometry(coat, 32), top));
+    const hem = mesh(new THREE.TorusGeometry(0.24, 0.018, 8, 40), gold, { y: -0.29 });
+    hem.rotation.x = Math.PI / 2;
+    body.add(hem);
+    const stole = mesh(new THREE.TorusGeometry(0.2, 0.028, 8, 32, Math.PI * 1.1), mat(0xb3122e), { y: 0.28, z: 0.02 });
+    stole.rotation.set(0.25, -0.2, 2.2);
+    body.add(stole);
+    for (let i = 0; i < 4; i++) body.add(mesh(new THREE.SphereGeometry(0.014, 8, 6), gold, { y: 0.5 - i * 0.12, z: 0.205 }, false));
+  } else if (kid) {
     body.add(mesh(new THREE.CapsuleGeometry(0.2 * s, torsoH * 0.55, 8, 16), top, { y: torsoH * 0.5 }));
     // Hoodie pocket and strings.
     body.add(mesh(new THREE.BoxGeometry(0.22 * s, 0.08 * s, 0.02), mat(0x356bd6), { y: torsoH * 0.28, z: 0.19 * s }));
@@ -111,11 +152,21 @@ function makePerson({ kind }) {
     dupatta.rotation.set(0.25, 0.2, 2.2);
     dupatta.position.set(0, 0.22 * s, 0.02);
     body.add(dupatta);
+    if (bride) {
+      // A gold border on the lehenga's hem and a necklace.
+      const hem = mesh(new THREE.TorusGeometry(0.295 * s, 0.025 * s, 8, 40), gold, { y: -0.33 * s });
+      hem.rotation.x = Math.PI / 2;
+      body.add(hem);
+      const necklace = mesh(new THREE.TorusGeometry(0.1 * s, 0.018 * s, 8, 24, Math.PI), gold, { y: 0.5 * s, z: 0.06 * s });
+      necklace.rotation.z = Math.PI;
+      necklace.rotation.x = -0.5;
+      body.add(necklace);
+    }
   }
 
-  const shoulderY = kid ? torsoH * 0.82 : 0.46 * s;
-  const shoulderX = kid ? 0.25 * s : 0.22 * s;
-  const armLen = kid ? 0.3 * s : 0.36 * s;
+  const shoulderY = kid ? torsoH * 0.82 : male ? 0.5 : 0.46 * s;
+  const shoulderX = kid ? 0.25 * s : male ? 0.25 : 0.22 * s;
+  const armLen = kid ? 0.3 * s : male ? 0.38 : 0.36 * s;
   const armL = limb(0.055 * s, armLen, top, 0.065 * s, skin);
   const armR = limb(0.055 * s, armLen, top, 0.065 * s, skin);
   armL.position.set(-shoulderX, shoulderY, 0);
@@ -125,7 +176,7 @@ function makePerson({ kind }) {
   body.add(armL, armR);
 
   // Head.
-  const headR = (kid ? 0.26 : 0.22) * s;
+  const headR = (kid ? 0.26 : male ? 0.215 : 0.22) * s;
   const head = new THREE.Group();
   head.position.y = shoulderY + headR * 1.05;
   body.add(head);
@@ -133,7 +184,7 @@ function makePerson({ kind }) {
   head.add(mesh(new THREE.SphereGeometry(headR, 32, 24), skin));
   for (const side of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(headR * 0.18, 12, 10), skin, { x: side * headR * 0.98 }));
 
-  // Hair: a cap over the top and back, plus a fringe (kid) or a bun (mom).
+  // Hair: a cap over the top and back, plus a fringe (kid), a ponytail or a bun.
   const cap = mesh(new THREE.SphereGeometry(headR * 1.06, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
   cap.rotation.x = -0.35;
   head.add(cap);
@@ -148,8 +199,58 @@ function makePerson({ kind }) {
       tuft.rotation.z = -i * 0.25;
       head.add(tuft);
     }
+  } else if (male) {
+    // Short hair with a side fringe; the groom wears a turban over it.
+    const fringe = mesh(new THREE.SphereGeometry(headR * 0.55, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), hair, { x: headR * 0.25, y: headR * 0.62, z: headR * 0.35 });
+    fringe.scale.set(1.2, 0.5, 0.9);
+    head.add(fringe);
+    if (groom) {
+      const safa = mat(0xe8862a, { roughness: 0.75 });
+      for (let i = 0; i < 4; i++) {
+        const fold = mesh(new THREE.TorusGeometry(headR * (1.0 - i * 0.12), headR * 0.2, 10, 28), safa, { y: headR * (0.45 + i * 0.2) });
+        fold.rotation.x = Math.PI / 2 + 0.15;
+        head.add(fold);
+      }
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.75, 20, 14), safa, { y: headR * 0.95 }));
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.13, 10, 8), gold, { y: headR * 0.75, z: headR * 0.95 }));
+      const plume = mesh(new THREE.ConeGeometry(headR * 0.08, headR * 0.6, 8), gold, { y: headR * 1.3, z: headR * 0.8 });
+      plume.rotation.x = -0.4;
+      head.add(plume);
+    }
+    if (mustache) {
+      const m = mesh(new THREE.CapsuleGeometry(headR * 0.06, headR * 0.3, 4, 8), hair, { y: -headR * 0.18, z: headR * 0.95 }, false);
+      m.rotation.z = Math.PI / 2;
+      head.add(m);
+    }
+    if (glasses) {
+      const frameMat = mat(0x1d1d1d, { metalness: 0.4, roughness: 0.3 });
+      for (const side of [-1, 1]) {
+        const lens = mesh(new THREE.TorusGeometry(headR * 0.2, headR * 0.03, 8, 20), frameMat, { x: side * headR * 0.36, y: headR * 0.08, z: headR * 0.97 }, false);
+        head.add(lens);
+      }
+      head.add(mesh(new THREE.BoxGeometry(headR * 0.3, headR * 0.03, headR * 0.03), frameMat, { y: headR * 0.1, z: headR * 0.98 }, false));
+    }
   } else {
-    head.add(mesh(new THREE.SphereGeometry(headR * 0.42, 20, 16), hair, { y: headR * 0.75, z: -headR * 0.55 }));
+    if (kind === 'woman') {
+      // A high ponytail.
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.3, 16, 12), hair, { y: headR * 0.55, z: -headR * 0.85 }));
+      const tail = mesh(new THREE.ConeGeometry(headR * 0.26, headR * 1.1, 14), hair, { y: -headR * 0.05, z: -headR * 1.05 });
+      tail.rotation.x = Math.PI + 0.35;
+      head.add(tail);
+    } else {
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.42, 20, 16), hair, { y: headR * 0.75, z: -headR * 0.55 }));
+    }
+    if (bride) {
+      // A sheer red-gold veil over the head and a forehead jewel.
+      const veil = mesh(
+        new THREE.SphereGeometry(headR * 1.25, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        mat(0xd4384f, { transparent: true, opacity: 0.55, side: THREE.DoubleSide, roughness: 0.6 }),
+        { y: headR * 0.05, z: -headR * 0.15 },
+      );
+      veil.rotation.x = -0.5;
+      head.add(veil);
+      head.add(mesh(new THREE.SphereGeometry(headR * 0.08, 10, 8), gold, { y: headR * 0.55, z: headR * 0.88 }));
+    }
     const back = mesh(new THREE.SphereGeometry(headR * 1.08, 24, 16, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.5), hair);
     back.position.z = -headR * 0.12;
     back.scale.set(1, 1.15, 0.9);
@@ -194,7 +295,7 @@ function makePerson({ kind }) {
   }
   setMood('happy');
 
-  return { root, hips, body, head, armL, armR, legL, legR, mouth, eyes, setMood, height: hips.position.y + head.position.y + headR };
+  return { root, hips, body, head, armL, armR, legL, legR, mouth, eyes, setMood, top, height: hips.position.y + head.position.y + headR };
 }
 
 /** Resets a person to standing still, before a frame's moves are applied. */
@@ -210,7 +311,7 @@ function rest(p, t) {
   p.legR.rotation.set(0, 0, 0);
   p.mouth.scale.set(1, 1, 1);
   // Blink every few seconds.
-  const blink = p.asleep || (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.12 : 1;
+  const blink = (t + p.root.id * 0.7) % 3.6 < 0.12 ? 0.12 : 1;
   p.eyes.forEach(e => (e.scale.y = blink));
 }
 
@@ -282,44 +383,23 @@ const moves = {
     p.armL.rotation.z = -0.15 - 0.45 * c + 0.6;
     p.armR.rotation.z = 0.15 + 0.45 * c - 0.6;
   },
-  /** Lying asleep on the bed, then (from `wake`) sitting up and hopping out to `standX`. */
-  sleepAndWake(p, t, wake, standX) {
-    const bedTop = 0.52;
-    const k = wake === undefined ? 0 : ease(seg(t, wake, wake + 0.9));
-    p.asleep = k === 0;
-    const lyingX = bed.position.x - 0.55;
-    p.root.rotation.set(0, 0, lerp(-Math.PI / 2, 0, k));
-    p.root.position.set(lerp(lyingX, standX, k), lerp(bedTop + 0.06, 0, k) + 0.35 * bump(k), lerp(bed.position.z + 0.05, 0.1, k));
-    if (k === 0) {
-      // Slow sleepy breathing.
-      p.body.scale.y = 1 + 0.03 * Math.sin(t * 1.6);
-      // Lying on the side, arms rest along the body.
-      p.armL.rotation.z = 0.08;
-      p.armR.rotation.z = -0.08;
-    }
-    bed.userData.blanket.position.y = 0.5 + 0.12 * (1 - k);
-    bed.userData.blanket.scale.set(1, 1 + (1 - k) * 0.6, 1);
+  /** Both hands to the head: "Oh no!" */
+  shock(p, t, a) {
+    const k = ease(seg(t, a, a + 0.4));
+    p.armL.rotation.set(-0.6 * k, 0, -(0.12 + 2.3 * k));
+    p.armR.rotation.set(-0.6 * k, 0, 0.12 + 2.3 * k);
+    p.head.rotation.x -= 0.15 * k;
   },
-  /** Arms up in a big morning stretch. */
-  stretch(p, t, a, b) {
-    const k = bump(seg(t, a, b));
-    p.armL.rotation.z = -(0.12 + 2.7 * k);
-    p.armR.rotation.z = 0.12 + 2.7 * k;
-    p.body.rotation.x -= 0.12 * k;
+  /** Arms out and around: a hug, held from a to b. */
+  hug(p, t, a, b) {
+    const k = ease(seg(t, a, a + 0.5)) * (1 - ease(seg(t, b - 0.4, b)));
+    p.armL.rotation.set(-1.25 * k, 0, -0.12 + 0.75 * k);
+    p.armR.rotation.set(-1.25 * k, 0, 0.12 - 0.75 * k);
   },
-  /** Running in a panic: fast legs, hands on head. */
-  panic(p, t, a, b, x0, x1) {
-    const k = seg(t, a, b);
-    if (k <= 0 || k >= 1) return;
-    const run = Math.sin((t - a) * 16);
-    const back = Math.sin((t - a) * 2.6);
-    p.root.position.x = lerp(x0, x1, 0.5 + 0.5 * back);
-    p.root.rotation.y = Math.cos((t - a) * 2.6) > 0 ? 1.1 : -1.1;
-    p.legL.rotation.x = 0.8 * run;
-    p.legR.rotation.x = -0.8 * run;
-    p.hips.position.y += 0.05 * Math.abs(run);
-    p.armL.rotation.set(0, 0, -2.6);
-    p.armR.rotation.set(0, 0, 2.6);
+  /** Holding something up in the right hand, e.g. the invitation. */
+  hold(p, amount = 1) {
+    p.armR.rotation.x = -1.3 * amount;
+    p.armR.rotation.z = 0.12 - 0.25 * amount;
   },
   busy(p, t) {
     // Hurrying: quick arm work and a restless head.
@@ -357,7 +437,7 @@ function makeRoom() {
   room.userData.sky = sky;
   room.add(sky);
 
-  // Sofa (the living room; the bedroom swaps it for the bed).
+  // Sofa.
   const sofa = new THREE.Group();
   room.add(sofa);
   room.userData.sofa = sofa;
@@ -410,7 +490,11 @@ function busyThing(kind) {
   return g;
 }
 
-/** The phone that rings with the reminder, its screen drawn on a canvas. */
+/**
+ * The phone, its screen drawn on a canvas. draw(screen) switches between the
+ * wedding photos Riya finds too late, her Memo reminders, and the reminder
+ * ringing on the day.
+ */
 function makePhone() {
   const g = new THREE.Group();
   const w = 0.62;
@@ -420,38 +504,77 @@ function makePhone() {
   canvas.width = 420;
   canvas.height = 800;
   const c = canvas.getContext('2d');
-  const grad = c.createLinearGradient(0, 0, 0, 800);
-  grad.addColorStop(0, '#1b2440');
-  grad.addColorStop(1, '#0b1122');
-  c.fillStyle = grad;
-  c.fillRect(0, 0, 420, 800);
-  c.fillStyle = '#efe9dc';
-  c.textAlign = 'center';
-  c.font = '600 120px Georgia, serif';
-  c.fillText('6:00', 210, 210);
-  c.font = '500 30px sans-serif';
-  c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Monday · Exam day', 210, 260);
-  c.fillStyle = 'rgba(239,233,220,0.12)';
-  roundRect(c, 40, 320, 340, 250, 32);
-  c.fill();
-  c.font = '72px sans-serif';
-  c.fillText('⏰', 210, 410);
-  c.fillStyle = '#efe9dc';
-  c.font = '700 40px sans-serif';
-  c.fillText('Wake up, Aarav!', 210, 475);
-  c.font = '500 28px sans-serif';
-  c.fillStyle = 'rgba(239,233,220,0.7)';
-  c.fillText('Final exam today · Alarm', 210, 520);
-  c.fillStyle = '#d4af6a';
-  roundRect(c, 70, 650, 280, 80, 40);
-  c.fill();
-  c.fillStyle = '#0b1122';
-  c.font = '700 36px sans-serif';
-  c.fillText('Stop', 210, 702);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   g.add(mesh(new THREE.PlaneGeometry(w * 0.9, h * 0.92), new THREE.MeshBasicMaterial({ map: texture }), { z: 0.031, shadow: false }));
+
+  const text = (value, y, font, color = '#efe9dc') => {
+    c.font = font;
+    c.fillStyle = color;
+    c.fillText(value, 210, y);
+  };
+  /**
+   * Draws one screen. spec.type: 'ring' (a Memo reminder going off), 'ad'
+   * (a sale advert), 'photos' (a friend's wedding post) or 'paid'.
+   */
+  g.userData.draw = spec => {
+    const grad = c.createLinearGradient(0, 0, 0, 800);
+    grad.addColorStop(0, '#1b2440');
+    grad.addColorStop(1, '#0b1122');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 420, 800);
+    c.textAlign = 'center';
+    if (spec.type === 'ad') {
+      c.fillStyle = '#e2574c';
+      roundRect(c, 30, 120, 360, 480, 30);
+      c.fill();
+      text('MEGA SALE', 230, '800 58px sans-serif');
+      text('Up to 70% off', 300, '600 34px sans-serif', '#ffe9c9');
+      text('🛍️', 420, '110px sans-serif');
+      text('Opens in 10 days', 540, '700 32px sans-serif');
+    } else if (spec.type === 'photos') {
+      text(spec.who ?? 'A friend posted photos', 90, '600 28px sans-serif', 'rgba(239,233,220,0.75)');
+      c.fillStyle = '#7a1f33';
+      roundRect(c, 40, 130, 340, 380, 28);
+      c.fill();
+      text('💍', 290, '120px sans-serif');
+      text('Our wedding day ✨', 400, '700 36px sans-serif');
+      text(spec.date ?? '', 450, '500 28px sans-serif', 'rgba(239,233,220,0.75)');
+      text('♥ 248   💬 61', 580, '600 30px sans-serif', 'rgba(239,233,220,0.8)');
+      text('Yesterday', 650, '500 26px sans-serif', 'rgba(239,233,220,0.5)');
+    } else if (spec.type === 'saved') {
+      text('Memo', 100, '700 34px sans-serif', '#d4af6a');
+      text('✅', 230, '110px sans-serif');
+      text('Reminder saved', 330, '800 40px sans-serif');
+      c.fillStyle = 'rgba(239,233,220,0.12)';
+      roundRect(c, 36, 380, 348, 220, 28);
+      c.fill();
+      text(spec.emoji ?? '🎨', 450, '56px sans-serif');
+      text(spec.title ?? '', 510, '700 30px sans-serif');
+      text(spec.date ?? '', 555, '600 27px sans-serif', '#f3dca6');
+      text(spec.sub ?? '', 680, '500 26px sans-serif', 'rgba(239,233,220,0.7)');
+    } else if (spec.type === 'paid') {
+      text('✅', 300, '150px sans-serif');
+      text('Bill paid', 420, '800 50px sans-serif');
+      text('₹2,340 · on time', 480, '500 30px sans-serif', 'rgba(239,233,220,0.75)');
+    } else {
+      text(spec.time ?? '9:00', 210, '600 120px Georgia, serif');
+      text(spec.date ?? '', 262, '500 30px sans-serif', 'rgba(239,233,220,0.7)');
+      c.fillStyle = 'rgba(239,233,220,0.12)';
+      roundRect(c, 40, 320, 340, 250, 32);
+      c.fill();
+      text(spec.emoji ?? '⏰', 410, '72px sans-serif');
+      text(spec.title ?? '', 475, '700 36px sans-serif');
+      text(spec.sub ?? '', 520, '500 27px sans-serif', 'rgba(239,233,220,0.7)');
+      c.fillStyle = '#d4af6a';
+      roundRect(c, 70, 650, 280, 80, 40);
+      c.fill();
+      text('Memo reminder', 702, '700 30px sans-serif', '#0b1122');
+    }
+    texture.needsUpdate = true;
+  };
+  g.userData.draw({ type: 'ring' });
+
   // Rings of light that pulse out while it rings.
   const rings = [];
   for (let i = 0; i < 3; i++) {
@@ -464,6 +587,160 @@ function makePhone() {
     rings.push(ring);
   }
   g.userData.rings = rings;
+  return g;
+}
+
+/** Draws on a fresh canvas and returns it as a texture. */
+function canvasTexture(width, height, paint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  paint(canvas.getContext('2d'));
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** A sign on two posts: "ADMISSIONS CLOSED", "ADMISSION CONFIRMED" and so on. */
+function makeBoard(lines, color) {
+  const tex = canvasTexture(512, 256, c => {
+    c.fillStyle = color;
+    c.fillRect(0, 0, 512, 256);
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 10;
+    c.strokeRect(14, 14, 484, 228);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '900 76px sans-serif';
+    c.fillText(lines[0], 256, 125);
+    c.font = '600 36px sans-serif';
+    c.fillText(lines[1] ?? '', 256, 195);
+  });
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshBasicMaterial({ map: tex }), { shadow: false }));
+  for (const side of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8), mat(0x777777), { x: side * 0.5, y: -0.6 }));
+  return g;
+}
+
+/** Outside a school: sky, road, the building with its name, trees. */
+function makeStreet(name) {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(40, 14), new THREE.MeshBasicMaterial({ color: 0x9fd0ff }), { y: 7, z: -6, shadow: false }));
+  const ground = mesh(new THREE.PlaneGeometry(40, 20), mat(0x6f8f4f, { roughness: 1 }), { z: -2, shadow: false });
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  g.add(ground);
+  const road = mesh(new THREE.PlaneGeometry(40, 1.6), mat(0x4a4d55, { roughness: 1 }), { y: 0.005, z: -0.6, shadow: false });
+  road.rotation.x = -Math.PI / 2;
+  road.receiveShadow = true;
+  g.add(road);
+  for (let i = -10; i <= 10; i++) {
+    const stripe = mesh(new THREE.PlaneGeometry(0.5, 0.06), mat(0xf2f2f2), { x: i * 1.2, y: 0.01, z: -0.6, shadow: false });
+    stripe.rotation.x = -Math.PI / 2;
+    g.add(stripe);
+  }
+  // The school.
+  const school = new THREE.Group();
+  school.add(mesh(new THREE.BoxGeometry(5, 2.4, 1), mat(0xe7c9a0, { roughness: 0.9 }), { y: 1.2 }));
+  school.add(mesh(new THREE.BoxGeometry(5.2, 0.15, 1.2), mat(0xb5653f), { y: 2.45 }));
+  for (let i = -2; i <= 2; i++) {
+    for (const y of [0.85, 1.75]) school.add(mesh(new THREE.PlaneGeometry(0.5, 0.45), new THREE.MeshBasicMaterial({ color: 0x5b8def }), { x: i * 0.95, y, z: 0.51, shadow: false }));
+  }
+  const sign = canvasTexture(512, 96, c => {
+    c.fillStyle = '#2a3a6e';
+    c.fillRect(0, 0, 512, 96);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '800 52px sans-serif';
+    c.fillText(name, 256, 66);
+  });
+  school.add(mesh(new THREE.PlaneGeometry(2.2, 0.42), new THREE.MeshBasicMaterial({ map: sign }), { y: 2.15, z: 0.52, shadow: false }));
+  school.position.set(0.3, 0, -3.2);
+  g.add(school);
+  for (const x of [-2.6, 3.0]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.8, 8), mat(0x7a4a2a), { x, y: 0.4, z: -1.6 }));
+    g.add(mesh(new THREE.ConeGeometry(0.55, 1.3, 12), mat(0x3f8f4f), { x, y: 1.4, z: -1.6 }));
+  }
+  return g;
+}
+
+/** Aarav's drawing for the art school. */
+function makeDrawing() {
+  const tex = canvasTexture(256, 200, c => {
+    c.fillStyle = '#fffdf6';
+    c.fillRect(0, 0, 256, 200);
+    c.fillStyle = '#9fd0ff';
+    c.fillRect(8, 8, 240, 110);
+    c.fillStyle = '#6fbf5f';
+    c.fillRect(8, 118, 240, 74);
+    c.fillStyle = '#f7c843';
+    c.beginPath();
+    c.arc(205, 45, 24, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#e2574c';
+    c.fillRect(60, 85, 80, 60);
+    c.fillStyle = '#8a3b2e';
+    c.beginPath();
+    c.moveTo(50, 88);
+    c.lineTo(100, 45);
+    c.lineTo(150, 88);
+    c.fill();
+    c.fillStyle = '#5b3a1a';
+    c.fillRect(90, 115, 20, 30);
+  });
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(0.34, 0.27), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), { shadow: false }));
+  return g;
+}
+
+/** A wall calendar; flip(t) tears pages off so weeks fly by. */
+function makeCalendar(months) {
+  const g = new THREE.Group();
+  const page = month => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 300;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#faf6ee';
+    c.fillRect(0, 0, 256, 300);
+    c.fillStyle = '#c0392b';
+    c.fillRect(0, 0, 256, 70);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.font = '700 40px sans-serif';
+    c.fillText(month[0], 128, 50);
+    c.fillStyle = '#2a1e1a';
+    c.font = '700 130px Georgia, serif';
+    c.fillText(month[1], 128, 220);
+    c.font = '500 26px sans-serif';
+    c.fillText(month[2], 128, 270);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+  };
+  const pages = months.map((m, i) => {
+    const sheet = mesh(new THREE.PlaneGeometry(0.42, 0.5), page(m), { z: 0.002 * (months.length - i), shadow: false });
+    g.add(sheet);
+    return sheet;
+  });
+  g.add(mesh(new THREE.BoxGeometry(0.46, 0.06, 0.03), mat(0x2a1e1a), { y: 0.27 }));
+  /** Shows page `index` with every earlier page torn off. `fly` (0..1) animates the last tear. */
+  g.userData.show = (index, fly = 1) => {
+    pages.forEach((sheet, i) => {
+      if (i < index - 1 || (i === index - 1 && fly >= 1)) sheet.visible = false;
+      else if (i === index - 1) {
+        sheet.visible = true;
+        sheet.position.set(0.5 * fly, -0.6 * fly * fly, 0.05 + 0.3 * fly);
+        sheet.rotation.set(0.6 * fly, 0, -1.4 * fly);
+      } else {
+        sheet.visible = true;
+        sheet.position.set(0, 0, 0.002 * (months.length - i));
+        sheet.rotation.set(0, 0, 0);
+      }
+    });
+  };
+  g.userData.show(0);
+  g.position.set(1.05, 2.2, -2.15);
   return g;
 }
 
@@ -494,174 +771,6 @@ function makeSparkles(count = 70) {
   return points;
 }
 
-/** Aarav's bed, along the back wall, with a pillow, a blanket and his school bag. */
-function makeBed() {
-  const g = new THREE.Group();
-  const wood = mat(0x8a5a3c, { roughness: 0.8 });
-  g.add(mesh(new THREE.BoxGeometry(1.7, 0.28, 0.95), wood, { y: 0.2 }));
-  g.add(mesh(new THREE.BoxGeometry(0.1, 0.75, 0.95), wood, { x: 0.88, y: 0.42 }));
-  g.add(mesh(new THREE.BoxGeometry(0.1, 0.45, 0.95), wood, { x: -0.88, y: 0.3 }));
-  g.add(mesh(new THREE.BoxGeometry(1.6, 0.14, 0.88), mat(0xf4efe6, { roughness: 1 }), { y: 0.41 }));
-  g.add(mesh(new THREE.BoxGeometry(0.34, 0.1, 0.55), mat(0xffffff, { roughness: 1 }), { x: 0.62, y: 0.53 }));
-  const blanket = mesh(new THREE.BoxGeometry(1.05, 0.12, 0.92), mat(0x5b8def, { roughness: 1 }), { x: -0.25, y: 0.5 });
-  g.add(blanket);
-  g.userData.blanket = blanket;
-  // School bag and books by the bed.
-  const bag = new THREE.Group();
-  bag.add(mesh(new THREE.BoxGeometry(0.34, 0.4, 0.18), mat(0xe2574c), { y: 0.2 }));
-  bag.add(mesh(new THREE.BoxGeometry(0.26, 0.16, 0.04), mat(0xb8433a), { y: 0.16, z: 0.1 }));
-  bag.position.set(1.2, 0, 0.2);
-  bag.rotation.y = -0.4;
-  g.add(bag);
-  g.position.set(-0.45, 0, -1.25);
-  return g;
-}
-
-/** Aarav's corner: a bedside table with a lamp and books, curtains and an exam-week poster. */
-function makeBedroomDecor() {
-  const g = new THREE.Group();
-  const wood = mat(0x9a6a48, { roughness: 0.8 });
-  const table = new THREE.Group();
-  table.add(mesh(new THREE.BoxGeometry(0.45, 0.42, 0.4), wood, { y: 0.21 }));
-  table.add(mesh(new THREE.BoxGeometry(0.47, 0.03, 0.42), mat(0x7a4a2a), { y: 0.43 }));
-  table.add(mesh(new THREE.SphereGeometry(0.02, 8, 6), mat(0xd4af6a, { metalness: 0.6 }), { y: 0.3, z: 0.205 }));
-  // A little lamp that glows at night.
-  table.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.04, 16), mat(0x333333), { x: -0.12, y: 0.47 }));
-  table.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 8), mat(0x333333), { x: -0.12, y: 0.58 }));
-  const shade = mesh(new THREE.ConeGeometry(0.11, 0.14, 20, 1, true), mat(0xf6e3b4, { emissive: 0xf6c56a, emissiveIntensity: 0.8, side: THREE.DoubleSide }), { x: -0.12, y: 0.72 });
-  table.add(shade);
-  for (let i = 0; i < 3; i++) table.add(mesh(new THREE.BoxGeometry(0.18, 0.03, 0.13), mat([0x5b8def, 0xe2574c, 0x4fc38a][i]), { x: 0.1, y: 0.46 + i * 0.032, z: 0.02 }));
-  table.position.set(0.95, 0, -1.3);
-  g.add(table);
-  g.userData.lampAt = new THREE.Vector3(0.83, 0.75, -1.3);
-  // Curtains either side of the window.
-  for (const side of [-1, 1]) {
-    const curtain = mesh(new THREE.BoxGeometry(0.32, 1.45, 0.04), mat(0x7a3a4a, { roughness: 1 }), { x: -1.6 + side * 0.82, y: 1.85, z: -2.12 });
-    g.add(curtain);
-  }
-  g.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 2.1, 8), mat(0xd4af6a, { metalness: 0.6 }), { x: -1.6, y: 2.62, z: -2.1 }).rotateZ(Math.PI / 2));
-  const poster = canvasTexture(256, 340, c => {
-    c.fillStyle = '#2a3a6e';
-    c.fillRect(0, 0, 256, 340);
-    c.fillStyle = '#f7c843';
-    c.textAlign = 'center';
-    c.font = '800 34px sans-serif';
-    c.fillText('EXAM', 128, 70);
-    c.fillText('WEEK', 128, 110);
-    c.font = '90px sans-serif';
-    c.fillText('📚', 128, 220);
-    c.fillStyle = '#ffffff';
-    c.font = '600 22px sans-serif';
-    c.fillText('You can do it!', 128, 300);
-  });
-  g.add(mesh(new THREE.PlaneGeometry(0.42, 0.56), new THREE.MeshBasicMaterial({ map: poster }), { x: 0.2, y: 1.95, z: -2.17, shadow: false }));
-  return g;
-}
-
-/** Draws on a fresh canvas and returns it as a texture. */
-function canvasTexture(width, height, paint) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  paint(canvas.getContext('2d'));
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/** Soft glowing "Z"s that float up from a sleeper and fade. */
-function makeZzz() {
-  const tex = canvasTexture(128, 128, c => {
-    c.fillStyle = '#efe9dc';
-    c.textAlign = 'center';
-    c.font = '800 96px Georgia, serif';
-    c.shadowColor = 'rgba(243,220,166,0.9)';
-    c.shadowBlur = 18;
-    c.fillText('Z', 64, 98);
-  });
-  const g = new THREE.Group();
-  const letters = [0, 1, 2].map(() => {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-    g.add(sprite);
-    return sprite;
-  });
-  g.userData.update = (t, from) => {
-    letters.forEach((sprite, i) => {
-      const k = (t * 0.45 + i / 3) % 1;
-      sprite.position.set(from.x + 0.12 * Math.sin(k * 6 + i) + k * 0.25, from.y + k * 0.7, from.z);
-      sprite.scale.setScalar(0.08 + k * 0.14);
-      sprite.material.opacity = Math.sin(Math.PI * k) * 0.95;
-    });
-  };
-  return g;
-}
-
-/** A warm beam of morning sun through the window, with dust drifting in it. */
-function makeSunbeam() {
-  const g = new THREE.Group();
-  const tex = canvasTexture(64, 256, c => {
-    const grad = c.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, 'rgba(255,224,160,0.55)');
-    grad.addColorStop(1, 'rgba(255,224,160,0)');
-    c.fillStyle = grad;
-    c.fillRect(0, 0, 64, 256);
-  });
-  const beam = mesh(
-    new THREE.PlaneGeometry(1.3, 3.2),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-    { shadow: false },
-  );
-  beam.position.set(-0.9, 1.1, -1.0);
-  beam.rotation.set(-0.5, 0.35, -0.55);
-  g.add(beam);
-  const count = 60;
-  const positions = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    positions[i * 3] = -1.6 + Math.random() * 1.6;
-    positions[i * 3 + 1] = 0.3 + Math.random() * 2.2;
-    positions[i * 3 + 2] = -1.8 + Math.random() * 1.6;
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const dust = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffe9b8, size: 0.022, transparent: true, opacity: 0.8, depthWrite: false }));
-  g.add(dust);
-  g.userData.update = (t, strength) => {
-    beam.material.opacity = strength;
-    dust.material.opacity = 0.8 * strength;
-    dust.rotation.y = Math.sin(t * 0.2) * 0.1;
-    dust.position.y = Math.sin(t * 0.5) * 0.05;
-  };
-  return g;
-}
-
-/** A wall clock whose hands can be set, or spun to show time racing by. */
-function makeWallClock() {
-  const g = new THREE.Group();
-  const face = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 40), mat(0xfaf6ee), { shadow: false });
-  face.rotation.x = Math.PI / 2;
-  g.add(face);
-  g.add(mesh(new THREE.TorusGeometry(0.28, 0.03, 10, 40), mat(0xd4af6a, { metalness: 0.6, roughness: 0.3 }), { shadow: false }));
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    g.add(mesh(new THREE.BoxGeometry(0.02, i % 3 ? 0.03 : 0.06, 0.01), mat(0x333333), { x: Math.sin(a) * 0.22, y: Math.cos(a) * 0.22, z: 0.025, shadow: false }));
-  }
-  const hand = (length, width, color) => {
-    const pivot = new THREE.Group();
-    pivot.position.z = 0.03;
-    pivot.add(mesh(new THREE.BoxGeometry(width, length, 0.01), mat(color), { y: length / 2, shadow: false }));
-    g.add(pivot);
-    return pivot;
-  };
-  const hour = hand(0.13, 0.03, 0x222222);
-  const minute = hand(0.2, 0.018, 0x222222);
-  g.userData.set = (hours, minutes) => {
-    minute.rotation.z = -(minutes / 60) * Math.PI * 2;
-    hour.rotation.z = -((hours % 12) / 12 + minutes / 720) * Math.PI * 2;
-  };
-  g.position.set(1.05, 2.25, -2.15);
-  return g;
-}
-
 /** Confetti for the happy endings: little paper squares that tumble down. */
 function makeConfetti(count = 160) {
   const colors = [0xd4af6a, 0xe2574c, 0x5b9bff, 0x4fc38a, 0xc24dff, 0xffffff];
@@ -690,7 +799,7 @@ function makeConfetti(count = 160) {
   return confetti;
 }
 
-// ---- Stage ------------------------------------------------------------------------------
+// ---- Renderer ---------------------------------------------------------------------------
 
 const canvas = document.getElementById('stage');
 let renderer;
@@ -705,65 +814,175 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
+renderer.setClearColor(0x000000, 0);
 
-const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x0b1122, 6, 14);
-const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+// Space the app keeps for its caption at the top and its hint at the bottom
+// (CSS pixels); the three panels share the height between them.
+const TOP = Number(params.get('top') || 130);
+const BOTTOM = Number(params.get('bottom') || 70);
+const GAP = 8;
 
-const hemi = new THREE.HemisphereLight(0xfff1dc, 0x2a2238, 1.1);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffe2b8, 2.2);
-sun.position.set(2.5, 5, 3.5);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -4;
-sun.shadow.camera.right = 4;
-sun.shadow.camera.top = 4;
-sun.shadow.camera.bottom = -2;
-sun.shadow.bias = -0.0005;
-scene.add(sun);
-const lamp = new THREE.PointLight(0xffb45e, 6, 6, 1.6);
-lamp.position.set(-2.3, 1.6, -1.2);
-scene.add(lamp);
-const rim = new THREE.DirectionalLight(0x8fb4ff, 0.8);
-rim.position.set(-3, 3, -3);
-scene.add(rim);
+// ---- Stages: one little world per story ---------------------------------------------------
 
-const room = makeRoom();
-scene.add(room);
-const aarav = makePerson({ kind: 'kid' });
-const mom = makePerson({ kind: 'mom' });
-scene.add(aarav.root, mom.root);
-const things = ['clock', 'phone', 'cup', 'book', 'bag'].map(k => {
-  const t = busyThing(k);
-  scene.add(t);
-  return t;
-});
-const phone = makePhone();
-scene.add(phone);
-const sparkles = makeSparkles();
-scene.add(sparkles);
-const bed = makeBed();
-scene.add(bed);
-const decor = makeBedroomDecor();
-scene.add(decor);
-const zzz = makeZzz();
-scene.add(zzz);
-const sunbeam = makeSunbeam();
-scene.add(sunbeam);
-const bedsideLight = new THREE.PointLight(0xffc27a, 0, 2.5, 1.8);
-bedsideLight.position.copy(decor.userData.lampAt);
-scene.add(bedsideLight);
-const wallClock = makeWallClock();
-scene.add(wallClock);
-const confetti = makeConfetti();
-scene.add(confetti);
+/** A room with its own camera and lights; `light()` sets the time of day (or a power cut). */
+function makeStage({ street } = {}) {
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b1122, 6, 14);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+  const hemi = new THREE.HemisphereLight(0xfff1dc, 0x2a2238, 1.1);
+  const sun = new THREE.DirectionalLight(0xffe2b8, 2.2);
+  sun.position.set(2.5, 5, 3.5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512);
+  Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -2 });
+  sun.shadow.bias = -0.0005;
+  const lamp = new THREE.PointLight(0xffb45e, 6, 6, 1.6);
+  lamp.position.set(-2.3, 1.6, -1.2);
+  const rim = new THREE.DirectionalLight(0x8fb4ff, 0.8);
+  rim.position.set(-3, 3, -3);
+  scene.add(hemi, sun, lamp, rim);
+  const room = makeRoom();
+  scene.add(room);
+  const stage = { scene, camera, room, view: null, power: 1, sky: null };
+  if (street) {
+    stage.street = makeStreet(street);
+    stage.street.visible = false;
+    scene.add(stage.street);
+  }
+  /** 'home' (the living room) or 'street' (outside the school). */
+  stage.place = where => {
+    room.visible = where === 'home';
+    if (stage.street) stage.street.visible = where === 'street';
+    if (stage.calendar) stage.calendar.visible = where === 'home';
+    scene.fog.color.set(where === 'street' ? 0x9fd0ff : stage.sky.bg);
+  };
+  stage.light = sky => {
+    stage.sky = sky;
+    scene.background = new THREE.Color(sky.bg);
+    scene.fog.color.set(sky.bg);
+    room.userData.window.color.set(sky.window);
+    room.userData.sky.material.color.set(sky.sun ? 0xffe9a8 : 0xf3dca6);
+    room.userData.sky.scale.setScalar(sky.sun ? 1.5 : 1);
+    room.userData.sky.visible = Boolean(sky.moon || sky.sun);
+    stage.setPower(1);
+    stage.place('home');
+  };
+  /** 1 is normal light, 0 a power cut (only the moonlight left). */
+  stage.setPower = level => {
+    stage.power = level;
+    const sky = stage.sky;
+    hemi.intensity = (sky.sun ? 1.6 : 1.1) * (0.12 + 0.88 * level);
+    sun.intensity = 2.2 * (0.05 + 0.95 * level);
+    lamp.intensity = sky.lamp * level;
+    rim.intensity = 0.8 * (0.5 + 0.5 * level);
+    scene.background = new THREE.Color(sky.bg).lerp(new THREE.Color(0x05070d), 1 - level);
+  };
+  return stage;
+}
+
+function addThings(stage) {
+  return ['clock', 'phone', 'cup', 'book', 'bag'].map(k => {
+    const t = busyThing(k);
+    t.visible = false;
+    stage.scene.add(t);
+    return t;
+  });
+}
+
+/** Small things whirl around a busy head. */
+function whirl(things, t, centerX) {
+  things.forEach((thing, i) => {
+    const a = t * 1.3 + (i / things.length) * Math.PI * 2;
+    thing.visible = true;
+    thing.position.set(Math.cos(a) * 0.9 + centerX * 0.5, 1.4 + 0.16 * Math.sin(t * 2 + i), Math.sin(a) * 0.45 + 0.3);
+    thing.rotation.set(t * 0.7 + i, t + i, 0);
+    if (thing.userData.spin) thing.userData.spin.rotation.z = -t * 6;
+    thing.scale.setScalar(0.6 + 0.4 * ease(seg(t, 0.1 * i, 0.1 * i + 0.6)));
+  });
+}
+
+/** Busy walking back and forth, then stopping to think. */
+function busyDay(p, t, stopAt) {
+  if (t < stopAt) {
+    p.root.position.x = 0.45 * Math.sin(t * 1.6);
+    p.root.rotation.y = Math.cos(t * 1.6) > 0 ? 0.9 : -0.9;
+    const swing = Math.sin(t * 9);
+    p.legL.rotation.x = 0.4 * swing;
+    p.legR.rotation.x = -0.4 * swing;
+    moves.busy(p, t);
+  } else {
+    p.root.rotation.y = lerp(p.root.rotation.y, 0, 0.1);
+    p.setMood('worried');
+    moves.think(p, t, stopAt, 99);
+  }
+}
+
+/** A phone floating in front, ringing between a and b. */
+function ringPhone(phone, t, a, b, { x = 0.35, y = 1.35, scale = 0.5 } = {}) {
+  phone.visible = true;
+  phone.scale.setScalar(scale * ease(seg(t, a - 0.3, a + 0.1)) + 0.001);
+  phone.position.set(x, y + 0.04 * Math.sin(t * 2), 0.5);
+  const ringing = t > a && t < b;
+  phone.rotation.set(-0.08, -0.2, ringing ? 0.09 * Math.sin(t * 38) : 0);
+  phone.userData.rings.forEach((ring, i) => {
+    const k = (t * 0.9 + i / 3) % 1;
+    ring.scale.setScalar(1 + k * 0.6);
+    ring.material.opacity = ringing ? 0.5 * (1 - k) : 0;
+  });
+}
+
+const AARAV = { kind: 'kid' };
+const MOM = { kind: 'mom', skinColor: 0xe9b48f, topColor: 0xc95c7a, hairColor: 0x3b2620 };
+
+function cast(stage, spec) {
+  const p = makePerson(spec);
+  p.root.position.set(-9, 0, 0);
+  stage.scene.add(p.root);
+  return p;
+}
+
+// The art school story.
+const B = makeStage({ street: 'CITY ART SCHOOL' });
+B.aarav = cast(B, AARAV);
+B.mom = cast(B, MOM);
+B.phone = makePhone();
+B.drawing = makeDrawing();
+B.closed = makeBoard(['ADMISSIONS', 'Closed on 8 March'], '#b71c1c');
+B.confirmed = makeBoard(['ADMITTED ✓', 'Welcome, Aarav!'], '#2e7d32');
+B.calendar = makeCalendar([
+  ['NOV', '1', 'Opens 1 March'],
+  ['DEC', '1', ''],
+  ['JAN', '1', ''],
+  ['FEB', '1', ''],
+  ['MAR', '1', 'Admissions open'],
+  ['MAR', '10', 'Too late'],
+]);
+B.confetti = makeConfetti(90);
+B.things = addThings(B);
+B.scene.add(B.phone, B.drawing, B.closed, B.confirmed, B.calendar, B.confetti);
+
+B.calendar.position.set(1.05, 1.9, -2.15);
+
+// Melo's arrival.
+const M = makeStage();
+M.aarav = cast(M, AARAV);
+M.mom = cast(M, MOM);
+M.melo = new THREE.Group();
+M.sparkles = makeSparkles();
+M.scene.add(M.melo, M.sparkles);
+
+// The finale.
+const F = makeStage();
+F.aarav = cast(F, AARAV);
+F.mom = cast(F, MOM);
+F.melo = new THREE.Group();
+F.confetti = makeConfetti(160);
+F.scene.add(F.melo, F.confetti);
+
+const PEOPLE = [B.aarav, B.mom, M.aarav, M.mom, F.aarav, F.mom];
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
-const satya = new THREE.Group();
-scene.add(satya);
-let satyaModel = null;
-(function loadSatya() {
+(function loadMelo() {
   const xhr = new XMLHttpRequest();
   xhr.open('GET', '../../models/model.glb');
   xhr.responseType = 'arraybuffer';
@@ -776,7 +995,6 @@ let satyaModel = null;
       const center = box.getCenter(new THREE.Vector3());
       const k = 1.1 / size.y;
       model.scale.setScalar(k);
-      // Stand it on the floor, centered on its own middle.
       model.position.set(-center.x * k, -box.min.y * k, -center.z * k);
       model.traverse(o => {
         if (o.isMesh) {
@@ -784,288 +1002,370 @@ let satyaModel = null;
           o.receiveShadow = true;
         }
       });
-      satya.add(model);
-      satyaModel = model;
+      M.melo.add(model);
+      F.melo.add(model.clone(true));
     });
   };
   xhr.send();
 })();
 
-// ---- Speech bubbles -------------------------------------------------------------------
+// ---- Speech bubbles and panel labels --------------------------------------------------------
 
 const bubbleLayer = document.getElementById('bubbles');
-const bubbles = [];
+let bubbles = [];
 
-/** A bubble pinned above `who`'s head from `at` seconds into the scene. */
-function say(who, text, at, { thought = false, until = Infinity } = {}) {
+/** A bubble pinned above `who` (a person, or Melo's group) in `stage`, from `at` seconds. */
+function say(stage, who, text, at, { thought = false, until = Infinity, gold = false } = {}) {
   const el = document.createElement('div');
-  el.className = `bubble${thought ? ' thought' : ''}${who === mom || who === satya ? ' gold' : ''}`;
+  el.className = `bubble${thought ? ' thought' : ''}${gold ? ' gold' : ''}${stage.view && stage.view.small ? ' small' : ''}`;
   el.textContent = text;
   bubbleLayer.appendChild(el);
-  bubbles.push({ el, who, at, until });
+  bubbles.push({ el, stage, who, at, until });
 }
 
-function clearBubbles() {
-  bubbles.length = 0;
+function clearOverlay() {
+  bubbles = [];
   bubbleLayer.innerHTML = '';
 }
 
+/** The little title chip at the top-left of each panel. */
+function label(stage, text) {
+  const el = document.createElement('div');
+  el.className = 'panel-label';
+  el.textContent = text;
+  el.style.left = '12px';
+  el.style.top = `${stage.view.y + 8}px`;
+  bubbleLayer.appendChild(el);
+  const line = document.createElement('div');
+  line.className = 'panel-line';
+  line.style.top = `${stage.view.y + stage.view.h + GAP / 2}px`;
+  bubbleLayer.appendChild(line);
+}
+
 const anchor = new THREE.Vector3();
+const lift = new THREE.Vector3(0, 0.36, 0);
+/** Dims a panel that is waiting its turn, with a short note on it. */
+function dim(stage, text) {
+  const el = document.createElement('div');
+  el.className = 'panel-dim';
+  el.style.top = `${stage.view.y}px`;
+  el.style.height = `${stage.view.h}px`;
+  el.innerHTML = `<span>${text}</span>`;
+  bubbleLayer.appendChild(el);
+}
+
 function placeBubbles(t) {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
   for (const b of bubbles) {
     const on = t >= b.at && t < b.until;
     b.el.classList.toggle('on', on);
     if (!on) continue;
-    if (b.who === satya) anchor.set(satya.position.x, satya.position.y + 1.25, satya.position.z);
-    else b.who.head.getWorldPosition(anchor).add(new THREE.Vector3(0, 0.38, 0));
-    anchor.project(camera);
-    const x = (anchor.x * 0.5 + 0.5) * w;
-    const y = (-anchor.y * 0.5 + 0.5) * h;
+    const v = b.stage.view;
+    if (b.who.isGroup) anchor.set(b.who.position.x, b.who.position.y + 1.2, b.who.position.z);
+    else b.who.head.getWorldPosition(anchor).add(lift);
+    anchor.project(b.stage.camera);
+    const x = (anchor.x * 0.5 + 0.5) * v.w;
+    const y = (-anchor.y * 0.5 + 0.5) * v.h;
     const bw = b.el.offsetWidth;
-    const left = Math.min(Math.max(x - bw / 2, 10), w - bw - 10);
-    b.el.style.transform = `translate(${left}px, ${Math.max(y - b.el.offsetHeight, 8)}px)`;
+    const bh = b.el.offsetHeight;
+    const left = Math.min(Math.max(x - bw / 2, 10), v.w - bw - 10);
+    const top = Math.min(Math.max(y - bh, 30), v.h - bh - 8);
+    b.el.style.transform = `translate(${left}px, ${v.y + top}px)`;
     b.el.style.setProperty('--tail', `${Math.min(Math.max(x - left, 18), bw - 18)}px`);
   }
 }
 
-// ---- Scenes -----------------------------------------------------------------------------
+// ---- Scenes ---------------------------------------------------------------------------------
+
+const NIGHT = { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 6 };
+const EVENING = { bg: 0x241b33, window: 0x5a3b6e, moon: false, lamp: 3 };
+const DUSK = { bg: 0x1d2236, window: 0x1b2a52, moon: true, lamp: 5 };
+const MORNING = { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 };
+const MAGIC = { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 };
+const DAY = { bg: 0x9fd0ff, window: 0xbfe3ff, sun: true, lamp: 0 };
+
+/** Panel camera: Aarav and Mom side by side, framed from the knees up. */
+const PANEL_CAM = { x: 0, y: 1.15, z: 4.4, look: [0, 1.25, 0], width: 2.9 };
 
 /**
- * Each scene sets things up once, then poses everyone for time t (seconds).
- * `place` picks the room: the living room (sofa) or Aarav's bedroom (bed).
+ * A scene is either three panels (`panels`: one entry per story, each with
+ * its own setup and update) or one full-screen stage.
  */
+/** Moves a stage outside the school (or back home) at most once per scene. */
+function goOutside(stage, sky) {
+  if (stage.outside) return false;
+  stage.outside = true;
+  stage.light(sky);
+  stage.place('street');
+  return true;
+}
+
+/** A hand-held prop (the form, the drawing) follows a person's right hand. */
+function inHand(prop, p, raise = 0) {
+  prop.visible = true;
+  prop.position.set(p.root.position.x + 0.28, p.hips.position.y + 0.45 + raise, p.root.position.z + 0.3);
+  prop.rotation.set(-0.15, -0.3, 0.05);
+}
+
+/** Full-screen camera for Aarav and Mom side by side. */
+const STORY_CAM = { x: 0, y: 1.1, z: 4.6, look: [0, 1.15, 0], width: 2.8 };
+
+/** Each scene sets things up once, then poses everyone for time t (seconds). */
 const SCENES = [
   {
-    // The night before the exam: Aarav asks Mom to wake him at 6.
-    place: 'living',
-    sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 6 },
-    camera: { x: 0, y: 1.05, z: 4.6, look: [0, 1.1, 0], width: 2.6 },
+    // Aarav shows Mom his drawing: admissions open on 1 March, four months away.
+    stage: B,
+    sky: DUSK,
+    camera: STORY_CAM,
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      mom.root.position.set(0.7, 0, 0);
-      mom.root.rotation.y = -0.45;
-      wallClock.userData.set(21, 0);
-      say(aarav, 'Mom, my final exam is tomorrow! Please wake me up at 6, so I can revise.', 1.4, { until: 4.3 });
-      say(mom, 'Don’t worry, beta. I’ll wake you at 6!', 4.4);
+      B.aarav.setMood('happy');
+      B.mom.setMood('happy');
+      B.mom.root.position.set(0.65, 0, 0);
+      B.mom.root.rotation.y = -0.45;
+      B.calendar.userData.show(0);
+      say(B, B.aarav, 'Mom, the art school admissions open on 1 March! That’s 4 months away.', 1.4, { until: 5.6 });
+      say(B, B.mom, 'Four months? I’ll remember, don’t worry.', 5.8, { gold: true });
     },
     update(t) {
-      moves.walk(aarav, t, 0, 1.4, -2.6, -0.55, 0.45);
-      moves.wave(aarav, t, 1.3, 2.5, 'L');
-      moves.talk(aarav, t, 1.5, 4.0);
-      moves.nod(mom, t, 2.4, 3.6);
-      moves.talk(mom, t, 4.5, 6.2);
-      moves.wave(mom, t, 6.0, 7.2, 'R');
+      moves.walk(B.aarav, t, 0, 1.3, -2.4, -0.55, 0.5);
+      const raise = bump(seg(t, 2.6, 5.0));
+      inHand(B.drawing, B.aarav, 0.25 * raise);
+      moves.hold(B.aarav, 0.8 + 0.4 * raise);
+      moves.talk(B.aarav, t, 1.5, 5.2);
+      moves.clap(B.mom, t, 3.2, 4.8);
+      moves.talk(B.mom, t, 5.9, 7.8);
+      moves.jump(B.aarav, t, 8.0, 9.0);
     },
   },
   {
-    // That night Mom has endless chores, the clock races, and 6 AM slips away.
-    place: 'living',
-    sky: { bg: 0x241b33, window: 0x5a3b6e, moon: true, lamp: 3 },
-    camera: { x: 0, y: 1.2, z: 5.0, look: [0, 1.3, 0], width: 2.6 },
-    pan: -0.35,
+    // Four months fly by, Mom forgets, and the admissions close.
+    stage: B,
+    sky: EVENING,
+    camera: STORY_CAM,
     setup() {
-      mom.setMood('happy');
-      mom.root.position.set(0, 0, 0);
-      aarav.root.position.set(-9, 0, 0);
-      say(mom, 'Wake Aarav at 6… at 6…', 0.6, { thought: true, until: 3.2 });
-      say(mom, '…was it 6, or 7? 🤔', 3.4, { thought: true });
+      B.outside = false;
+      B.mom.setMood('happy');
+      B.mom.root.position.set(0, 0, 0);
+      B.calendar.userData.show(0);
+      say(B, B.mom, 'Admissions… March… I’ll remember.', 0.8, { thought: true, until: 4.6 });
+      say(B, B.aarav, 'Admissions closed on 8 March… we missed it. 😞', 5.8, { until: 8.8 });
+      say(B, B.mom, 'I’m so sorry, beta… I forgot.', 9.0, { gold: true });
     },
     update(t) {
-      // Hours fly by on the wall clock.
-      const minutes = 21 * 60 + 360 * ease(seg(t, 0, 5.5));
-      wallClock.userData.set(Math.floor(minutes / 60), minutes % 60);
-      if (t < 3.2) {
-        const dir = Math.sin(t * 1.6);
-        mom.root.position.x = 0.5 * dir;
-        mom.root.rotation.y = Math.cos(t * 1.6) > 0 ? 0.9 : -0.9;
-        const swing = Math.sin(t * 9);
-        mom.legL.rotation.x = 0.4 * swing;
-        mom.legR.rotation.x = -0.4 * swing;
-        moves.busy(mom, t);
-      } else {
-        mom.root.rotation.y = lerp(mom.root.rotation.y, 0, 0.1);
-        mom.setMood('worried');
-        moves.think(mom, t, 3.2, 99);
+      if (t < 4.7) {
+        tearPages(B.calendar, t);
+        busyDay(B.mom, t, 99);
+        whirl(B.things, t, B.mom.root.position.x);
+        return;
       }
-      things.forEach((thing, i) => {
-        const a = t * 1.3 + (i / things.length) * Math.PI * 2;
-        thing.visible = true;
-        thing.position.set(Math.cos(a) * 0.95 + mom.root.position.x * 0.5, 1.45 + 0.18 * Math.sin(t * 2 + i), Math.sin(a) * 0.48 + 0.3);
-        thing.rotation.set(t * 0.7 + i, t + i, 0);
-        if (thing.userData.spin) thing.userData.spin.rotation.z = -t * 6;
-        thing.scale.setScalar(0.6 + 0.4 * ease(seg(t, 0.1 * i, 0.1 * i + 0.6)));
-      });
+      if (goOutside(B, DAY)) {
+        B.things.forEach(th => (th.visible = false));
+        B.aarav.setMood('happy');
+        B.mom.setMood('happy');
+        B.aarav.root.position.set(-0.55, 0, 0.3);
+        B.aarav.root.rotation.y = 0.3;
+        B.mom.root.position.set(-1.2, 0, 0.1);
+        B.mom.root.rotation.y = 0.4;
+        B.closed.visible = true;
+      }
+      const k = t - 4.7;
+      B.closed.position.set(0.65, lerp(3.4, 1.6, ease(seg(k, 0.2, 0.7))) + 0.04 * bump(seg(k, 0.7, 1.0)), 0.1);
+      inHand(B.drawing, B.aarav);
+      moves.hold(B.aarav, 0.7);
+      if (k > 0.9) {
+        B.aarav.setMood('sad');
+        moves.sad(B.aarav, ease(seg(k, 0.9, 1.6)));
+      }
+      if (k > 4.0) B.mom.setMood('sad');
+      moves.think(B.mom, t, 8.8, 99);
     },
   },
   {
-    // The morning: Aarav wakes at 8:30 and panics; Mom realizes she forgot.
-    place: 'bedroom',
-    sky: { bg: 0x3a4a6e, window: 0xbfe3ff, sun: true, lamp: 0 },
-    camera: { x: 0, y: 1.1, z: 4.8, look: [0, 1.1, 0], width: 2.8 },
+    // Melo arrives, and says what Memo does that an alarm can't.
+    stage: M,
+    sky: MAGIC,
+    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.0, 0], width: 3.4 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('surprised');
-      mom.root.position.set(2.6, 0, 0.1);
-      wallClock.userData.set(8, 30);
-      say(aarav, 'It’s 8:30! I’m late for my exam! 😱', 2.0, { until: 4.3 });
-      say(mom, 'Oh no… I forgot to wake you!', 4.4);
+      M.aarav.setMood('sad');
+      M.mom.setMood('sad');
+      M.aarav.root.position.set(-1.05, 0, 0.1);
+      M.aarav.root.rotation.y = 0.55;
+      M.mom.root.position.set(1.25, 0, -0.1);
+      M.mom.root.rotation.y = -0.55;
+      say(M, M.melo, 'Hi, I’m Melo! An alarm only knows a time. Memo remembers the date, even months ahead.', 2.0, { gold: true });
     },
     update(t) {
-      // Late morning sun already pours in; the Zzz float until he jolts awake.
-      sunbeam.visible = true;
-      sunbeam.userData.update(t, 0.9);
-      zzz.visible = t < 1.6;
-      if (zzz.visible) zzz.userData.update(t, aarav.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.1, 0.25, 0)));
-      if (t > 1.6) aarav.setMood('surprised');
-      moves.sleepAndWake(aarav, t, 1.6, -0.5);
-      moves.panic(aarav, t, 2.6, 7.5, -1.0, 0.0);
-      moves.walk(mom, t, 3.4, 4.4, 2.6, 0.9, -0.5);
-      if (t > 4.2) mom.setMood('sad');
-      moves.think(mom, t, 4.5, 99);
-      moves.talk(mom, t, 4.5, 6.2);
-    },
-  },
-  {
-    // Melo arrives.
-    place: 'living',
-    sky: { bg: 0x161a33, window: 0x3a2a6e, moon: true, lamp: 2 },
-    camera: { x: 0, y: 1.0, z: 5.0, look: [0, 1.15, 0], width: 3.4 },
-    push: 0.6,
-    setup() {
-      aarav.setMood('surprised');
-      mom.setMood('surprised');
-      aarav.root.position.set(-1.25, 0, 0.1);
-      aarav.root.rotation.y = 0.6;
-      mom.root.position.set(1.3, 0, 0.1);
-      mom.root.rotation.y = -0.6;
-      say(satya, 'Hi! I’m Melo. Tell Memo once, and I’ll remember it for you.', 2.0);
-    },
-    update(t) {
-      // Drops in with a bounce, spins once, then wiggles hello.
       const drop = seg(t, 0, 0.9);
       const bounce = drop < 1 ? (1 - ease(drop)) * 3 : Math.abs(Math.sin((t - 0.9) * 9)) * 0.25 * Math.max(0, 1 - (t - 0.9) * 1.6);
-      satya.position.set(0, bounce, 0.3);
-      satya.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0));
-      satya.rotation.z = t > 2 ? 0.2 * Math.sin((t - 2) * 7) * Math.max(0, 1 - (t - 2) * 0.25) : 0;
-      satya.visible = true;
-      sparkles.visible = true;
-      sparkles.rotation.y = t * 0.3;
-      sparkles.material.opacity = 0.9 * seg(t, 0.6, 1.4);
-      if (t > 1.2) {
-        aarav.setMood('happy');
-        mom.setMood('happy');
+      M.melo.visible = true;
+      M.melo.position.set(0.15, bounce, 0.4);
+      M.melo.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0)) - 0.3;
+      M.melo.rotation.z = t > 2 ? 0.2 * Math.sin((t - 2) * 7) * Math.max(0, 1 - (t - 2) * 0.25) : 0;
+      M.sparkles.visible = true;
+      M.sparkles.rotation.y = t * 0.3;
+      M.sparkles.material.opacity = 0.9 * seg(t, 0.6, 1.4);
+      for (const [p, i] of [
+        [M.aarav, 0],
+        [M.mom, 1],
+      ]) {
+        if (t > 1.0 + i * 0.2) p.setMood('surprised');
+        if (t > 2.6 + i * 0.3) p.setMood('happy');
       }
-      moves.jump(aarav, t, 1.3, 2.4);
-      moves.clap(mom, t, 1.4, 3.0);
+      moves.jump(M.aarav, t, 2.8, 4.0);
+      moves.clap(M.mom, t, 3.0, 4.6);
     },
   },
   {
-    // Before the next exam: the alarm rings at 6, Aarav is up on time.
-    place: 'bedroom',
-    sky: { bg: 0x2c3558, window: 0xffc78a, sun: true, lamp: 2 },
-    camera: { x: 0, y: 1.15, z: 4.9, look: [0, 1.2, 0], width: 3.0 },
-    pan: 0.25,
+    // This time Mom saves it in Memo, four months ahead; on 1 March it rings.
+    stage: B,
+    sky: MORNING,
+    camera: STORY_CAM,
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      mom.root.position.set(1.15, 0, 0);
-      mom.root.rotation.y = -0.5;
-      wallClock.userData.set(6, 0);
-      say(aarav, 'Up on time! Thank you, Memo! 🎉', 3.6);
+      B.outside = false;
+      B.aarav.setMood('happy');
+      B.mom.setMood('happy');
+      B.aarav.root.position.set(-0.6, 0, 0);
+      B.aarav.root.rotation.y = 0.4;
+      B.mom.root.position.set(0.55, 0, 0);
+      B.mom.root.rotation.y = -0.4;
+      B.calendar.userData.show(0);
+      B.phone.userData.draw({ type: 'saved', emoji: '🎨', title: 'Art school admissions', date: '1 March · 9:00 AM', sub: 'In 4 months · Memo will remind you' });
+      B.phone.userData.screen = 'saved';
+      say(B, B.mom, 'Saved in Memo, for 1 March. Done! ✅', 1.2, { gold: true, until: 3.4 });
+      say(B, B.aarav, 'I got in! Thank you, Mom! 🎨', 10.4);
     },
     update(t) {
-      // Dawn: the room starts dark with the bedside lamp on, then the sun comes up.
-      const dawn = ease(seg(t, 0.8, 3.2));
-      hemi.intensity = lerp(0.35, 1.6, dawn);
-      sun.intensity = lerp(0.2, 2.2, dawn);
-      bedsideLight.intensity = 2.2 * (1 - dawn);
-      room.userData.window.color.set(new THREE.Color(0x1b2a52).lerp(new THREE.Color(0xffc78a), dawn));
-      room.userData.sky.position.y = lerp(1.65, 2.15, dawn);
-      sunbeam.visible = dawn > 0.05;
-      sunbeam.userData.update(t, 0.85 * dawn);
-      zzz.visible = t < 1.4;
-      if (zzz.visible) zzz.userData.update(t, aarav.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.1, 0.25, 0)));
-      phone.visible = true;
-      const ringing = t > 0.5 && t < 2.6;
-      const appear = ease(seg(t, 0, 0.6));
-      // The phone lifts off the bedside table as it rings.
-      phone.position.set(lerp(0.95, 0.35, appear), lerp(0.55, 1.55, appear) + 0.05 * Math.sin(t * 2), lerp(-1.25, 0.5, appear));
-      phone.scale.setScalar((0.25 + 0.75 * appear) * (1 - 0.35 * ease(seg(t, 2.8, 3.4))));
-      if (t > 2.8) {
-        phone.position.x = lerp(0.35, 0.9, ease(seg(t, 2.8, 3.4)));
-        phone.position.y = lerp(1.55, 2.1, ease(seg(t, 2.8, 3.4)));
+      inHand(B.drawing, B.aarav);
+      moves.hold(B.aarav, 0.7);
+      if (t < 3.4) {
+        // Mom saves the reminder months ahead.
+        // (No ringing here: it appears at 0.3 s and just shows the saved reminder.)
+        ringPhone(B.phone, t, 0.3, 0.3, { x: 0.0, y: 1.3, scale: 0.95 * (1 - ease(seg(t, 3.0, 3.4))) + 0.001 });
+        moves.talk(B.mom, t, 1.3, 3.0);
+        return;
       }
-      phone.rotation.set(-0.08, -0.15, ringing ? 0.09 * Math.sin(t * 38) : 0);
-      phone.userData.rings.forEach((ring, i) => {
-        const k = (t * 0.9 + i / 3) % 1;
-        ring.scale.setScalar(1 + k * 0.6);
-        ring.material.opacity = ringing ? 0.5 * (1 - k) : 0;
-      });
-      moves.sleepAndWake(aarav, t, 1.4, -0.7);
-      moves.stretch(aarav, t, 2.3, 3.3);
-      moves.jump(aarav, t, 3.4, 5.0);
-      moves.talk(aarav, t, 5.0, 6.8);
-      moves.clap(mom, t, 3.5, 5.5);
-      confetti.visible = t > 3.4;
-      if (confetti.visible) confetti.userData.update(t - 3.4);
+      if (t < 5.6) {
+        // The months fly by…
+        B.phone.visible = false;
+        const p = Math.min((t - 3.4) / 0.5, 4);
+        B.calendar.userData.show(Math.min(Math.floor(p) + 1, 4), p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
+        return;
+      }
+      if (t < 8.8) {
+        // …and on 1 March, Memo rings.
+        if (B.phone.userData.screen !== 'ring') {
+          B.phone.userData.draw({ type: 'ring', time: '9:00', date: '1 March', emoji: '🎨', title: 'Art school admissions', sub: 'Open today · apply now' });
+          B.phone.userData.screen = 'ring';
+        }
+        B.calendar.userData.show(4);
+        ringPhone(B.phone, t, 5.9, 7.8, { x: 0.0, y: 1.3, scale: 0.95 * (1 - ease(seg(t, 8.3, 8.75))) + 0.001 });
+        if (t > 6.2) moves.nod(B.mom, t, 6.2, 7.4);
+        return;
+      }
+      if (goOutside(B, DAY)) {
+        B.phone.visible = false;
+        B.confirmed.visible = true;
+        B.mom.root.position.set(-1.1, 0, 0.1);
+        B.mom.root.rotation.y = 0.4;
+      }
+      const k = t - 8.8;
+      B.confirmed.position.set(0.65, lerp(3.4, 1.6, ease(seg(k, 0.1, 0.6))), 0.1);
+      inHand(B.drawing, B.aarav, 0.25 * bump(seg(k, 0.8, 2.2)));
+      moves.jump(B.aarav, t, 9.6, 10.8);
+      moves.clap(B.mom, t, 9.8, 11.6);
+      B.confetti.visible = k > 0.8;
+      if (B.confetti.visible) B.confetti.userData.update(k - 0.8);
     },
   },
   {
-    // Everyone says hello: the closing shot behind the app's feature list.
-    place: 'living',
-    sky: { bg: 0x2a2140, window: 0x2b4a8a, moon: true, lamp: 5 },
-    camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.5 },
+    // Aarav, Mom and Melo wave: the closing shot behind the app's feature list.
+    stage: F,
+    sky: NIGHT,
+    camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.4 },
     setup() {
-      aarav.setMood('happy');
-      mom.setMood('happy');
-      aarav.root.position.set(-1.1, 0, 0.3);
-      aarav.root.rotation.y = 0.2;
-      mom.root.position.set(1.1, 0, 0);
-      mom.root.rotation.y = -0.2;
+      F.aarav.setMood('happy');
+      F.mom.setMood('happy');
+      F.aarav.root.position.set(-1.0, 0, 0.3);
+      F.aarav.root.rotation.y = 0.25;
+      F.mom.root.position.set(1.1, 0, 0);
+      F.mom.root.rotation.y = -0.25;
     },
     update(t) {
-      satya.visible = true;
-      satya.position.set(0, Math.abs(Math.sin(t * 2.2)) * 0.12, 0.4);
-      satya.rotation.z = 0.12 * Math.sin(t * 3);
-      moves.wave(aarav, t % 3, 0, 2.2, 'L');
-      moves.wave(mom, (t + 1.2) % 3, 0, 2.2, 'R');
-      confetti.visible = true;
-      confetti.userData.update(t);
+      F.melo.visible = true;
+      F.melo.position.set(0, Math.abs(Math.sin(t * 2.2)) * 0.12, 0.45);
+      F.melo.rotation.z = 0.12 * Math.sin(t * 3);
+      moves.wave(F.aarav, t % 3, 0, 2.2, 'L');
+      moves.wave(F.mom, (t + 1.2) % 3, 0, 2.2, 'R');
+      F.confetti.visible = true;
+      F.confetti.userData.update(t);
     },
   },
 ];
 
+/** A calendar page tears off about every second, as weeks go by. */
+function tearPages(calendar, t) {
+  const p = Math.min(t / 1.05, 4.999);
+  calendar.userData.show(Math.floor(p) + 1, p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
+}
+
+// ---- Playing ------------------------------------------------------------------------------
+
 let current = -1;
 let startedAt = 0;
+
+function resetStage(stage) {
+  for (const key of ['phone', 'drawing', 'closed', 'confirmed', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
+  stage.outside = false;
+  if (stage.things) stage.things.forEach(th => (th.visible = false));
+  if (stage.phone) stage.phone.userData.paid = undefined;
+  if (stage.calendar) stage.calendar.userData.show(0);
+}
+
+function layout() {
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  renderer.setSize(w, h, false);
+  const s = SCENES[current];
+  if (!s) return;
+  const fit = (stage, cam, view) => {
+    stage.view = view;
+    stage.camera.aspect = view.w / view.h;
+    const halfFov = THREE.MathUtils.degToRad(stage.camera.fov / 2);
+    const needed = cam.width / 2 / (Math.tan(halfFov) * stage.camera.aspect);
+    stage.base = { ...cam, z: Math.max(cam.z, needed) };
+    stage.scene.fog.near = stage.base.z + 1.5;
+    stage.scene.fog.far = stage.base.z + 12;
+    stage.camera.updateProjectionMatrix();
+  };
+  if (s.panels) {
+    const bandH = (h - TOP - BOTTOM - GAP * (s.panels.length - 1)) / s.panels.length;
+    s.panels.forEach((panel, i) => fit(panel.stage, PANEL_CAM, { x: 0, y: TOP + i * (bandH + GAP), w, h: bandH, small: true }));
+  } else {
+    fit(s.stage, s.camera, { x: 0, y: 0, w, h, small: false });
+  }
+}
 
 function show(index) {
   const s = SCENES[index];
   if (!s) return;
   current = index;
   startedAt = performance.now();
-  clearBubbles();
-  // Hide the extras; each scene turns on what it needs.
-  satya.visible = false;
-  sparkles.visible = false;
-  phone.visible = false;
-  confetti.visible = false;
-  things.forEach(th => (th.visible = false));
-  aarav.root.rotation.set(0, 0, 0);
-  mom.root.rotation.set(0, 0, 0);
-  aarav.asleep = false;
-  mom.asleep = false;
-  const bedroom = s.place === 'bedroom';
-  bed.visible = bedroom;
-  decor.visible = bedroom;
-  zzz.visible = false;
-  sunbeam.visible = false;
-  bedsideLight.intensity = 0;
-  room.userData.sofa.visible = !bedroom;
-  wallClock.userData.set(9, 0);
-  s.setup();
+  clearOverlay();
+  for (const p of PEOPLE) {
+    p.root.position.set(-9, 0, 0);
+    p.root.rotation.set(0, 0, 0);
+    p.root.visible = true;
+  }
+  const entries = s.panels ?? [s];
+  for (const e of entries) {
+    resetStage(e.stage);
+    e.stage.light(e.sky);
+  }
+  layout();
+  for (const e of entries) {
+    if (s.panels) label(e.stage, e.label);
+    e.setup();
+    if (e.still) dim(e.stage, e.still);
+  }
   // Each new scene fades up from dark.
   canvas.style.transition = 'none';
   canvas.style.opacity = '0';
@@ -1073,56 +1373,41 @@ function show(index) {
     canvas.style.transition = 'opacity 450ms ease';
     canvas.style.opacity = '1';
   });
-  scene.background = new THREE.Color(s.sky.bg);
-  scene.fog.color.set(s.sky.bg);
-  room.userData.window.color.set(s.sky.window);
-  room.userData.sky.material.color.set(s.sky.sun ? 0xffe9a8 : 0xf3dca6);
-  room.userData.sky.scale.setScalar(s.sky.sun ? 1.5 : 1);
-  room.userData.sky.visible = Boolean(s.sky.moon || s.sky.sun);
-  lamp.intensity = s.sky.lamp;
-  hemi.intensity = s.sky.sun ? 1.6 : 1.1;
-  fitCamera();
 }
 
-function fitCamera() {
-  const s = SCENES[current];
-  if (!s) return;
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  // Pull back far enough that the scene's width always fits, even on narrow phones.
-  const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
-  const needed = s.camera.width / 2 / (Math.tan(halfFov) * camera.aspect);
-  camera.userData.base = { ...s.camera, z: Math.max(s.camera.z, needed) };
-  // The haze starts just behind the cast, however far back the camera sits.
-  scene.fog.near = camera.userData.base.z + 1.5;
-  scene.fog.far = camera.userData.base.z + 12;
-  camera.updateProjectionMatrix();
-}
-
-window.addEventListener('resize', fitCamera);
+window.addEventListener('resize', layout);
 window.story = { show };
+
+function draw(stage, t) {
+  const v = stage.view;
+  const h = canvas.clientHeight || window.innerHeight;
+  const base = stage.base;
+  const drift = reduced ? 0 : Math.sin(t * 0.35);
+  stage.camera.position.set(base.x + 0.2 * drift, base.y + 0.04 * drift, base.z - (reduced ? 0 : 0.2 * seg(t, 0, 8)));
+  stage.camera.lookAt(base.look[0], base.look[1], base.look[2]);
+  // WebGL counts y from the bottom of the canvas.
+  const y = h - (v.y + v.h);
+  renderer.setViewport(v.x, y, v.w, v.h);
+  renderer.setScissor(v.x, y, v.w, v.h);
+  renderer.render(stage.scene, stage.camera);
+}
 
 function frame(now) {
   requestAnimationFrame(frame);
   if (current < 0) return;
   const t = (now - startedAt) / 1000;
   const s = SCENES[current];
-  rest(aarav, now / 1000);
-  rest(mom, now / 1000 + 1.3);
-  s.update(t);
-  // A slow, gentle drift of the camera keeps every shot alive.
-  const base = camera.userData.base;
-  const drift = reduced ? 0 : Math.sin(t * 0.35);
-  // A slow dolly in (and a sideways glide, where a scene asks for one).
-  const move = reduced ? 0 : ease(seg(t, 0, 7));
-  const push = s.push ?? 0.35;
-  const pan = s.pan ?? 0;
-  camera.position.set(base.x + 0.15 * drift + pan * move, base.y + 0.04 * drift, base.z - push * move);
-  camera.lookAt(base.look[0], base.look[1], base.look[2]);
-  if (satyaModel && satya.visible) satyaModel.rotation.y = 0;
-  renderer.render(scene, camera);
+  PEOPLE.forEach((p, i) => rest(p, now / 1000 + i * 0.7));
+  // Each panel's background sets the clear color; reset it, so the space
+  // around the panels stays see-through.
+  renderer.setClearColor(0x000000, 0);
+  renderer.setScissorTest(false);
+  renderer.clear();
+  renderer.setScissorTest(true);
+  for (const e of s.panels ?? [s]) {
+    e.update(t);
+    draw(e.stage, t);
+  }
   placeBubbles(t);
 }
 

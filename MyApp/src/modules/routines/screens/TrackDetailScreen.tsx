@@ -212,7 +212,12 @@ export function TrackDetailScreen() {
         <Skeleton height={160} rounded={20} style={styles.section} />
       ) : null}
 
-      <Sheet visible={Boolean(sheet)} onClose={() => setSheet(null)} title={sheet?.mode === 'edit' ? 'Edit task' : 'New task'}>
+      <Sheet
+        visible={Boolean(sheet)}
+        onClose={() => setSheet(null)}
+        title={sheet?.mode === 'edit' ? 'Edit task' : 'New task'}
+        placement="top"
+      >
         <TextField
           label="Task"
           value={taskName}
