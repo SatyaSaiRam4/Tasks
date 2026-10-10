@@ -88,7 +88,6 @@ export function ProfileScreen() {
           <SectionHeader title="More" />
           <ListGroup>
             <ListRow icon="flame" title="Streak & progress" subtitle="History, milestones and calendar" onPress={() => navigation.navigate('Consistency')} />
-            <ListRow icon="award" title="Achievements" subtitle="Your badge collection" onPress={() => navigation.navigate('Achievements')} />
             <ListRow icon="users" title="Find friends" subtitle="See a friend’s streak by their User ID" onPress={() => navigation.navigate('Discover')} />
             <ListRow icon="settings" title="Settings" onPress={() => navigation.navigate('Settings')} last={!isAdmin} />
             {isAdmin ? <ListRow icon="shield" title="Admin panel" onPress={() => navigation.navigate('AdminDashboard')} last /> : null}

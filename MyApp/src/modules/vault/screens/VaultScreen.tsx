@@ -58,7 +58,8 @@ function dayHeading(key: string, todayKey: string) {
 
 /**
  * The open Vault: all notes grouped by the day they were written, or one
- * day at a time (date strip and calendar, like Reminders). The bin icon by
+ * day at a time (date strip, like Reminders). The search box and the
+ * calendar button share the top row; picking a day shows that day's notes. The bin icon by
  * the lock opens the bin: deleted notes wait there for 30 days (open one to
  * restore it or delete it for good), then the daily cleanup removes them.
  */
@@ -145,6 +146,21 @@ function UnlockedVault() {
                   autoCorrect={false}
                 />
               </View>
+            ) : null}
+            {!showDeleted ? (
+              <DatePicker
+                value={fromDateKey(day)}
+                precision="day"
+                minDate={new Date(2020, 0, 1)}
+                maxDate={new Date()}
+                onChange={(d: Date) => {
+                  setDay(toDateKey(d));
+                  setMode('date');
+                }}
+                title="Notes from which day?"
+              >
+                <CalendarButton />
+              </DatePicker>
             ) : (
               <View style={styles.binNote}>
                 <Icon name="clock" size={15} color={colors.textSecondary} />
@@ -178,16 +194,6 @@ function UnlockedVault() {
                   <Text style={styles.link}>Today</Text>
                 </Pressable>
               ) : null}
-              <DatePicker
-                value={fromDateKey(day)}
-                precision="day"
-                minDate={new Date(2020, 0, 1)}
-                maxDate={new Date()}
-                onChange={(d: Date) => setDay(toDateKey(d))}
-                title="Pick a day"
-              >
-                <CalendarButton />
-              </DatePicker>
             </View>
           </>
         ) : null}
