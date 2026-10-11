@@ -348,3 +348,16 @@ def test_vault_photos_are_encrypted_private_and_limited(client, auth, db):
     assert bad.status_code == 415
     gone = client.delete(f"{API}/vault/entries/{note['id']}/images/{image_id}", headers=vh)
     assert gone.status_code == 200 and gone.json()["images"] == []
+
+
+def test_an_open_vault_session_can_be_refreshed_but_not_without_one(client, auth):
+    vh = unlock_headers(client, auth)
+    fresh = client.post(f"{API}/vault/refresh", headers=vh)
+    assert fresh.status_code == 200 and fresh.json()["vault_token"]
+    assert client.post(f"{API}/vault/refresh", headers=auth).status_code == 403
+
+
+def test_badge_congratulations_only_move_up(client, auth):
+    assert client.get(f"{API}/users/me/settings", headers=auth).json()["badge_seen"] == -1
+    assert client.patch(f"{API}/users/me/settings", json={"badge_seen": 1}, headers=auth).json()["badge_seen"] == 1
+    assert client.patch(f"{API}/users/me/settings", json={"badge_seen": 0}, headers=auth).json()["badge_seen"] == 1

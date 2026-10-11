@@ -47,7 +47,7 @@ const STEPS: Step[] = [
   {
     tab: 'HomeTab',
     title: () => '5. Streaks earn rewards',
-    text: 'Keep your streak growing and it earns real rewards. Tap your profile picture at the top, then Wallet, to see them.',
+    text: 'Keep your streak growing and you can earn real money.',
     gesture: 'cheer',
   },
   {

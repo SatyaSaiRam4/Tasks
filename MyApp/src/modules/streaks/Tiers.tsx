@@ -1,6 +1,6 @@
-import React, { useId, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CelebrationSpec } from '../../components/Celebration';
+import React, { useCallback, useId, useState } from 'react';
+import { useCelebration } from '../../components/Celebration';
+import { useGetMeQuery, useUpdateSettingsMutation } from '../users/usersApi';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { colors, font, gradients, radius, spacing, type as t } from '../../theme';
@@ -41,52 +41,48 @@ export function tierIndex(best: number): number {
   return index;
 }
 
-const seenKey = (userId: string) => `@memo/tier_seen_${userId}`;
 const seenInMemory = new Map<string, number>();
 
 /**
- * Congratulates the user once for each badge they reach ("You reached
- * Bronze!"). The first check on a device only records the badges already
- * held, so nobody is congratulated for old news, unless the badge was
- * reached by the tick that is being checked.
+ * Congratulates the user once for each streak badge they reach ("Congrats!
+ * You've upgraded to Bronze"). Which badge was last congratulated is kept on
+ * the server (`badge_seen`), so it works the same on every device and after
+ * reinstalling, and nobody is told twice.
  */
-export async function celebrateNewTier(
-  userId: string,
-  best: number,
-  celebrate: (spec: CelebrationSpec) => void,
-  /** True when this very tick added the streak point, so a badge reached exactly now is news. */
-  justEarned = false,
-) {
-  const reached = tierIndex(best);
-  const reachedNow = justEarned && reached >= 0 && TIERS[reached].days === best;
-  let seen = seenInMemory.get(userId);
-  if (seen === undefined) {
-    const raw = await AsyncStorage.getItem(seenKey(userId)).catch(() => null);
-    seen = raw === null ? (reachedNow ? reached - 1 : reached) : Number(raw);
-    // A check that ran while this one waited may already have recorded more.
-    seen = Math.max(seen, seenInMemory.get(userId) ?? -1);
-  }
-  seenInMemory.set(userId, Math.max(seen, reached));
-  if (reached > seen) {
-    const tier = TIERS[reached];
-    const next = TIERS[reached + 1];
-    celebrate({
-      icon: 'award',
-      tone: 'primary',
-      eyebrow: 'New badge',
-      title: `You reached ${tier.name}!`,
-      subtitle: tier.reward
-        ? `${tier.reward} has been added to your Wallet.`
-        : next
-          ? `Streak ${tier.days} reached. Next: ${next.name} at ${next.days}.`
-          : `Streak ${tier.days}. The highest badge there is.`,
-      stats: [
-        { label: 'Badge', value: tier.name },
-        { label: 'Best streak', value: String(best) },
-      ],
-    });
-  }
-  AsyncStorage.setItem(seenKey(userId), String(Math.max(seen, reached))).catch(() => undefined);
+export function useBadgeCongrats() {
+  const me = useGetMeQuery();
+  const [update] = useUpdateSettingsMutation();
+  const { celebrate } = useCelebration();
+  const id = me.data?.id;
+  const serverSeen = me.data?.settings.badge_seen;
+  return useCallback(
+    (best: number) => {
+      if (!id || serverSeen === undefined) return;
+      const seen = Math.max(serverSeen, seenInMemory.get(id) ?? -1);
+      const reached = tierIndex(best);
+      if (reached <= seen) return;
+      seenInMemory.set(id, reached);
+      const tier = TIERS[reached];
+      const next = TIERS[reached + 1];
+      celebrate({
+        icon: 'award',
+        tone: 'primary',
+        eyebrow: 'Level up',
+        title: `Congrats! You’ve upgraded to ${tier.name}`,
+        subtitle: tier.reward
+          ? `Streak ${tier.days} reached, and ${tier.reward} has been added to your Wallet.`
+          : next
+            ? `Streak ${tier.days} reached. Next up: ${next.name} at ${next.days}.`
+            : `Streak ${tier.days}. The highest badge there is.`,
+        stats: [
+          { label: 'Badge', value: tier.name },
+          { label: 'Best streak', value: String(best) },
+        ],
+      });
+      update({ badge_seen: reached }).catch(() => undefined);
+    },
+    [id, serverSeen, celebrate, update],
+  );
 }
 
 export function earnedCount(best: number) {

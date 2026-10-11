@@ -557,6 +557,42 @@ function makePhone() {
       text(spec.title ?? '', 510, '700 30px sans-serif');
       text(spec.date ?? '', 555, '600 27px sans-serif', '#f3dca6');
       text(spec.sub ?? '', 680, '500 26px sans-serif', 'rgba(239,233,220,0.7)');
+    } else if (spec.type === 'vault-lock') {
+      // The Vault's PIN pad, with `spec.dots` digits entered.
+      text('🔒', 230, '120px sans-serif');
+      text('Private Vault', 320, '800 38px sans-serif');
+      text('Enter your PIN', 365, '500 26px sans-serif', 'rgba(239,233,220,0.7)');
+      for (let i = 0; i < 4; i++) {
+        c.beginPath();
+        c.arc(135 + i * 50, 450, 15, 0, Math.PI * 2);
+        c.fillStyle = i < (spec.dots ?? 0) ? '#b58cff' : 'rgba(239,233,220,0.18)';
+        c.fill();
+      }
+      text('Only you can open it', 560, '600 26px sans-serif', 'rgba(239,233,220,0.6)');
+    } else if (spec.type === 'vault') {
+      text('Private Vault', 95, '800 36px sans-serif', '#cec3f6');
+      text('🔓 Unlocked with your PIN', 140, '500 24px sans-serif', 'rgba(239,233,220,0.7)');
+      [
+        ['🏦', 'Bank details', 'Note'],
+        ['🪪', 'Our ID cards', '2 photos'],
+        ['🎙️', 'Gift ideas for Papa', 'Voice note'],
+      ].forEach(([icon, title, sub], i) => {
+        const y = 190 + i * 150;
+        c.fillStyle = 'rgba(181,140,255,0.16)';
+        roundRect(c, 30, y, 360, 126, 24);
+        c.fill();
+        c.textAlign = 'left';
+        c.font = '54px sans-serif';
+        c.fillText(icon, 52, y + 82);
+        c.font = '700 30px sans-serif';
+        c.fillStyle = '#efe9dc';
+        c.fillText(title, 130, y + 58);
+        c.font = '500 24px sans-serif';
+        c.fillStyle = 'rgba(239,233,220,0.65)';
+        c.fillText(sub, 130, y + 96);
+        c.textAlign = 'center';
+      });
+      text('Encrypted · only you can see it', 690, '600 24px sans-serif', 'rgba(239,233,220,0.55)');
     } else if (spec.type === 'call') {
       // A video call: Grandma big, Aarav small in the corner.
       const bg = c.createLinearGradient(0, 0, 0, 800);
@@ -590,6 +626,12 @@ function makePhone() {
       text(spec.emoji ?? '⏰', 410, '72px sans-serif');
       text(spec.title ?? '', 475, '700 36px sans-serif');
       text(spec.sub ?? '', 520, '500 27px sans-serif', 'rgba(239,233,220,0.7)');
+      if (spec.whatsapp) {
+        c.fillStyle = '#25d366';
+        roundRect(c, 40, 588, 340, 46, 23);
+        c.fill();
+        text(spec.whatsapp, 620, '700 23px sans-serif', '#06301a');
+      }
       c.fillStyle = '#d4af6a';
       roundRect(c, 70, 650, 280, 80, 40);
       c.fill();
@@ -726,6 +768,163 @@ function makeSparkles(count = 70) {
   return points;
 }
 
+/** Aarav's drawing plan in Memo: a title, the day, and three tasks that tick. */
+function makePlanCard() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 560;
+  canvas.height = 380;
+  const c = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const tasks = ['Sketch for 15 minutes', 'Practice shading', 'Draw one new thing'];
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.PlaneGeometry(1.16, 0.79), new THREE.MeshBasicMaterial({ map: tex, transparent: true }), { shadow: false }));
+  /** Redraws for `day` (1–7) with `done` tasks ticked today. */
+  g.userData.draw = (day, done) => {
+    c.clearRect(0, 0, 560, 380);
+    c.fillStyle = '#121a33';
+    roundRect(c, 4, 4, 552, 372, 36);
+    c.fill();
+    c.strokeStyle = '#d4af6a';
+    c.lineWidth = 4;
+    roundRect(c, 4, 4, 552, 372, 36);
+    c.stroke();
+    c.textAlign = 'left';
+    c.fillStyle = '#d4af6a';
+    c.font = '700 24px sans-serif';
+    c.fillText('MEMO · PLAN', 36, 52);
+    c.fillStyle = '#efe9dc';
+    c.font = '800 38px sans-serif';
+    c.fillText('🎨 Drawing practice', 36, 100);
+    c.textAlign = 'right';
+    c.fillStyle = 'rgba(239,233,220,0.7)';
+    c.font = '600 26px sans-serif';
+    c.fillText(`Day ${day} of 7`, 524, 52);
+    c.textAlign = 'left';
+    tasks.forEach((task, i) => {
+      const y = 150 + i * 72;
+      const ok = i < done;
+      c.fillStyle = ok ? '#4fc38a' : 'rgba(239,233,220,0.12)';
+      c.beginPath();
+      c.arc(60, y + 22, 22, 0, Math.PI * 2);
+      c.fill();
+      if (ok) {
+        c.strokeStyle = '#0b1122';
+        c.lineWidth = 6;
+        c.beginPath();
+        c.moveTo(49, y + 23);
+        c.lineTo(57, y + 31);
+        c.lineTo(72, y + 13);
+        c.stroke();
+      }
+      c.fillStyle = ok ? 'rgba(239,233,220,0.55)' : '#efe9dc';
+      c.font = '600 30px sans-serif';
+      c.fillText(task, 100, y + 33);
+    });
+    tex.needsUpdate = true;
+  };
+  g.userData.draw(1, 0);
+  return g;
+}
+
+/** The streak flame with its number, which counts up as days are finished. */
+function makeStreakFlame() {
+  const g = new THREE.Group();
+  const outer = mesh(new THREE.ConeGeometry(0.16, 0.42, 20), mat(0xff5a1f, { emissive: 0xff3d00, emissiveIntensity: 0.9 }), { y: 0.21, shadow: false });
+  const inner = mesh(new THREE.ConeGeometry(0.09, 0.26, 16), mat(0xffd54a, { emissive: 0xffc22e, emissiveIntensity: 1.1 }), { y: 0.15, z: 0.05, shadow: false });
+  const base = mesh(new THREE.SphereGeometry(0.16, 20, 14), mat(0xff5a1f, { emissive: 0xff3d00, emissiveIntensity: 0.9 }), { y: 0.03, shadow: false });
+  g.add(outer, inner, base);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const c = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const counter = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  counter.scale.set(0.5, 0.25, 1);
+  counter.position.set(0, -0.2, 0);
+  g.add(counter);
+  let shown = -1;
+  /** Shows `n` and flickers for time t. */
+  g.userData.update = (n, t) => {
+    const f = 1 + 0.08 * Math.sin(t * 17) + 0.05 * Math.sin(t * 29);
+    outer.scale.set(1, f, 1);
+    inner.scale.set(1, 2 - f, 1);
+    if (n === shown) return;
+    shown = n;
+    c.clearRect(0, 0, 256, 128);
+    c.textAlign = 'center';
+    c.fillStyle = '#ffb23e';
+    c.font = '900 72px Georgia, serif';
+    c.fillText(`${n}`, 128, 70);
+    c.fillStyle = 'rgba(239,233,220,0.85)';
+    c.font = '700 28px sans-serif';
+    c.fillText('STREAK', 128, 112);
+    tex.needsUpdate = true;
+  };
+  g.userData.update(0, 0);
+  return g;
+}
+
+/** The Bronze badge: a metal disc with a ribbon. */
+function makeMedal() {
+  const g = new THREE.Group();
+  const bronze = mat(0xe0904f, { metalness: 0.7, roughness: 0.28, emissive: 0x7a3d12, emissiveIntensity: 0.6 });
+  const disc = mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.04, 40), bronze, { shadow: false });
+  disc.rotation.x = Math.PI / 2;
+  g.add(disc);
+  const rim = mesh(new THREE.TorusGeometry(0.17, 0.02, 10, 40), mat(0xf6c29a, { metalness: 0.9, roughness: 0.25 }), { shadow: false });
+  g.add(rim);
+  const star = mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 5), mat(0xf6c29a, { metalness: 0.9, roughness: 0.2 }), { z: 0.01, shadow: false });
+  star.rotation.x = Math.PI / 2;
+  g.add(star);
+  for (const side of [-1, 1]) {
+    const ribbon = mesh(new THREE.BoxGeometry(0.08, 0.26, 0.01), mat(side < 0 ? 0x2f5fd0 : 0xd8698a), { x: side * 0.06, y: 0.26, z: -0.02, shadow: false });
+    ribbon.rotation.z = side * 0.25;
+    g.add(ribbon);
+  }
+  return g;
+}
+
+/** A gold coin with a rupee sign: streaks can earn real money. */
+function makeCoin() {
+  const tex = canvasTexture(256, 256, c => {
+    const grad = c.createRadialGradient(100, 90, 20, 128, 128, 128);
+    grad.addColorStop(0, '#fff4bf');
+    grad.addColorStop(0.6, '#f2c230');
+    grad.addColorStop(1, '#b07a0c');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 256, 256);
+    c.fillStyle = '#8a5a06';
+    c.textAlign = 'center';
+    c.font = '900 150px Georgia, serif';
+    c.fillText('₹', 128, 180);
+  });
+  const face = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.6, roughness: 0.3 });
+  const edge = mat(0xb07a0c, { metalness: 0.8, roughness: 0.3 });
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 48), [edge, face, face]);
+  coin.rotation.x = Math.PI / 2;
+  const g = new THREE.Group();
+  g.add(coin);
+  return g;
+}
+
+/** Specks of dust that drift slowly through the lamp light, in every room. */
+function makeDust(count = 90) {
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 5;
+    positions[i * 3 + 1] = Math.random() * 2.8;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 2.5;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({ color: 0xffe2b8, size: 0.018, transparent: true, opacity: 0.55, depthWrite: false }),
+  );
+}
+
 /** Little hearts that float up from the phone while Aarav talks to Grandma. */
 function makeHearts(count = 14) {
   const tex = canvasTexture(64, 64, c => {
@@ -832,7 +1031,9 @@ function makeStage() {
   scene.add(hemi, sun, lamp, rim);
   const room = makeRoom();
   scene.add(room);
-  const stage = { scene, camera, room, view: null, power: 1, sky: null };
+  const dust = makeDust();
+  scene.add(dust);
+  const stage = { scene, camera, room, dust, view: null, power: 1, sky: null };
   stage.light = sky => {
     stage.sky = sky;
     scene.background = new THREE.Color(sky.bg);
@@ -945,8 +1146,12 @@ B.calendar = makeCalendar([
 ]);
 B.confetti = makeConfetti(90);
 B.hearts = makeHearts();
+B.plan = makePlanCard();
+B.flame = makeStreakFlame();
+B.medal = makeMedal();
+B.coin = makeCoin();
 B.things = addThings(B);
-B.scene.add(B.phone, B.card, B.calendar, B.confetti, B.hearts);
+B.scene.add(B.phone, B.card, B.calendar, B.confetti, B.hearts, B.plan, B.flame, B.medal, B.coin);
 B.calendar.position.set(1.15, 2.05, -2.15);
 
 // Melo's arrival.
@@ -971,6 +1176,8 @@ F.confetti = makeConfetti(160);
 F.scene.add(F.melo, F.confetti);
 
 const PEOPLE = [B.aarav, B.mom, M.aarav, M.mom, F.aarav, F.mom];
+// The calendar comes back for the scenes that use it.
+const showCalendar = on => (B.calendar.visible = on);
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
 (function loadMelo() {
@@ -1215,6 +1422,7 @@ const SCENES = [
       B.phone.userData.draw({ type: 'saved', emoji: '🎂', title: 'Call Grandma: birthday', date: '14 Oct · 8:00 AM', sub: 'In 2 days · Memo will remind you' });
       B.phone.userData.screen = 'saved';
       say(B, B.mom, 'Saved in Memo, for 14 October. Done! ✅', 1.2, { gold: true, until: 3.4 });
+      say(B, B.mom, 'Memo reminded me, and sent Papa a WhatsApp too! 📲', 5.4, { gold: true, until: 8.4 });
       say(B, B.aarav, 'Happy birthday, Grandma! 🎂 I made you a card!', 9.4, { until: 12.2 });
       say(B, B.mom, 'She’s so happy! Thank you, Memo. 💛', 12.4, { gold: true });
     },
@@ -1239,7 +1447,7 @@ const SCENES = [
       if (t < 8.4) {
         // …and on 14 October, Memo reminds her.
         if (B.phone.userData.screen !== 'ring') {
-          B.phone.userData.draw({ type: 'ring', time: '8:00', date: '14 October', emoji: '🎂', title: 'Grandma’s birthday', sub: 'Call her today' });
+          B.phone.userData.draw({ type: 'ring', time: '8:00', date: '14 October', emoji: '🎂', title: 'Grandma’s birthday', sub: 'Call her today', whatsapp: '✓ Also sent to Papa on WhatsApp' });
           B.phone.userData.screen = 'ring';
         }
         ringPhone(B.phone, t, 5.1, 7.4, { ...phone, scale: 0.9 });
@@ -1263,6 +1471,107 @@ const SCENES = [
       if (B.confetti.visible) B.confetti.userData.update(k);
       B.hearts.visible = true;
       B.hearts.userData.update(t - 8.6, phone.x, phone.y + 0.45);
+    },
+  },
+  {
+    // Big goals, one small step a day: Aarav's drawing plan, his streak, a badge and real money.
+    stage: B,
+    steady: true,
+    sky: DUSK,
+    camera: STORY_CAM,
+    setup() {
+      B.aarav.setMood('happy');
+      B.mom.setMood('happy');
+      B.aarav.root.position.set(-0.75, 0, 0.1);
+      B.aarav.root.rotation.y = 0.35;
+      B.mom.root.position.set(0.75, 0, 0);
+      B.mom.root.rotation.y = -0.35;
+      B.calendar.visible = false;
+      B.plan.userData.draw(1, 0);
+      say(B, B.aarav, 'Mom, I want to get really good at drawing! 🎨', 0.4, { until: 3.2 });
+      say(B, B.mom, 'Make it a plan in Memo: a few small tasks every day.', 3.4, { gold: true, until: 6.6 });
+      say(B, B.aarav, 'Streak 7! I got the Bronze badge! 🥉', 12.0, { until: 14.8 });
+      say(B, B.mom, 'And your streaks can earn real money too! 💰', 15.0, { gold: true });
+    },
+    update(t) {
+      // The plan card floats above their heads, never in front of a face.
+      const pop = ease(seg(t, 4.6, 5.3)) * (1 - ease(seg(t, 14.6, 15.2)));
+      B.plan.visible = pop > 0.01;
+      B.plan.scale.setScalar(0.001 + pop);
+      B.plan.position.set(0, 1.98 + 0.03 * Math.sin(t * 1.6), -0.2);
+      // Day 1: the three tasks tick one by one; then the next days fly by.
+      let day = 1;
+      let done = t > 8.0 ? 3 : t > 7.3 ? 2 : t > 6.6 ? 1 : 0;
+      if (t > 8.6) {
+        const k = Math.min((t - 8.6) / 0.5, 6);
+        day = 1 + Math.min(Math.ceil(k), 6);
+        done = k >= 6 ? 3 : Math.floor((k - Math.floor(k)) * 4);
+      }
+      if (B.plan.userData.day !== day || B.plan.userData.done !== done) {
+        B.plan.userData.day = day;
+        B.plan.userData.done = done;
+        B.plan.userData.draw(day, done);
+      }
+      // The streak: one point for each finished day.
+      const streakDays = t < 8.0 ? 0 : t > 8.6 ? Math.min(1 + Math.floor((t - 8.6) / 0.5), 7) : 1;
+      const flamePop = ease(seg(t, 5.6, 6.2)) * (1 - ease(seg(t, 14.6, 15.2)));
+      B.flame.visible = flamePop > 0.01;
+      B.flame.scale.setScalar(0.001 + flamePop * (1 + 0.15 * bump(seg(t, 11.6, 12.2))));
+      B.flame.position.set(0.98, 1.86, -0.1);
+      B.flame.userData.update(streakDays, t);
+      // Day 7: the Bronze badge pops up and spins.
+      const medalPop = ease(seg(t, 11.6, 12.2)) * (1 - ease(seg(t, 14.6, 15.2)));
+      B.medal.visible = medalPop > 0.01;
+      B.medal.scale.setScalar(0.001 + medalPop * 1.1);
+      B.medal.position.set(-0.98, 1.86 + 0.04 * Math.sin(t * 2), -0.1);
+      B.medal.rotation.y = (t - 11.6) * 2.4;
+      // Then a coin for the real-money rewards.
+      const coinPop = ease(seg(t, 15.0, 15.6));
+      B.coin.visible = coinPop > 0.01;
+      B.coin.scale.setScalar(0.001 + coinPop * 1.2);
+      // Between them at chest height: clear of both faces and of the speech bubble.
+      B.coin.position.set(0, 1.15 + 0.05 * Math.sin(t * 2), 0.3);
+      B.coin.rotation.y = 0.7 * Math.sin(t * 1.6);
+      moves.talk(B.aarav, t, 0.5, 3.0);
+      moves.talk(B.mom, t, 3.5, 6.3);
+      if (t > 6.6 && t < 11.4) moves.nod(B.aarav, t, 6.6, 8.2);
+      moves.jump(B.aarav, t, 12.0, 13.4);
+      moves.clap(B.mom, t, 12.2, 13.8);
+      moves.talk(B.mom, t, 15.1, 17.2);
+      B.confetti.visible = t > 12.0;
+      if (B.confetti.visible) B.confetti.userData.update(t - 12.0);
+    },
+  },
+  {
+    // Private things stay private: Mom's Vault, behind her own PIN.
+    stage: B,
+    steady: true,
+    sky: NIGHT,
+    camera: STORY_CAM,
+    setup() {
+      B.aarav.setMood('happy');
+      B.mom.setMood('happy');
+      B.aarav.root.position.set(-0.7, 0, 0.1);
+      B.aarav.root.rotation.y = 0.4;
+      B.mom.root.position.set(0.7, 0, 0);
+      B.mom.root.rotation.y = -0.4;
+      B.calendar.visible = false;
+      B.phone.userData.draw({ type: 'vault-lock', dots: 0 });
+      B.phone.userData.screen = 'lock0';
+      say(B, B.mom, 'Bank details, ID photos, voice notes? In my private Vault, behind my own PIN. 🔒', 0.6, { gold: true, until: 5.4 });
+      say(B, B.aarav, 'So only you can open it? Cool! 😎', 5.6);
+    },
+    update(t) {
+      const dots = Math.max(0, Math.min(4, Math.floor((t - 1.4) / 0.35) + 1));
+      const screen = t > 3.0 ? 'vault' : `lock${dots}`;
+      if (B.phone.userData.screen !== screen) {
+        B.phone.userData.screen = screen;
+        B.phone.userData.draw(screen === 'vault' ? { type: 'vault' } : { type: 'vault-lock', dots });
+      }
+      ringPhone(B.phone, t, 0, 0, { x: 0.0, y: 1.3, scale: 0.9 });
+      moves.talk(B.mom, t, 0.7, 5.0);
+      moves.nod(B.aarav, t, 3.2, 4.4);
+      moves.clap(B.aarav, t, 5.8, 7.0);
     },
   },
   {
@@ -1298,14 +1607,17 @@ let startedAt = 0;
 const SLOW = 1.3;
 
 function resetStage(stage) {
-  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts']) if (stage[key]) stage[key].visible = false;
+  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts', 'plan', 'flame', 'medal', 'coin']) if (stage[key]) stage[key].visible = false;
   if (stage.flash) stage.flash.intensity = 0;
   stage.room.userData.sky.position.set(-1.3, 2.15, -2.17);
   stage.cam = null;
   stage.settled = false;
   if (stage.things) stage.things.forEach(th => (th.visible = false));
   if (stage.phone) stage.phone.userData.paid = undefined;
-  if (stage.calendar) stage.calendar.userData.show(0);
+  if (stage.calendar) {
+    stage.calendar.userData.show(0);
+    showCalendar(true);
+  }
 }
 
 function layout() {
@@ -1395,9 +1707,10 @@ function draw(stage, t) {
   const h = canvas.clientHeight || window.innerHeight;
   const base = stage.base;
   const drift = reduced ? 0 : Math.sin(t * 0.35);
-  const speaker = reduced ? null : speakerOn(stage, t);
+  // Scenes with things floating above the cast keep the camera steady.
+  const speaker = reduced || SCENES[current]?.steady ? null : speakerOn(stage, t);
   const sx = speaker ? (speaker.isGroup ? speaker.position.x : speaker.root.position.x) : 0;
-  const goal = { x: 0.35 * sx, look: 0.5 * sx, z: speaker ? -0.45 : 0 };
+  const goal = { x: 0.2 * sx, look: 0.3 * sx, z: speaker ? -0.25 : 0 };
   const cam = (stage.cam = stage.cam ?? { ...goal });
   const follow = reduced ? 1 : 0.035;
   cam.x += (goal.x - cam.x) * follow;
@@ -1426,6 +1739,8 @@ function frame(now) {
   renderer.setScissorTest(true);
   for (const e of s.panels ?? [s]) {
     e.update(t);
+    e.stage.dust.rotation.y = t * 0.025;
+    e.stage.dust.position.y = 0.08 * Math.sin(t * 0.3);
     listen(e.stage, t);
     draw(e.stage, t);
   }

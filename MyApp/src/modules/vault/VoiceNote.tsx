@@ -7,7 +7,7 @@ import { colors, font, radius, spacing, type as t, withAlpha } from '../../theme
 import { Icon } from '../../components/Icon';
 import { API_BASE_URL } from '../../config/env';
 import { selectVaultToken } from './vaultSlice';
-import { touchVault } from './VaultAutoLock';
+import { keepVaultOpenWhile, touchVault } from './VaultAutoLock';
 
 /** Longest recording, in seconds (the server accepts about 4 MB). */
 const MAX_SECONDS = 4 * 60;
@@ -120,7 +120,7 @@ export function VoiceNote({
   const startRecording = async () => {
     if (!sound) return;
     touchVault();
-    if (!(await micAllowed())) {
+    if (!(await keepVaultOpenWhile(micAllowed))) {
       Toast.info('Allow the microphone in your phone’s settings to record.', 2.5);
       return;
     }
@@ -133,6 +133,7 @@ export function VoiceNote({
         const secs = meta.currentPosition / 1000;
         elapsedRef.current = secs;
         setElapsed(secs);
+        touchVault(); // recording counts as using the Vault
         if (secs >= MAX_SECONDS) stopRecording();
       });
       await sound.startRecorder();

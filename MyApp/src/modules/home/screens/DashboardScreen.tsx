@@ -22,9 +22,7 @@ import { formatDateTime } from '../../../utils/date';
 import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks/streaksApi';
 import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
-import { BadgeStrip, celebrateNewTier } from '../../streaks/Tiers';
-import { useAppSelector } from '../../../app/hooks';
-import { selectCurrentUser } from '../../auth/authSlice';
+import { BadgeStrip, useBadgeCongrats } from '../../streaks/Tiers';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -44,13 +42,13 @@ export function DashboardScreen() {
   const completions = useGetTrackCompletionsQuery();
   const tracks = useListTracksQuery();
   const { celebrate } = useCelebration();
-  const user = useAppSelector(selectCurrentUser);
   const best = data?.streak.best_streak;
 
   // A badge reached since the last visit gets its congratulations here.
+  const congratulateBadge = useBadgeCongrats();
   useEffect(() => {
-    if (user && best !== undefined) celebrateNewTier(user.id, best, celebrate).catch(() => undefined);
-  }, [user, best, celebrate]);
+    if (best !== undefined) congratulateBadge(best);
+  }, [best, congratulateBadge]);
   const celebrated = useRef(false);
 
   // Celebrate finished categories the user hasn't seen yet.

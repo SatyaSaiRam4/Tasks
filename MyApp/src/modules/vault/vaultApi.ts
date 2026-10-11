@@ -83,6 +83,11 @@ export const vaultApi = baseApi.injectEndpoints({
       invalidatesTags: ['VaultStatus'],
       onQueryStarted: (_arg, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
     }),
+    /** Swaps an open Vault session for a fresh one while the Vault is in use. */
+    refreshVaultSession: builder.mutation<VaultSession, void>({
+      query: () => ({ url: '/vault/refresh', method: 'POST' }),
+      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
+    }),
     /** Forgot the PIN: the account password sets a new one; notes are kept. */
     resetVaultPin: builder.mutation<VaultSession, { password: string; new_pin: string }>({
       query: body => ({ url: '/vault/reset-pin', method: 'POST', body }),
@@ -172,4 +177,5 @@ export const {
   useUploadVaultImageMutation,
   useDeleteVaultImageMutation,
   useResetVaultPinMutation,
+  useRefreshVaultSessionMutation,
 } = vaultApi;

@@ -125,6 +125,9 @@ def update_profile(db: Session, user: User, fields: dict) -> MeOut:
 def update_settings(db: Session, user: User, fields: dict) -> SettingsOut:
     settings = ensure_settings(db, user.id)
     clear_accent = fields.pop("clear_accent_color", False)
+    # Only ever moves up, so two devices can't congratulate the same badge twice.
+    if fields.get("badge_seen") is not None:
+        fields["badge_seen"] = max(settings.badge_seen, fields["badge_seen"])
     for key, value in fields.items():
         if value is not None:
             setattr(settings, key, value)

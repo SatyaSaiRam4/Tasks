@@ -486,3 +486,23 @@ have streaks). Keep it honest: update the table when those apps change.
   window, Melo lands with a flash of light, and hearts float up during the
   call with Grandma.
 - Migration `a7c3e9f15b20` adds `vault_images` and `user_settings.tap_sound`.
+
+## Vault session, badges and the longer story
+
+- The Vault locks after the chosen time of *inactivity* (taps, typing,
+  recording, uploads all count), not a fixed time after unlocking: while it
+  is in use the app swaps its session for a fresh one (`POST
+  /vault/refresh`). Opening the gallery, the camera or the microphone
+  permission (`keepVaultOpenWhile` in `VaultAutoLock.tsx`) doesn't lock it;
+  really leaving the app does.
+- The notes and the bin are separate queries, so opening the bin never
+  shows the notes first.
+- Badge congratulations (“Congrats! You’ve upgraded to Bronze”) use
+  `user_settings.badge_seen` (only ever moves up), so each badge is
+  congratulated once, on any device. Migration `c1d8f4a2e6b3`.
+- The welcome story has seven scenes: the ask, the forgotten birthday, Melo,
+  Memo reminding on the day (and sending Papa a WhatsApp) with the call to
+  Grandma, Aarav's drawing plan (tasks ticking, streak flame counting to 7,
+  the Bronze badge, real money), Mom's private Vault, and the closing
+  features. Dust drifts in the lamp light; scenes with floating props keep
+  the camera steady (`steady: true`).
