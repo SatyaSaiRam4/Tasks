@@ -49,8 +49,9 @@ const seenInMemory = new Map<string, number>();
 const seenOnPhone = new Map<string, number>();
 const loading = new Set<string>();
 const listeners = new Set<() => void>();
-// v2: earlier test builds marked badges seen without revealing them.
-const phoneKey = (userId: string) => `@memo/badge_seen_v2_${userId}`;
+// Which badge this phone has revealed. v3: earlier builds could mark badges
+// seen without revealing them, so every phone starts fresh.
+const phoneKey = (userId: string) => `@memo/badge_revealed_v3_${userId}`;
 const notify = () => listeners.forEach(fn => fn());
 
 function loadFromPhone(userId: string) {
@@ -66,7 +67,10 @@ function loadFromPhone(userId: string) {
 }
 
 function markSeen(userId: string, index: number) {
-  const value = Math.max(seenInMemory.get(userId) ?? -1, seenOnPhone.get(userId) ?? -1, index);
+  setSeen(userId, Math.max(seenInMemory.get(userId) ?? -1, seenOnPhone.get(userId) ?? -1, index));
+}
+
+function setSeen(userId: string, value: number) {
   seenInMemory.set(userId, value);
   seenOnPhone.set(userId, value);
   AsyncStorage.setItem(phoneKey(userId), String(value)).catch(() => undefined);
@@ -75,35 +79,33 @@ function markSeen(userId: string, index: number) {
 
 /**
  * Which badges look earned (`shown`, the highest index, -1 for none) and
- * which one waits to be revealed on Home (`pending`, or -1). A badge counts
- * as seen only once it was revealed; nothing is assumed seen because a
- * record is missing. `phone` undefined means it is still loading, so
- * nothing is revealed yet.
+ * which one waits to be revealed on Home (`pending`, or -1). Only what this
+ * phone has actually shown counts: a badge looks earned only after its
+ * reveal played here. `phone` undefined means the record is still loading:
+ * everything new stays locked and nothing is revealed yet.
  */
 export function badgeState({
   best,
   signedIn,
-  server,
   phone,
   memory,
 }: {
   best: number;
   signedIn: boolean;
-  server?: number;
   phone?: number;
   memory?: number;
 }): { shown: number; pending: number } {
   const reached = tierIndex(best);
   if (!signedIn) return { shown: -1, pending: -1 };
-  const seen = Math.max(typeof server === 'number' ? server : -1, phone ?? -1, memory ?? -1);
+  const seen = Math.max(phone ?? -1, memory ?? -1);
   return { shown: Math.min(reached, seen), pending: phone !== undefined && reached > seen ? reached : -1 };
 }
 
 /**
  * Badges appear earned only once they've been revealed on Home: until then a
- * newly reached badge still looks locked everywhere (Home, Profile). The
- * last revealed badge is kept on the server (`badge_seen`), so every device
- * agrees and nobody sees the same reveal twice.
+ * newly reached badge still looks locked everywhere (Home, Profile). Each
+ * phone remembers what it has revealed, so the reveal is always seen; the
+ * server's `badge_seen` is also updated, for the record.
  */
 export function useBadges(best: number) {
   const me = useGetMeQuery();
@@ -121,13 +123,14 @@ export function useBadges(best: number) {
   useEffect(() => {
     if (id) loadFromPhone(id);
   }, [id]);
-  const { shown, pending } = badgeState({
-    best,
-    signedIn: Boolean(id),
-    server: me.data?.settings.badge_seen,
-    phone: id ? seenOnPhone.get(id) : undefined,
-    memory: id ? seenInMemory.get(id) : undefined,
-  });
+  const phone = id ? seenOnPhone.get(id) : undefined;
+  const { shown, pending } = badgeState({ best, signedIn: Boolean(id), phone, memory: id ? seenInMemory.get(id) : undefined });
+  // The best streak only grows; if it went down (test data reset), so does
+  // the record, and reaching the badge again reveals it again.
+  const reached = tierIndex(best);
+  useEffect(() => {
+    if (id && phone !== undefined && best > 0 && reached < phone) setSeen(id, reached);
+  }, [id, phone, best, reached]);
 
   /** After the reveal animation: mark it seen and open its congratulations card. */
   const congratulate = useCallback(

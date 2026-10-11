@@ -456,6 +456,26 @@ const moves = {
     p.armR.rotation.x = -1.3 * amount;
     p.armR.rotation.z = 0.12 - 0.25 * amount;
   },
+  /** Jogging on the spot: quick knees, pumping arms, a light bounce. */
+  jog(p, t, a, b) {
+    const k = seg(t, a, b);
+    if (k <= 0 || k >= 1) return;
+    const swing = Math.sin((t - a) * 14);
+    p.legL.rotation.x = 0.85 * swing;
+    p.legR.rotation.x = -0.85 * swing;
+    p.armL.rotation.x = -0.6 - 0.5 * swing;
+    p.armR.rotation.x = -0.6 + 0.5 * swing;
+    p.hips.position.y += 0.045 * Math.abs(swing);
+    p.body.rotation.x += 0.08;
+  },
+  /** Both arms up at the sides: "I did it!" (never in front of the face). */
+  flex(p, t, a, b) {
+    const k = ease(seg(t, a, a + 0.35)) * (1 - ease(seg(t, b - 0.35, b)));
+    if (k <= 0) return;
+    const pump = 0.12 * Math.sin((t - a) * 9);
+    p.armL.rotation.z = -(0.12 + (2.1 + pump) * k);
+    p.armR.rotation.z = 0.12 + (2.1 + pump) * k;
+  },
   busy(p, t) {
     // Hurrying: quick arm work and a restless head.
     p.armL.rotation.x = -0.9 + 0.5 * Math.sin(t * 7);
@@ -968,6 +988,44 @@ function makeCoin() {
   return g;
 }
 
+/** The Vault's padlock: it springs open when the PIN goes in. */
+function makePadlock() {
+  const g = new THREE.Group();
+  const violet = mat(0x8f6bff, { metalness: 0.6, roughness: 0.3, emissive: 0x3a1f99, emissiveIntensity: 0.6 });
+  g.add(mesh(new THREE.BoxGeometry(0.24, 0.19, 0.09), violet, { shadow: false }));
+  g.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.1, 12), mat(0x1b1240), { y: 0.0, z: 0.03, shadow: false }));
+  const shackle = mesh(new THREE.TorusGeometry(0.075, 0.02, 10, 24, Math.PI), mat(0xd9dde3, { metalness: 0.9, roughness: 0.2 }), { y: 0.095, shadow: false });
+  g.add(shackle);
+  /** 0 = locked, 1 = open. */
+  g.userData.open = k => {
+    shackle.position.y = 0.095 + 0.07 * k;
+    shackle.rotation.y = 1.2 * k;
+  };
+  return g;
+}
+
+/** Gold coins raining down behind the cast: streaks can earn real money. */
+function makeCoinRain(count = 26) {
+  const g = new THREE.Group();
+  const gold = mat(0xf2c230, { metalness: 0.7, roughness: 0.25, emissive: 0x6a4a00, emissiveIntensity: 0.4 });
+  const seeds = [];
+  for (let i = 0; i < count; i++) {
+    const coin = mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.012, 20), gold, { shadow: false });
+    g.add(coin);
+    seeds.push({ coin, x: (Math.random() - 0.5) * 3.2, delay: Math.random() * 1.6, speed: 1.0 + Math.random() * 0.7, spin: 3 + Math.random() * 5 });
+  }
+  g.userData.update = t => {
+    for (const sd of seeds) {
+      const k = t - sd.delay;
+      sd.coin.visible = k > 0;
+      if (k <= 0) continue;
+      sd.coin.position.set(sd.x, 3.0 - ((k * sd.speed) % 3.2), -0.7);
+      sd.coin.rotation.set(k * sd.spin, k * 2, 0.4);
+    }
+  };
+  return g;
+}
+
 /** Specks of dust that drift slowly through the lamp light, in every room. */
 function makeDust(count = 90) {
   const positions = new Float32Array(count * 3);
@@ -1226,7 +1284,13 @@ P.plan = makePlanCard('💪 Get fit in 30 days', ['Walk for 20 minutes', 'Do 10 
 P.flame = makeStreakFlame();
 P.medal = makeMedal();
 P.coin = makeCoin();
-P.scene.add(P.phone, P.confetti, P.plan, P.flame, P.medal, P.coin);
+P.rain = makeCoinRain();
+P.padlock = makePadlock();
+P.sparkles = makeSparkles(50);
+// A burst of light when the badge appears, and when the Vault opens.
+P.flash = new THREE.PointLight(0xffe2a8, 0, 5, 1.4);
+P.flash.position.set(0, 1.4, 1.1);
+P.scene.add(P.phone, P.confetti, P.plan, P.flame, P.medal, P.coin, P.rain, P.padlock, P.sparkles, P.flash);
 
 // Melo's arrival.
 const M = makeStage();
@@ -1618,13 +1682,26 @@ const SCENES = [
       P.coin.position.set(0, 1.15 + 0.05 * Math.sin(t * 2), 0.3);
       P.coin.rotation.y = 0.7 * Math.sin(t * 1.6);
       moves.talk(P.satya, t, 0.5, 3.0);
+      moves.flex(P.satya, t, 1.2, 3.0);
       moves.talk(P.riya, t, 3.5, 6.3);
-      if (t > 6.6 && t < 11.4) moves.nod(P.satya, t, 6.6, 8.2);
-      moves.jump(P.satya, t, 12.0, 13.4);
+      // He gets going: jogging on the spot while his tasks tick and the days fly.
+      moves.jog(P.satya, t, 6.2, 11.4);
+      for (const at of [6.6, 7.3, 8.0]) moves.clap(P.riya, t, at, at + 0.45);
+      if (t > 8.6 && t < 11.6) daysPass(P, t - 8.6);
+      else if (t >= 11.6 && !P.settled) {
+        P.settled = true;
+        P.light(DUSK);
+        P.room.userData.sky.position.set(-1.3, 2.15, -2.17);
+      }
+      P.flash.intensity = 7 * bump(seg(t, 11.5, 12.6));
+      moves.jump(P.satya, t, 12.0, 13.0);
+      moves.flex(P.satya, t, 13.0, 14.6);
       moves.clap(P.riya, t, 12.2, 13.8);
       moves.talk(P.riya, t, 15.1, 17.2);
-      P.confetti.visible = t > 12.0;
+      P.confetti.visible = t > 12.0 && t < 15.0;
       if (P.confetti.visible) P.confetti.userData.update(t - 12.0);
+      P.rain.visible = t > 15.0;
+      if (P.rain.visible) P.rain.userData.update(t - 15.0);
     },
   },
   {
@@ -1642,8 +1719,8 @@ const SCENES = [
       P.riya.root.rotation.y = -0.4;
       P.phone.userData.draw({ type: 'vault-lock', dots: 0 });
       P.phone.userData.screen = 'lock0';
-      say(P, P.riya, 'My bank details, ID photos and voice notes? In my private Vault, behind my own PIN. 🔒', 0.6, { gold: true, until: 5.4 });
-      say(P, P.satya, 'So only you can open it? Smart, Satya! 😎', 5.6);
+      say(P, P.satya, 'My bank details, ID photos and voice notes? In my private Vault, behind my own PIN. 🔒', 0.6, { gold: true, until: 5.4 });
+      say(P, P.riya, 'So only you can open it? Smart, Satya! 😎', 5.6);
     },
     update(t) {
       const dots = Math.max(0, Math.min(4, Math.floor((t - 1.4) / 0.35) + 1));
@@ -1653,9 +1730,20 @@ const SCENES = [
         P.phone.userData.draw(screen === 'vault' ? { type: 'vault' } : { type: 'vault-lock', dots });
       }
       ringPhone(P.phone, t, 0, 0, { x: 0.0, y: 1.3, scale: 0.9 });
-      moves.talk(P.riya, t, 0.7, 5.0);
-      moves.nod(P.satya, t, 3.2, 4.4);
-      moves.clap(P.satya, t, 5.8, 7.0);
+      // The padlock under the phone springs open as the PIN goes in.
+      P.padlock.visible = true;
+      P.padlock.position.set(0, 0.55 + 0.03 * Math.sin(t * 2), 0.45);
+      P.padlock.scale.setScalar(1 + 0.25 * bump(seg(t, 2.9, 3.5)));
+      P.padlock.userData.open(ease(seg(t, 2.9, 3.3)));
+      P.flash.intensity = 6 * bump(seg(t, 2.9, 3.9));
+      P.flash.color.set(0xc9b6ff);
+      P.sparkles.visible = t > 2.9;
+      P.sparkles.rotation.y = t * 0.4;
+      P.sparkles.material.opacity = 0.8 * seg(t, 2.9, 3.4);
+      moves.talk(P.satya, t, 0.7, 5.0);
+      moves.nod(P.riya, t, 3.2, 4.4);
+      moves.talk(P.riya, t, 5.7, 7.2);
+      moves.flex(P.satya, t, 6.0, 7.6);
     },
   },
   {
@@ -1694,8 +1782,11 @@ let startedAt = 0;
 const SLOW = 1.15;
 
 function resetStage(stage) {
-  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts', 'plan', 'flame', 'medal', 'coin']) if (stage[key]) stage[key].visible = false;
-  if (stage.flash) stage.flash.intensity = 0;
+  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts', 'plan', 'flame', 'medal', 'coin', 'rain', 'padlock']) if (stage[key]) stage[key].visible = false;
+  if (stage.flash) {
+    stage.flash.intensity = 0;
+    stage.flash.color.set(0xffe2a8);
+  }
   stage.room.userData.sky.position.set(-1.3, 2.15, -2.17);
   stage.cam = null;
   stage.settled = false;

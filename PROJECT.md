@@ -525,7 +525,12 @@ have streaks). Keep it honest: update the table when those apps change.
   server records it (mirrored on the phone), so it happens once, on any
   device; a badge is never treated as seen just because that record is
   missing. Before the tremble it beats like a heart. The reveal waits until
-  Home is on screen and no other celebration card is open; Home scrolls the
+  Home is on screen and no other celebration card is open. What counts as
+  revealed is what *this phone* has shown (`@memo/badge_revealed_v3_…`),
+  so leftovers from earlier builds or the server can't skip it; if the best
+  streak goes down (test data reset), the record follows, so the badge
+  reveals again when reached. The server's `badge_seen` is still written.
+  Home scrolls the
   streak card into view first. The gating rule is `badgeState()` (tested in
   `__tests__/badges.test.ts`). Achievements earned on other screens are
   queued for Home too (`modules/streaks/homeQueue.ts`), and the “Plan
@@ -533,3 +538,7 @@ have streaks). Keep it honest: update the table when those apps change.
   celebrations don't mention badges. Migration `d4e7a1c9b5f2` cleared
   `badge_seen` once, so badges earned on earlier test builds get their
   reveal.
+- Part 2's animation: Satya flexes as he says it, jogs on the spot while
+  his tasks tick, days and nights pass in the window as the streak climbs,
+  a burst of light brings the badge, gold coins rain behind them at “real
+  money”, and in the Vault a glowing padlock springs open with sparkles.
