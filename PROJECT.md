@@ -453,3 +453,36 @@ have streaks). Keep it honest: update the table when those apps change.
   friend search carries the version, so a changed photo is fetched fresh.
   Searching a friend's User ID shows their photo when they allow it.
 - Migration `f4b9d2e61c08` adds the columns: run `alembic upgrade head`.
+
+## Vault photos, forgotten PIN, tap sound and celebrations
+
+- Vault notes hold up to 6 photos (camera or gallery, resized to 1600 px,
+  up to 10 MB each), in `vault_images` (Fernet-encrypted, `data` deferred):
+  `POST /vault/entries/{id}/images` (multipart), `GET` and `DELETE
+  …/images/{image_id}`, all behind the Vault session. The app
+  (`modules/vault/VaultPhotos.tsx`) loads each photo into memory as a data
+  URI, so decrypted photos never reach the image disk cache. Adds and
+  removals apply on Save, like the voice note. The list shows `📷 n`.
+- Forgot the Vault PIN: “Forgot PIN?” on the lock screen
+  (`modules/vault/ForgotPin.tsx`) calls `POST /vault/reset-pin` with the
+  account password and a new PIN (5 tries per 10 minutes). Notes are
+  encrypted with the server's key, not the PIN, so nothing is lost; the
+  owner gets an email that it happened.
+- Settings → Appearance → Tap sound (`user_settings.tap_sound`, off by
+  default): a soft click on every tap, from the phone's own key click
+  (`TapSoundModule.kt`, `components/TapSound.tsx`). Scrolls stay silent.
+- Finishing one plan for today (+1 streak) now celebrates (“Congrats! You
+  earned 1 streak”): the completion result carries `plan_just_finished`,
+  `plan_name`, `plans_due` and `plans_done`. New achievements and a badge
+  reached by that very tick are congratulated too.
+- Wallet “to go” uses `live_best_streak` (today's finished plans included,
+  like the dashboard) and refreshes after every tick; payouts still wait for
+  the day to finish (`best_streak`).
+- The day strip always scrolls the selected day into view, also when it is
+  picked from the calendar, and grows to include it. The six-month calendar
+  keeps Monday–Sunday fixed while the weeks scroll.
+- The welcome story runs 1.3× slower with longer slides; the camera leans
+  toward whoever speaks, listeners turn to the speaker, days pass in the
+  window, Melo lands with a flash of light, and hearts float up during the
+  call with Grandma.
+- Migration `a7c3e9f15b20` adds `vault_images` and `user_settings.tap_sound`.

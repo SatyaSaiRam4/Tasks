@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, font, gradients, radius, spacing } from '../theme';
 import { useLayout } from '../hooks/useLayout';
 import { Gradient } from './Gradient';
-import { addDays, toDateKey, WEEKDAY_SHORT } from '../utils/date';
+import { addDays, fromDateKey, toDateKey, WEEKDAY_SHORT } from '../utils/date';
 
 export interface DayMark {
   required: number;
@@ -12,8 +12,14 @@ export interface DayMark {
 }
 
 const CELL = 54;
+const STEP = CELL + spacing.sm;
 
-/** Horizontally scrolling day tabs with a completion dot under each day. */
+/**
+ * Horizontally scrolling day tabs with a completion dot under each day. The
+ * selected day always scrolls into view (near the start, one day before it
+ * showing), also when it is picked from a calendar, and the strip grows to
+ * include a day picked outside its range.
+ */
 export function DateStrip({
   selected,
   today,
@@ -30,18 +36,32 @@ export function DateStrip({
   daysForward?: number;
 }) {
   const { gutter } = useLayout();
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const days = useMemo(() => {
-    const base = new Date(`${today}T00:00:00`);
-    return Array.from({ length: daysBack + daysForward + 1 }, (_, i) => addDays(base, i - daysBack));
-  }, [today, daysBack, daysForward]);
+    const base = fromDateKey(today);
+    const picked = fromDateKey(selected);
+    const offset = Math.round((picked.getTime() - base.getTime()) / 86400000);
+    const back = Math.max(daysBack, -offset + 3);
+    const forward = Math.max(daysForward, offset + 7);
+    return Array.from({ length: back + forward + 1 }, (_, i) => addDays(base, i - back));
+  }, [today, selected, daysBack, daysForward]);
+  const selectedIndex = days.findIndex(d => toDateKey(d) === selected);
+  const startX = Math.max(0, (selectedIndex - 1) * STEP);
+
+  // Bring the selected day to the front whenever it changes.
+  useEffect(() => {
+    const id = setTimeout(() => scroller.current?.scrollTo({ x: startX, animated: true }), 0);
+    return () => clearTimeout(id);
+  }, [startX]);
 
   return (
     <ScrollView
+      ref={scroller}
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.strip}
       contentContainerStyle={[styles.content, { paddingHorizontal: gutter }]}
-      contentOffset={{ x: Math.max(0, (daysBack - 2) * (CELL + spacing.sm)), y: 0 }}
+      contentOffset={{ x: startX, y: 0 }}
     >
       {days.map(d => {
         const key = toDateKey(d);

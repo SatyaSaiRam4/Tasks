@@ -23,6 +23,9 @@ def _redeemed(db: Session, user: User) -> int:
 
 def summary(db: Session, user: User) -> dict:
     best = _best_streak(db, user)
+    # What the dashboard shows: today's finished plans count straight away.
+    # Money still waits for the day to finish (see _best_streak).
+    live = engine.today_status(db, user).best_streak
     earned = sum(amount for days, amount in MILESTONES if best >= days)
     redeemed = _redeemed(db, user)
     redemptions = db.scalars(
@@ -30,6 +33,7 @@ def summary(db: Session, user: User) -> dict:
     ).all()
     return {
         "best_streak": best,
+        "live_best_streak": max(live, best),
         "earned": earned,
         "redeemed": redeemed,
         "balance": max(earned - redeemed, 0),

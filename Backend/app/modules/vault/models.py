@@ -40,6 +40,24 @@ class VaultEntry(Base):
     )
 
 
+class VaultImage(Base):
+    """A photo attached to a Vault note (an ID card, a document), Fernet-encrypted."""
+
+    __tablename__ = "vault_images"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("vault_entries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Loaded only when the photo itself is asked for.
+    data: Mapped[bytes] = deferred(mapped_column(LargeBinary, nullable=False))
+    mime: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 class VaultCredential(Base):
     """The user's Vault PIN (Argon2 hash only) plus brute-force lockout state."""
 

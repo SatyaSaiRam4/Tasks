@@ -28,10 +28,19 @@ export interface VaultEntrySummary {
   /** A voice recording is attached (fetched separately, never in lists). */
   has_audio: boolean;
   audio_seconds: number | null;
+  /** How many photos are attached (the photos are fetched one by one). */
+  image_count?: number;
+}
+
+export interface VaultImageRef {
+  id: string;
+  mime: string;
+  created_at: string;
 }
 
 export interface VaultEntry extends VaultEntrySummary {
   content: string;
+  images?: VaultImageRef[];
 }
 
 export type VaultView = 'all' | 'favorites' | 'pinned' | 'archived' | 'trash';
@@ -72,6 +81,12 @@ export const vaultApi = baseApi.injectEndpoints({
     changeVaultPin: builder.mutation<VaultSession, { current_pin: string; new_pin: string }>({
       query: body => ({ url: '/vault/change-pin', method: 'POST', body }),
       invalidatesTags: ['VaultStatus'],
+      onQueryStarted: (_arg, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
+    }),
+    /** Forgot the PIN: the account password sets a new one; notes are kept. */
+    resetVaultPin: builder.mutation<VaultSession, { password: string; new_pin: string }>({
+      query: body => ({ url: '/vault/reset-pin', method: 'POST', body }),
+      invalidatesTags: ['VaultStatus', 'VaultEntry'],
       onQueryStarted: (_arg, { dispatch, queryFulfilled }) => storeSession(dispatch, queryFulfilled),
     }),
     listVaultEntries: builder.query<VaultEntrySummary[], { view?: VaultView; q?: string; folder?: string; tag?: string }>({
@@ -123,6 +138,19 @@ export const vaultApi = baseApi.injectEndpoints({
       query: id => ({ url: `/vault/entries/${id}/audio`, method: 'DELETE' }),
       invalidatesTags: ['VaultEntry'],
     }),
+    /** Attaches a photo (a local file) to a note, encrypted on the server. */
+    uploadVaultImage: builder.mutation<VaultEntry, { id: string; uri: string; type: string; name: string }>({
+      query: ({ id, uri, type, name }) => {
+        const form = new FormData();
+        form.append('file', { uri, name, type } as unknown as Blob);
+        return { url: `/vault/entries/${id}/images`, method: 'POST', body: form };
+      },
+      invalidatesTags: ['VaultEntry'],
+    }),
+    deleteVaultImage: builder.mutation<VaultEntry, { id: string; imageId: string }>({
+      query: ({ id, imageId }) => ({ url: `/vault/entries/${id}/images/${imageId}`, method: 'DELETE' }),
+      invalidatesTags: ['VaultEntry'],
+    }),
   }),
 });
 
@@ -141,4 +169,7 @@ export const {
   useEmptyVaultTrashMutation,
   useUploadVaultAudioMutation,
   useDeleteVaultAudioMutation,
+  useUploadVaultImageMutation,
+  useDeleteVaultImageMutation,
+  useResetVaultPinMutation,
 } = vaultApi;

@@ -57,6 +57,8 @@ class UserSettings(Base):
     show_achievements: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     # Others who look you up can see your profile photo (you always see your own).
     show_photo: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
+    # A soft click on every tap. Off until the user turns it on.
+    tap_sound: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False

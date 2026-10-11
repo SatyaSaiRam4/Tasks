@@ -19,6 +19,8 @@ export interface UserSettings {
   show_achievements: boolean;
   /** Others who find you can see your profile photo. */
   show_photo: boolean;
+  /** A soft click on every tap. */
+  tap_sound?: boolean;
 }
 
 export interface Me {
@@ -86,6 +88,7 @@ function toPreferences(s: UserSettings) {
     notifyActions: s.notify_actions,
     notifyReminders: s.notify_reminders,
     notifyStreakWarnings: s.notify_streak_warnings,
+    tapSound: Boolean(s.tap_sound),
   };
 }
 
@@ -164,6 +167,7 @@ export const usersApi = baseApi.injectEndpoints({
             Object.assign(draft.settings, arg);
           }),
         );
+        if (arg.tap_sound !== undefined) dispatch(preferencesSynced({ tapSound: arg.tap_sound }));
         try {
           const { data } = await queryFulfilled;
           dispatch(preferencesSynced(toPreferences(data)));

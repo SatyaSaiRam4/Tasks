@@ -42,6 +42,7 @@ class SettingsOut(BaseModel):
     show_best_streak: bool
     show_achievements: bool
     show_photo: bool
+    tap_sound: bool
 
 
 class SettingsUpdate(BaseModel):
@@ -61,6 +62,7 @@ class SettingsUpdate(BaseModel):
     show_best_streak: bool | None = None
     show_achievements: bool | None = None
     show_photo: bool | None = None
+    tap_sound: bool | None = None
 
     @field_validator("confirmation_mode")
     @classmethod

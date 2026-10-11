@@ -726,6 +726,40 @@ function makeSparkles(count = 70) {
   return points;
 }
 
+/** Little hearts that float up from the phone while Aarav talks to Grandma. */
+function makeHearts(count = 14) {
+  const tex = canvasTexture(64, 64, c => {
+    c.fillStyle = '#ff5a7a';
+    c.beginPath();
+    c.moveTo(32, 56);
+    c.bezierCurveTo(4, 36, 6, 10, 22, 10);
+    c.bezierCurveTo(28, 10, 32, 16, 32, 20);
+    c.bezierCurveTo(32, 16, 36, 10, 42, 10);
+    c.bezierCurveTo(58, 10, 60, 36, 32, 56);
+    c.fill();
+  });
+  const g = new THREE.Group();
+  const seeds = [];
+  for (let i = 0; i < count; i++) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    g.add(sprite);
+    seeds.push({ sprite, x: (Math.random() - 0.5) * 0.5, delay: Math.random() * 2.4, speed: 0.35 + Math.random() * 0.25, size: 0.08 + Math.random() * 0.07, sway: Math.random() * 6 });
+  }
+  /** Rises from (x, y) for t seconds, looping. */
+  g.userData.update = (t, x, y) => {
+    for (const sd of seeds) {
+      const k = ((t - sd.delay) * sd.speed) % 1.4;
+      const on = t > sd.delay;
+      sd.sprite.visible = on;
+      if (!on) continue;
+      sd.sprite.position.set(x + sd.x + 0.08 * Math.sin(t * 2 + sd.sway), y + k * 1.1, 0.6);
+      sd.sprite.scale.setScalar(sd.size * (0.6 + 0.4 * Math.min(1, k * 4)));
+      sd.sprite.material.opacity = Math.max(0, 1 - k / 1.4);
+    }
+  };
+  return g;
+}
+
 /** Confetti for the happy endings: little paper squares that tumble down. */
 function makeConfetti(count = 160) {
   const colors = [0xd4af6a, 0xe2574c, 0x5b9bff, 0x4fc38a, 0xc24dff, 0xffffff];
@@ -843,6 +877,20 @@ function whirl(things, t, centerX) {
   });
 }
 
+const DAY_WINDOW = new THREE.Color(0xffc78a);
+const NIGHT_WINDOW = new THREE.Color(0x1b2a6e);
+/** Days going by: the window turns from day to night and back, the sun and moon cross it. */
+function daysPass(stage, t) {
+  const phase = (t / 1.4) % 1;
+  const night = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
+  stage.room.userData.window.color.copy(DAY_WINDOW).lerp(NIGHT_WINDOW, night);
+  const disc = stage.room.userData.sky;
+  disc.visible = true;
+  disc.position.x = -2.05 + 0.9 * phase;
+  disc.position.y = 1.85 + 0.35 * Math.sin(phase * Math.PI);
+  disc.material.color.set(night > 0.5 ? 0xf3dca6 : 0xffe9a8);
+}
+
 /** Busy walking back and forth, then stopping to think. */
 function busyDay(p, t, stopAt) {
   if (t < stopAt) {
@@ -896,8 +944,9 @@ B.calendar = makeCalendar([
   ['OCT', '15', 'One day late'],
 ]);
 B.confetti = makeConfetti(90);
+B.hearts = makeHearts();
 B.things = addThings(B);
-B.scene.add(B.phone, B.card, B.calendar, B.confetti);
+B.scene.add(B.phone, B.card, B.calendar, B.confetti, B.hearts);
 B.calendar.position.set(1.15, 2.05, -2.15);
 
 // Melo's arrival.
@@ -905,14 +954,19 @@ const M = makeStage();
 M.aarav = cast(M, AARAV);
 M.mom = cast(M, MOM);
 M.melo = new THREE.Group();
+M.melo.isGroup = true;
 M.sparkles = makeSparkles();
-M.scene.add(M.melo, M.sparkles);
+// A burst of warm light as Melo lands.
+M.flash = new THREE.PointLight(0xffe2a8, 0, 6, 1.4);
+M.flash.position.set(0.15, 1.2, 1.2);
+M.scene.add(M.melo, M.sparkles, M.flash);
 
 // The finale.
 const F = makeStage();
 F.aarav = cast(F, AARAV);
 F.mom = cast(F, MOM);
 F.melo = new THREE.Group();
+F.melo.isGroup = true;
 F.confetti = makeConfetti(160);
 F.scene.add(F.melo, F.confetti);
 
@@ -1078,6 +1132,7 @@ const SCENES = [
     },
     update(t) {
       if (t < 4.7) {
+        daysPass(B, t);
         const p = Math.min(t / 1.4, 2.999);
         B.calendar.userData.show(Math.floor(p) + 1, p - Math.floor(p) < 0.6 ? (p - Math.floor(p)) / 0.6 : 1);
         busyDay(B.mom, t, 99);
@@ -1086,6 +1141,8 @@ const SCENES = [
       }
       if (!B.settled) {
         B.settled = true;
+        B.light(EVENING);
+        B.room.userData.sky.position.set(-1.3, 2.15, -2.17);
         B.things.forEach(th => (th.visible = false));
         B.calendar.userData.show(3);
         B.aarav.root.position.set(-0.6, 0, 0.2);
@@ -1125,6 +1182,7 @@ const SCENES = [
       const bounce = drop < 1 ? (1 - ease(drop)) * 3 : Math.abs(Math.sin((t - 0.9) * 9)) * 0.25 * Math.max(0, 1 - (t - 0.9) * 1.6);
       M.melo.visible = true;
       M.melo.position.set(0.15, bounce, 0.4);
+      M.flash.intensity = 9 * bump(seg(t, 0.75, 1.9));
       M.melo.rotation.y = Math.PI * 2 * ease(seg(t, 0.9, 2.0)) - 0.3;
       M.melo.rotation.z = t > 2 ? 0.2 * Math.sin((t - 2) * 7) * Math.max(0, 1 - (t - 2) * 0.25) : 0;
       M.sparkles.visible = true;
@@ -1203,6 +1261,8 @@ const SCENES = [
       const k = t - 9.4;
       B.confetti.visible = k > 0;
       if (B.confetti.visible) B.confetti.userData.update(k);
+      B.hearts.visible = true;
+      B.hearts.userData.update(t - 8.6, phone.x, phone.y + 0.45);
     },
   },
   {
@@ -1234,9 +1294,14 @@ const SCENES = [
 
 let current = -1;
 let startedAt = 0;
+/** Story time runs this much slower than real time, so there's time to read. */
+const SLOW = 1.3;
 
 function resetStage(stage) {
-  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo']) if (stage[key]) stage[key].visible = false;
+  for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts']) if (stage[key]) stage[key].visible = false;
+  if (stage.flash) stage.flash.intensity = 0;
+  stage.room.userData.sky.position.set(-1.3, 2.15, -2.17);
+  stage.cam = null;
   stage.settled = false;
   if (stage.things) stage.things.forEach(th => (th.visible = false));
   if (stage.phone) stage.phone.userData.paid = undefined;
@@ -1301,13 +1366,45 @@ function show(index) {
 window.addEventListener('resize', layout);
 window.story = { show };
 
+/** Who is speaking on `stage` at time t (the newest bubble showing), or null. */
+function speakerOn(stage, t) {
+  let who = null;
+  let at = -1;
+  for (const b of bubbles) if (b.stage === stage && t >= b.at && t < b.until && b.at > at) ((who = b.who), (at = b.at));
+  return who;
+}
+
+/** Whoever isn't speaking turns their head toward the one who is. */
+function listen(stage, t) {
+  const speaker = speakerOn(stage, t);
+  if (!speaker) return;
+  const sx = speaker.isGroup ? speaker.position.x : speaker.root.position.x;
+  for (const p of [stage.aarav, stage.mom]) {
+    if (!p || p === speaker) continue;
+    const dx = sx - p.root.position.x;
+    if (Math.abs(dx) > 0.15) p.head.rotation.y += 0.32 * Math.sign(dx) - 0.5 * p.root.rotation.y * 0.3;
+  }
+}
+
+/**
+ * A gentle film camera: it drifts, eases in over the scene, and leans toward
+ * whoever is speaking (pushing in a little), smoothly.
+ */
 function draw(stage, t) {
   const v = stage.view;
   const h = canvas.clientHeight || window.innerHeight;
   const base = stage.base;
   const drift = reduced ? 0 : Math.sin(t * 0.35);
-  stage.camera.position.set(base.x + 0.2 * drift, base.y + 0.04 * drift, base.z - (reduced ? 0 : 0.2 * seg(t, 0, 8)));
-  stage.camera.lookAt(base.look[0], base.look[1], base.look[2]);
+  const speaker = reduced ? null : speakerOn(stage, t);
+  const sx = speaker ? (speaker.isGroup ? speaker.position.x : speaker.root.position.x) : 0;
+  const goal = { x: 0.35 * sx, look: 0.5 * sx, z: speaker ? -0.45 : 0 };
+  const cam = (stage.cam = stage.cam ?? { ...goal });
+  const follow = reduced ? 1 : 0.035;
+  cam.x += (goal.x - cam.x) * follow;
+  cam.look += (goal.look - cam.look) * follow;
+  cam.z += (goal.z - cam.z) * follow;
+  stage.camera.position.set(base.x + cam.x + 0.18 * drift, base.y + 0.04 * drift, base.z + cam.z - (reduced ? 0 : 0.25 * seg(t, 0, 10)));
+  stage.camera.lookAt(base.look[0] + cam.look, base.look[1], base.look[2]);
   // WebGL counts y from the bottom of the canvas.
   const y = h - (v.y + v.h);
   renderer.setViewport(v.x, y, v.w, v.h);
@@ -1318,7 +1415,7 @@ function draw(stage, t) {
 function frame(now) {
   requestAnimationFrame(frame);
   if (current < 0) return;
-  const t = (now - startedAt) / 1000;
+  const t = (now - startedAt) / 1000 / SLOW;
   const s = SCENES[current];
   PEOPLE.forEach((p, i) => rest(p, now / 1000 + i * 0.7));
   // Each panel's background sets the clear color; reset it, so the space
@@ -1329,6 +1426,7 @@ function frame(now) {
   renderer.setScissorTest(true);
   for (const e of s.panels ?? [s]) {
     e.update(t);
+    listen(e.stage, t);
     draw(e.stage, t);
   }
   placeBubbles(t);
@@ -1336,6 +1434,6 @@ function frame(now) {
 
 show(Number(params.get('scene') || 0));
 // For checking a moment of a scene in a browser: ?scene=2&at=3 starts 3 s in.
-if (params.get('at')) startedAt -= Number(params.get('at')) * 1000;
+if (params.get('at')) startedAt -= Number(params.get('at')) * 1000 * SLOW;
 requestAnimationFrame(frame);
 post('loaded');

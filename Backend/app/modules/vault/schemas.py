@@ -25,6 +25,13 @@ class PinChange(BaseModel):
     new_pin: str = Field(pattern=PIN_PATTERN)
 
 
+class PinReset(BaseModel):
+    """Forgot the PIN: prove it's you with the account password, then pick a new PIN."""
+
+    password: str = Field(min_length=1, max_length=128)
+    new_pin: str = Field(pattern=PIN_PATTERN)
+
+
 class VaultSessionOut(BaseModel):
     vault_token: str
     expires_at: datetime
@@ -82,10 +89,18 @@ class VaultEntrySummary(BaseModel):
     updated_at: datetime
     has_audio: bool = False
     audio_seconds: int | None = None
+    image_count: int = 0
+
+
+class VaultImageOut(BaseModel):
+    id: UUID
+    mime: str
+    created_at: datetime
 
 
 class VaultEntryOut(VaultEntrySummary):
     content: str
+    images: list[VaultImageOut] = []
 
 
 class VaultFolderOut(BaseModel):

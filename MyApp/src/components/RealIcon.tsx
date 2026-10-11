@@ -5,10 +5,10 @@ import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect,
  * Full-colour, shaded icons for the places that deserve a "real" object
  * rather than a line drawing: the streak flame, the wallet coin, the
  * reminder bell, a category's target, the trophy, the vault lock, and the
- * home, profile and wallet of the navigation. They
+ * home, profile and wallet of the navigation, and the Vault's dustbin. They
  * are self-coloured, so they read the same on the dark and light themes.
  */
-export type RealIconName = 'flame' | 'coin' | 'bell' | 'target' | 'trophy' | 'lock' | 'home' | 'user' | 'wallet' | 'check';
+export type RealIconName = 'flame' | 'coin' | 'bell' | 'target' | 'trophy' | 'lock' | 'home' | 'user' | 'wallet' | 'check' | 'bin';
 
 export function RealIcon({ name, size = 28 }: { name: RealIconName; size?: number }) {
   const id = useId().replace(/:/g, '');
@@ -134,6 +134,26 @@ export function RealIcon({ name, size = 28 }: { name: RealIconName; size?: numbe
           <Path d="M7 44c0-10 8-16 17-16s17 6 17 16z" fill={g('u')} />
           <Circle cx="24" cy="16" r="10" fill={g('uf')} />
           <Path d="M14 15c0-7 5-10 10-10s10 3 10 9c-3-3-7-4-10-4s-7 2-10 5z" fill="#5A3A22" />
+        </>
+      ) : name === 'bin' ? (
+        <>
+          <Defs>
+            <LinearGradient id={`d${id}`} x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0" stopColor="#7E8A99" />
+              <Stop offset="0.45" stopColor="#C9D2DC" />
+              <Stop offset="1" stopColor="#6B7685" />
+            </LinearGradient>
+            <LinearGradient id={`dl${id}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#D7DEE6" />
+              <Stop offset="1" stopColor="#8995A4" />
+            </LinearGradient>
+          </Defs>
+          {/* A dustbin: lid with a handle, a tapered body with ridges. */}
+          <Rect x="19" y="4" width="10" height="5" rx="2.2" fill="none" stroke="#8995A4" strokeWidth={2.4} />
+          <Rect x="7" y="8" width="34" height="6" rx="3" fill={g('dl')} />
+          <Path d="M10 16h28l-2.6 25a4 4 0 0 1-4 3.6H16.6a4 4 0 0 1-4-3.6z" fill={g('d')} />
+          <Path d="M18 21l.8 18M24 21v18M30 21l-.8 18" stroke="#5B6573" strokeWidth={2.2} strokeLinecap="round" opacity={0.75} />
+          <Rect x="9" y="9.2" width="30" height="1.6" rx="0.8" fill="#FFFFFF" opacity={0.5} />
         </>
       ) : name === 'wallet' ? (
         <>

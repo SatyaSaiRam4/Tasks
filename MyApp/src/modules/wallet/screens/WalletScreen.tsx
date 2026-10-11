@@ -28,6 +28,8 @@ export function WalletScreen() {
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
   const w = wallet.data;
+  // The same streak the dashboard shows (today's finished plans included).
+  const live = Math.max(w?.live_best_streak ?? 0, w?.best_streak ?? 0);
 
   const submit = async () => {
     setError(null);
@@ -62,7 +64,7 @@ export function WalletScreen() {
             <Text style={styles.balanceLabel}>Balance</Text>
             <Text style={styles.balance}>₹{w.balance}</Text>
             <Text style={styles.balanceNote}>
-              {w.balance > 0 ? 'Ready to redeem' : `Best streak: ${w.best_streak}`}
+              {w.balance > 0 ? 'Ready to redeem' : `Best streak: ${live}`}
             </Text>
           </Card>
 
@@ -74,13 +76,13 @@ export function WalletScreen() {
                 <Text style={styles.milestoneAmount}>₹{m.amount}</Text>
                 <Text style={styles.milestoneGoal}>{m.days} streaks</Text>
                 <ProgressBar
-                  progress={Math.min(w.best_streak / m.days, 1)}
+                  progress={Math.min(live / m.days, 1)}
                   height={4}
                   colorsPair={m.reached ? gradients.success : gradients.primary}
                   style={styles.milestoneBar}
                 />
                 <Text style={[t.caption, m.reached && { color: colors.success }]}>
-                  {m.reached ? 'Earned ✓' : `${Math.max(m.days - w.best_streak, 0)} to go`}
+                  {m.reached ? 'Earned ✓' : live >= m.days ? 'Added tonight' : `${m.days - live} to go`}
                 </Text>
               </Card>
             ))}

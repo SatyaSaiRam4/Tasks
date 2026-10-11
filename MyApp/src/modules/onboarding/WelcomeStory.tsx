@@ -34,10 +34,10 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Aarav. Grandma’s birthday is in 2 days.', duration: 9500, Body: AskScene },
-  { caption: 'Two busy days fly by… and then…', duration: 12500, Body: MissedScene },
-  { caption: 'That’s why Memo is here.', duration: 8000, Body: SatyaScene },
-  { caption: 'This time, Mom tells Memo.', duration: 15000, Body: RemindScene },
+  { caption: 'Meet Aarav. Grandma’s birthday is in 2 days.', duration: 14000, Body: AskScene },
+  { caption: 'Two busy days fly by… and then…', duration: 18000, Body: MissedScene },
+  { caption: 'That’s why Memo is here.', duration: 12000, Body: SatyaScene },
+  { caption: 'This time, Mom tells Memo.', duration: 22000, Body: RemindScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -240,7 +240,7 @@ function Duo({ lines }: { lines: Line[] }) {
 }
 
 function DuoRow({ line, index }: { line: Line; index: number }) {
-  const enter = useAppear(300 + index * 2600, 600);
+  const enter = useAppear(400 + index * 3800, 700);
   return (
     <Animated.View style={[styles.trioRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
       {line.who === 'Aarav' ? <Kid size={120} mood={line.mood} /> : <Mom size={130} mood={line.mood} />}

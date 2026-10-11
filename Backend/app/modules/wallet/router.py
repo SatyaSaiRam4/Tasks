@@ -33,6 +33,8 @@ class RedemptionOut(BaseModel):
 
 class WalletOut(BaseModel):
     best_streak: int
+    # Includes today's finished plans, like the dashboard; payouts use best_streak.
+    live_best_streak: int = 0
     earned: int
     redeemed: int
     balance: int
