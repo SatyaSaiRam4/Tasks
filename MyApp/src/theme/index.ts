@@ -141,18 +141,22 @@ export function applyTheme(mode: string | null | undefined): ThemeMode {
   gradients.success = dark ? ['#9FDCBF', '#5BA886'] : ['#5DB38B', '#2F8A63'];
   gradients.danger = dark ? ['#F0A2A6', '#C9606A'] : ['#D86A72', '#B8434B'];
   gradients.sheen = dark ? ['rgba(243, 220, 166, 0)', 'rgba(243, 220, 166, 0.38)'] : ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.95)'];
-  Object.assign(shadow.card, {
+  // New objects, never edits: once a screen has used a style object, React
+  // Native freezes it, and changing it in place would throw.
+  shadow.card = {
+    ...shadow.card,
     shadowColor: dark ? colors.black : '#3B2A10',
     shadowOpacity: dark ? 0.32 : 0.08,
     shadowRadius: dark ? 22 : 18,
     elevation: dark ? 4 : 2,
-  });
-  Object.assign(shadow.float, {
+  };
+  shadow.float = {
+    ...shadow.float,
     shadowColor: dark ? colors.black : '#1A1408',
     shadowOpacity: dark ? 0.45 : 0.16,
     shadowRadius: dark ? 30 : 26,
     elevation: dark ? 12 : 8,
-  });
+  };
   Object.assign(type, buildType());
   return key;
 }
@@ -169,7 +173,7 @@ export function applyAccent(name: string | null | undefined): AccentName {
   colors.primaryFill = accent.primary;
   colors.onPrimary = brand.ink;
   gradients.primary = [accent.bright, accent.primary];
-  shadow.glow.shadowColor = accent.primary;
+  shadow.glow = { ...shadow.glow, shadowColor: accent.primary };
   return key;
 }
 
