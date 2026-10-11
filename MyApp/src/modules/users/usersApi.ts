@@ -21,6 +21,8 @@ export interface UserSettings {
   show_photo: boolean;
   /** A soft click on every tap. */
   tap_sound?: boolean;
+  /** The highest streak badge already congratulated (0 = Bronze), -1 for none. */
+  badge_seen?: number;
 }
 
 export interface Me {

@@ -59,6 +59,9 @@ class UserSettings(Base):
     show_photo: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     # A soft click on every tap. Off until the user turns it on.
     tap_sound: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # The highest streak badge (0 = Bronze … 5 = Master) the user has been
+    # congratulated for; -1 for none yet. Kept here so every device agrees.
+    badge_seen: Mapped[int] = mapped_column(Integer, default=-1, server_default="-1", nullable=False)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False

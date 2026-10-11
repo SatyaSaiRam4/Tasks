@@ -83,13 +83,17 @@ export function VaultEntryScreen() {
     const fallbackTitle = content.trim() ? null : hasVoice ? 'Voice note' : keptPhotos ? 'Photos' : null;
     const body = { title: title.trim() || fallbackTitle, content: content || title.trim() };
     setLeaving(true);
+    touchVault();
     try {
       const saved = entryId ? await update({ id: entryId, ...body }).unwrap() : await create(body).unwrap();
       // Recording and photos go up once the note exists.
       if (recording) await uploadAudio({ id: saved.id, uri: recording.uri, seconds: recording.seconds }).unwrap();
       else if (audioRemoved && entry?.has_audio) await deleteAudio(saved.id).unwrap();
       for (const id of removedPhotos) await deleteImage({ id: saved.id, imageId: id }).unwrap();
-      for (const photo of newPhotos) await uploadImage({ id: saved.id, ...photo }).unwrap();
+      for (const photo of newPhotos) {
+        touchVault(); // a slow upload is still using the Vault
+        await uploadImage({ id: saved.id, ...photo }).unwrap();
+      }
       Toast.success('Saved.', 1);
       navigation.goBack();
     } catch (err) {
@@ -139,7 +143,10 @@ export function VaultEntryScreen() {
           <>
             <TextInput
               value={title}
-              onChangeText={setTitle}
+              onChangeText={v => {
+                touchVault();
+                setTitle(v);
+              }}
               placeholder="Title"
               placeholderTextColor={colors.textTertiary}
               style={styles.title}
@@ -149,7 +156,10 @@ export function VaultEntryScreen() {
             />
             <TextInput
               value={content}
-              onChangeText={setContent}
+              onChangeText={v => {
+                touchVault();
+                setContent(v);
+              }}
               placeholder="Write your private note…"
               placeholderTextColor={colors.textTertiary}
               style={styles.content}

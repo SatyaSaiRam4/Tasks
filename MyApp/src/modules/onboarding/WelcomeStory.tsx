@@ -16,7 +16,11 @@ import { Kid, Mom } from './Characters';
  * birthday, two days away. Two busy days fly by, she forgets, and they miss
  * the call. Melo arrives: tell Memo once, days or months ahead, and it
  * reminds you on the day. This time Mom saves it in Memo; on the birthday it
- * reminds her, and Aarav calls Grandma. Ends on what the app does. Plays like a phone
+ * reminds her (and sends Papa a WhatsApp), and Aarav calls Grandma. Then
+ * Aarav turns drawing into a plan with daily tasks: his streak grows, he
+ * earns the Bronze badge, and streaks can earn real money. Mom keeps her
+ * private things in the Vault, behind her own PIN. Ends on what the app
+ * does. Plays like a phone
  * "story": it moves on by itself; tap the right side for next, the left for
  * back.
  *
@@ -38,6 +42,8 @@ const SCENES: Scene[] = [
   { caption: 'Two busy days fly by… and then…', duration: 18000, Body: MissedScene },
   { caption: 'That’s why Memo is here.', duration: 12000, Body: SatyaScene },
   { caption: 'This time, Mom tells Memo.', duration: 22000, Body: RemindScene },
+  { caption: 'Big goals, one small step a day.', duration: 25000, Body: PlanScene },
+  { caption: 'Private things stay private.', duration: 12500, Body: VaultScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -233,17 +239,18 @@ function Duo({ lines }: { lines: Line[] }) {
   return (
     <View style={styles.trio}>
       {lines.map((line, i) => (
-        <DuoRow key={`${line.who}${i}`} line={line} index={i} />
+        <DuoRow key={`${line.who}${i}`} line={line} index={i} compact={lines.length > 2} />
       ))}
     </View>
   );
 }
 
-function DuoRow({ line, index }: { line: Line; index: number }) {
+function DuoRow({ line, index, compact }: { line: Line; index: number; compact?: boolean }) {
   const enter = useAppear(400 + index * 3800, 700);
   return (
     <Animated.View style={[styles.trioRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
-      {line.who === 'Aarav' ? <Kid size={120} mood={line.mood} /> : <Mom size={130} mood={line.mood} />}
+      {/* More lines in a scene: smaller figures, so it all fits on one screen. */}
+      {line.who === 'Aarav' ? <Kid size={compact ? 82 : 120} mood={line.mood} /> : <Mom size={compact ? 92 : 130} mood={line.mood} />}
       <View style={styles.flex}>
         <Text style={styles.trioWho}>{line.who}</Text>
         <View style={[styles.speech, styles.speechLeft, line.thought && styles.trioThought]}>
@@ -294,17 +301,42 @@ function RemindScene() {
     <Duo
       lines={[
         { who: 'Mom', mood: 'happy', text: 'Saved in Memo, for 14 October. Done! ✅' },
+        { who: 'Mom', mood: 'surprised', text: 'Memo reminded me, and sent Papa a WhatsApp too! 📲' },
         { who: 'Aarav', mood: 'happy', text: 'Happy birthday, Grandma! 🎂 I made you a card!' },
       ]}
     />
   );
 }
 
+function PlanScene() {
+  return (
+    <Duo
+      lines={[
+        { who: 'Aarav', mood: 'happy', text: 'Mom, I want to get really good at drawing! 🎨' },
+        { who: 'Mom', mood: 'happy', text: 'Make it a plan in Memo: a few small tasks every day.' },
+        { who: 'Aarav', mood: 'surprised', text: 'Streak 7! I got the Bronze badge! 🥉' },
+        { who: 'Mom', mood: 'happy', text: 'And your streaks can earn real money too! 💰' },
+      ]}
+    />
+  );
+}
+
+function VaultScene() {
+  return (
+    <Duo
+      lines={[
+        { who: 'Mom', mood: 'happy', text: 'Bank details, ID photos, voice notes? In my private Vault, behind my own PIN. 🔒' },
+        { who: 'Aarav', mood: 'happy', text: 'So only you can open it? Cool! 😎' },
+      ]}
+    />
+  );
+}
+
 const FEATURES: { icon: RealIconName; title: string; text: string }[] = [
-  { icon: 'target', title: 'Plans', text: 'Goals with small daily tasks' },
-  { icon: 'flame', title: 'Streaks', text: 'Keep going, day after day' },
-  { icon: 'bell', title: 'Reminders', text: 'Never forget what matters, even months ahead' },
-  { icon: 'lock', title: 'Private Vault', text: 'Notes only you can open' },
+  { icon: 'bell', title: 'Reminders', text: 'Right on the day, even months ahead, and on WhatsApp too' },
+  { icon: 'target', title: 'Plans', text: 'Big goals as small daily tasks' },
+  { icon: 'flame', title: 'Streaks and badges', text: 'Keep going, and earn real money' },
+  { icon: 'lock', title: 'Private Vault', text: 'Notes, voice and photos behind your PIN' },
 ];
 
 /** What Memo does. `compact` sits under the 3D cast at the bottom of the screen. */

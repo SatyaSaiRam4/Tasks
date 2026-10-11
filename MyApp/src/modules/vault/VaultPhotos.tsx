@@ -10,6 +10,7 @@ import { ListGroup, ListRow } from '../../components/ListRow';
 import { Sheet } from '../../components/Sheet';
 import { pickPhoto, type PickedPhoto } from '../users/pickPhoto';
 import { selectVaultToken } from './vaultSlice';
+import { keepVaultOpenWhile } from './VaultAutoLock';
 import type { VaultImageRef } from './vaultApi';
 
 /** A note holds up to this many photos (the server checks too). */
@@ -92,7 +93,8 @@ export function VaultPhotos({
   const add = async (camera: boolean) => {
     setChoosing(false);
     try {
-      const photo = await pickPhoto({ maxSide: 1600, camera });
+      // The gallery and camera leave the app for a moment; that mustn't lock the Vault.
+      const photo = await keepVaultOpenWhile(() => pickPhoto({ maxSide: 1600, camera }));
       if (photo) onAdd(photo);
     } catch (err) {
       Toast.fail(err instanceof Error ? err.message : 'Could not add this photo.', 2);

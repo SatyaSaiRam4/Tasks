@@ -76,6 +76,13 @@ def change_pin(payload: PinChange, response: Response, current_user: User = Depe
     return service.change_pin(db, current_user, payload.current_pin, payload.new_pin)
 
 
+@router.post("/refresh", response_model=VaultSessionOut)
+def refresh_session(user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
+    """While the Vault is in use, the app swaps its session for a fresh one, so
+    it only locks after the chosen time of *inactivity*, not after unlocking."""
+    return service.refresh_session(db, user)
+
+
 @router.post("/reset-pin", response_model=VaultSessionOut)
 def reset_pin(payload: PinReset, response: Response, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Forgot the PIN: the account password sets a new one. Notes are kept."""

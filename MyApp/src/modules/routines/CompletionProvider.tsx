@@ -10,8 +10,7 @@ import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
-import { selectCurrentUser } from '../auth/authSlice';
-import { celebrateNewTier } from '../streaks/Tiers';
+import { useBadgeCongrats } from '../streaks/Tiers';
 
 interface Target {
   actionId: string;
@@ -38,8 +37,8 @@ export function useCompletion() {
  */
 export function CompletionProvider({ children }: { children: React.ReactNode }) {
   const mode = useAppSelector(s => s.preferences.confirmationMode);
-  const user = useAppSelector(selectCurrentUser);
   const { celebrate } = useCelebration();
+  const congratulateBadge = useBadgeCongrats();
   const [target, setTarget] = useState<Target | null>(null);
   const [complete, { isLoading: completing }] = useCompleteActionMutation();
   const [uncomplete, { isLoading: undoing }] = useUncompleteActionMutation();
@@ -92,7 +91,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
       for (const a of result.new_achievements ?? []) {
         celebrate({ icon: 'award', tone: 'primary', eyebrow: 'New achievement', title: a.title, subtitle: a.description });
       }
-      if (user) celebrateNewTier(user.id, result.best_streak, celebrate, Boolean(result.plan_just_finished)).catch(() => undefined);
+      congratulateBadge(result.best_streak);
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
     } finally {

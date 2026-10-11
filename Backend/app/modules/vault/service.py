@@ -101,6 +101,11 @@ def change_pin(db: Session, user: User, current_pin: str, new_pin: str) -> Vault
     return _issue(db, user)
 
 
+def refresh_session(db: Session, user: User) -> VaultSessionOut:
+    """A new session for an already-unlocked Vault (the caller proved the old one)."""
+    return _issue(db, user)
+
+
 def reset_pin(db: Session, user: User, password: str, new_pin: str) -> VaultSessionOut:
     """Forgot the PIN. Notes are encrypted with the server's key, not the PIN,
     so after the account password is checked a new PIN opens the same notes."""

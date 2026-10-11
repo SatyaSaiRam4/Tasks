@@ -43,6 +43,7 @@ class SettingsOut(BaseModel):
     show_achievements: bool
     show_photo: bool
     tap_sound: bool
+    badge_seen: int = -1
 
 
 class SettingsUpdate(BaseModel):
@@ -63,6 +64,7 @@ class SettingsUpdate(BaseModel):
     show_achievements: bool | None = None
     show_photo: bool | None = None
     tap_sound: bool | None = None
+    badge_seen: int | None = Field(default=None, ge=-1, le=5)
 
     @field_validator("confirmation_mode")
     @classmethod

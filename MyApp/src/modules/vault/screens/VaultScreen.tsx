@@ -74,7 +74,12 @@ function UnlockedVault() {
   const [day, setDay] = useState(todayKey);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const entries = useListVaultEntriesQuery({ view: showDeleted ? 'trash' : 'all', q: query.trim() || undefined });
+  // The notes and the bin are separate lists, so opening the bin never shows
+  // the notes for a moment first (and coming back is instant).
+  const q = query.trim() || undefined;
+  const notes = useListVaultEntriesQuery({ view: 'all', q });
+  const bin = useListVaultEntriesQuery({ view: 'trash', q }, { skip: !showDeleted });
+  const entries = showDeleted ? bin : notes;
 
   const all = useMemo(() => entries.data ?? [], [entries.data]);
   // A dot under every day that has notes.
@@ -208,7 +213,7 @@ function UnlockedVault() {
         ) : null}
 
         <View style={{ paddingHorizontal: gutter }}>
-          {entries.isLoading ? (
+          {entries.isLoading || entries.isUninitialized ? (
             <SkeletonList count={4} height={72} />
           ) : entries.isError ? (
             <ErrorState message={getErrorMessage(entries.error, 'Could not open your Vault.')} onRetry={entries.refetch} />
