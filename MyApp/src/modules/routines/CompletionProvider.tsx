@@ -9,6 +9,7 @@ import { Icon } from '../../components/Icon';
 import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
+import { queueForHome } from '../streaks/homeQueue';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
 
 interface Target {
@@ -87,9 +88,9 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
         const left = result.today_required - result.today_completed;
         Toast.success(left > 0 ? `Done. ${left} left today.` : 'Done.', 1.2);
       }
-      // Achievements earned with this tick get their own congratulations.
+      // Achievements earned with this tick are congratulated on Home, like badges.
       for (const a of result.new_achievements ?? []) {
-        celebrate({ icon: 'award', tone: 'primary', eyebrow: 'New achievement', title: a.title, subtitle: a.description });
+        queueForHome({ icon: 'award', tone: 'primary', eyebrow: 'New achievement', title: a.title, subtitle: a.description });
       }
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);

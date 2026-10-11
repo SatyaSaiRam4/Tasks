@@ -21,6 +21,8 @@ interface ScreenProps {
   wide?: boolean;
   keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps'];
   footer?: React.ReactNode;
+  /** The screen's scroll view, e.g. to bring something at the top into view. */
+  scrollRef?: React.RefObject<React.ComponentRef<typeof ScrollView> | null>;
 }
 
 /**
@@ -41,6 +43,7 @@ export function Screen({
   wide = false,
   keyboardShouldPersistTaps = 'handled',
   footer,
+  scrollRef,
 }: ScreenProps) {
   const { gutter, hasRail } = useLayout();
   // Content rises in from below whenever the screen comes into view.
@@ -75,6 +78,7 @@ export function Screen({
       <OfflineBanner />
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
           style={styles.fill}
           contentContainerStyle={[styles.scrollContent, ...inner]}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}

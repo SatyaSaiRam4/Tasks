@@ -74,6 +74,32 @@ function markSeen(userId: string, index: number) {
 }
 
 /**
+ * Which badges look earned (`shown`, the highest index, -1 for none) and
+ * which one waits to be revealed on Home (`pending`, or -1). A badge counts
+ * as seen only once it was revealed; nothing is assumed seen because a
+ * record is missing. `phone` undefined means it is still loading, so
+ * nothing is revealed yet.
+ */
+export function badgeState({
+  best,
+  signedIn,
+  server,
+  phone,
+  memory,
+}: {
+  best: number;
+  signedIn: boolean;
+  server?: number;
+  phone?: number;
+  memory?: number;
+}): { shown: number; pending: number } {
+  const reached = tierIndex(best);
+  if (!signedIn) return { shown: -1, pending: -1 };
+  const seen = Math.max(typeof server === 'number' ? server : -1, phone ?? -1, memory ?? -1);
+  return { shown: Math.min(reached, seen), pending: phone !== undefined && reached > seen ? reached : -1 };
+}
+
+/**
  * Badges appear earned only once they've been revealed on Home: until then a
  * newly reached badge still looks locked everywhere (Home, Profile). The
  * last revealed badge is kept on the server (`badge_seen`), so every device
@@ -95,15 +121,13 @@ export function useBadges(best: number) {
   useEffect(() => {
     if (id) loadFromPhone(id);
   }, [id]);
-  const reached = tierIndex(best);
-  // A badge counts as seen only once it was revealed; nothing is ever assumed
-  // seen just because the account or the server is missing the record.
-  const serverSeen = typeof me.data?.settings.badge_seen === 'number' ? me.data.settings.badge_seen : -1;
-  const phoneSeen = id ? seenOnPhone.get(id) : undefined;
-  const seen = id ? Math.max(serverSeen, phoneSeen ?? -1, seenInMemory.get(id) ?? -1) : -1;
-  const shown = Math.min(reached, seen);
-  /** The badge waiting to be revealed (once everything has loaded), or -1. */
-  const pending = id && phoneSeen !== undefined && reached > seen ? reached : -1;
+  const { shown, pending } = badgeState({
+    best,
+    signedIn: Boolean(id),
+    server: me.data?.settings.badge_seen,
+    phone: id ? seenOnPhone.get(id) : undefined,
+    memory: id ? seenInMemory.get(id) : undefined,
+  });
 
   /** After the reveal animation: mark it seen and open its congratulations card. */
   const congratulate = useCallback(
