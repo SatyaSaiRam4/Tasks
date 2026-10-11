@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCelebration } from '../../components/Celebration';
 import { useGetMeQuery, useUpdateSettingsMutation } from '../users/usersApi';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
@@ -42,11 +43,33 @@ export function tierIndex(best: number): number {
   return index;
 }
 
+// The last revealed badge per user: in memory, mirrored on the phone (so it
+// holds even before the server knows `badge_seen`), and on the server.
 const seenInMemory = new Map<string, number>();
+const seenOnPhone = new Map<string, number>();
+const loading = new Set<string>();
 const listeners = new Set<() => void>();
+const phoneKey = (userId: string) => `@memo/badge_seen_${userId}`;
+const notify = () => listeners.forEach(fn => fn());
+
+function loadFromPhone(userId: string) {
+  if (seenOnPhone.has(userId) || loading.has(userId)) return;
+  loading.add(userId);
+  AsyncStorage.getItem(phoneKey(userId))
+    .then(raw => seenOnPhone.set(userId, raw === null ? -1 : Number(raw)))
+    .catch(() => seenOnPhone.set(userId, -1))
+    .finally(() => {
+      loading.delete(userId);
+      notify();
+    });
+}
+
 function markSeen(userId: string, index: number) {
-  seenInMemory.set(userId, Math.max(seenInMemory.get(userId) ?? -1, index));
-  listeners.forEach(fn => fn());
+  const value = Math.max(seenInMemory.get(userId) ?? -1, seenOnPhone.get(userId) ?? -1, index);
+  seenInMemory.set(userId, value);
+  seenOnPhone.set(userId, value);
+  AsyncStorage.setItem(phoneKey(userId), String(value)).catch(() => undefined);
+  notify();
 }
 
 /**
@@ -68,13 +91,18 @@ export function useBadges(best: number) {
     };
   }, []);
   const id = me.data?.id;
-  const serverSeen = me.data?.settings.badge_seen;
+  useEffect(() => {
+    if (id) loadFromPhone(id);
+  }, [id]);
   const reached = tierIndex(best);
-  // Until the account has loaded, show what's reached (no locked flash).
-  const seen = id === undefined || serverSeen === undefined ? reached : Math.max(serverSeen, seenInMemory.get(id) ?? -1);
+  // A badge counts as seen only once it was revealed; nothing is ever assumed
+  // seen just because the account or the server is missing the record.
+  const serverSeen = typeof me.data?.settings.badge_seen === 'number' ? me.data.settings.badge_seen : -1;
+  const phoneSeen = id ? seenOnPhone.get(id) : undefined;
+  const seen = id ? Math.max(serverSeen, phoneSeen ?? -1, seenInMemory.get(id) ?? -1) : -1;
   const shown = Math.min(reached, seen);
-  /** The badge waiting to be revealed, or -1. */
-  const pending = reached > seen ? reached : -1;
+  /** The badge waiting to be revealed (once everything has loaded), or -1. */
+  const pending = id && phoneSeen !== undefined && reached > seen ? reached : -1;
 
   /** After the reveal animation: mark it seen and open its congratulations card. */
   const congratulate = useCallback(
@@ -267,6 +295,8 @@ export function BadgeStrip({
 }
 
 const SPARKS = 10;
+/** The heartbeat before the tremble: four 170 ms pulses and two pauses. */
+const BEATS_MS = 4 * 170 + 120 + 140;
 const SPARK_WHITE = '#FFFFFF';
 
 /**
@@ -279,6 +309,7 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
   const shake = useRef(new Animated.Value(0)).current;
   const grow = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
+  const beat = useRef(new Animated.Value(0)).current;
   const [lit, setLit] = useState(false);
   const done = useRef(onDone);
   done.current = onDone;
@@ -289,11 +320,19 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
       const id = setTimeout(() => done.current(), 300);
       return () => clearTimeout(id);
     }
+    const pulse = (to: number) => Animated.timing(beat, { toValue: to, duration: 170, easing: Easing.inOut(Easing.quad), useNativeDriver: true });
     const unlock = setTimeout(() => {
       setLit(true);
       Vibration.vibrate(40);
-    }, 1250);
+    }, 1250 + BEATS_MS);
     const anim = Animated.sequence([
+      // First a heartbeat or two: it's waking up.
+      pulse(1),
+      pulse(0),
+      Animated.delay(120),
+      pulse(1),
+      pulse(0),
+      Animated.delay(140),
       // Comes to life: a growing tremble while it swells and glows.
       Animated.parallel([
         Animated.timing(shake, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }),
@@ -312,7 +351,7 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
       clearTimeout(unlock);
       anim.stop();
     };
-  }, [reduced, shake, grow, flash]);
+  }, [reduced, shake, grow, flash, beat]);
 
   const rotate = shake.interpolate({
     inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
@@ -358,7 +397,7 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
           />
         );
       })}
-      <Animated.View style={{ transform: [{ rotate }, { scale }] }}>
+      <Animated.View style={{ transform: [{ rotate }, { scale }, { scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }}>
         <TierBadge tier={tier} earned={lit} size={size} />
       </Animated.View>
     </View>

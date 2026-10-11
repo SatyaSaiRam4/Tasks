@@ -508,12 +508,15 @@ have streaks). Keep it honest: update the table when those apps change.
   the camera steady (`steady: true`).
 - The story plays its first part by default (the birthday: four scenes and
   the closing features). The second part, plans and streaks and the Vault,
-  is optional: a small “▶ Part 2” pill at the top right of the last slide.
+  is optional: a quiet “▶ Part 2” link at the bottom right of the last
+  slide, and it has its own progress bars.
   Story time runs 1.15× slower than real time.
 - Badges (`useBadges` in `modules/streaks/Tiers.tsx`): a newly reached badge
   still looks locked everywhere until the first time Home is on screen.
   Then the locked badge in the streak card comes to life (trembles, glows,
   breaks open in a flash with sparks, turns into the medal and settles, with
   a short vibration) and its congratulations card opens. `badge_seen` on the
-  server records it, so it happens once, on any device. Plan celebrations
+  server records it (mirrored on the phone), so it happens once, on any
+  device; a badge is never treated as seen just because that record is
+  missing. Before the tremble it beats like a heart. Plan celebrations
   don't mention badges.

@@ -48,10 +48,12 @@ const SCENES: Scene[] = [
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
-/** The story plays these scenes; "See more" adds plans, streaks and the Vault before the end. */
+/**
+ * Part 1 (the birthday) plays by default. Part 2 (plans, streaks, the Vault)
+ * is optional, from a quiet link on the last slide, and has its own bars.
+ */
 const MAIN_STORY = [0, 1, 2, 3, 6];
-const FULL_STORY = [0, 1, 2, 3, 4, 5, 6];
-const MORE_START = FULL_STORY.indexOf(4);
+const PART_TWO = [4, 5, 6];
 
 const STORY_PAGE = 'file:///android_asset/web/story/index.html';
 /** Room for the progress bars and caption above the panels, and the hint below. */
@@ -66,7 +68,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
   // `step` walks through the chosen story; `index` is the scene it shows.
   const [step, setStep] = useState(0);
   const [more, setMore] = useState(false);
-  const order = more ? FULL_STORY : MAIN_STORY;
+  const order = more ? PART_TWO : MAIN_STORY;
   const index = order[step];
   const [mode, setMode] = useState<Mode>(Platform.OS === 'android' ? 'loading' : 'flat');
   const web = useRef<React.ComponentRef<typeof WebView>>(null);
@@ -87,7 +89,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
   const go = useCallback(
     (to: number, withMore = more) => {
-      const length = (withMore ? FULL_STORY : MAIN_STORY).length;
+      const length = (withMore ? PART_TWO : MAIN_STORY).length;
       if (to < 0 || to >= length) return;
       const apply = () => {
         setMore(withMore);
@@ -175,18 +177,6 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
           <Pressable onPress={onDone} hitSlop={12} accessibilityRole="button" style={styles.skip}>
             <Text style={styles.skipText}>Skip</Text>
           </Pressable>
-        ) : !more ? (
-          // The optional second part: plans, streaks, rewards and the Vault.
-          <Pressable
-            onPress={() => go(MORE_START, true)}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Watch part 2: plans, streaks and the Vault"
-            style={({ pressed }) => [styles.morePill, pressed && styles.pressed]}
-          >
-            <Icon name="play" size={11} color={brand.midnight} strokeWidth={2.6} />
-            <Text style={styles.moreText}>Part 2</Text>
-          </Pressable>
         ) : null}
       </View>
 
@@ -211,7 +201,22 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         {last ? (
-          <Button label="Let’s begin" size="lg" onPress={onDone} />
+          <View style={styles.endButtons}>
+            <Button label="Let’s begin" size="lg" onPress={onDone} fullWidth />
+            {more ? null : (
+              // Optional, so it's quiet: plans, streaks, rewards and the Vault.
+              <Pressable
+                onPress={() => go(0, true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Watch part 2: plans, streaks and the Vault"
+                style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}
+              >
+                <Icon name="play" size={11} color={colors.heroTextTertiary} strokeWidth={2.2} />
+                <Text style={styles.moreText}>Part 2</Text>
+              </Pressable>
+            )}
+          </View>
         ) : (
           <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}
@@ -572,19 +577,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
-  morePill: {
+  endButtons: {
+    alignSelf: 'stretch',
+  },
+  moreLink: {
+    alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: brand.champagne,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   moreText: {
-    ...font.bold,
+    ...font.medium,
     fontSize: 12.5,
-    color: brand.midnight,
+    color: colors.heroTextTertiary,
   },
   pressed: {
     opacity: 0.7,
