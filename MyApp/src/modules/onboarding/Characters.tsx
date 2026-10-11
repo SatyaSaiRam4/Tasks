@@ -3,7 +3,8 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 
 
 /**
  * The welcome story's cast, drawn in SVG so they stay sharp at any size and
- * need no image files: Aarav (a boy) and a woman in a kurta, each with a few moods.
+ * need no image files: Aarav (a boy) and a woman in a kurta (Mom; Riya with a
+ * ponytail) and Satya (a young man in a shirt and glasses), each with a few moods.
  */
 export type Mood = 'happy' | 'sad' | 'worried' | 'surprised';
 
@@ -92,10 +93,13 @@ export function Mom({
   size = 190,
   mood = 'happy',
   colors = ['#D8698A', '#8E3A5E'],
+  ponytail = false,
 }: {
   size?: number;
   mood?: Mood;
   colors?: [string, string];
+  /** A high ponytail instead of the bun (Riya). */
+  ponytail?: boolean;
 }) {
   const skin = '#E9B48F';
   const hair = '#3B2620';
@@ -118,11 +122,57 @@ export function Mom({
       <Path d="M44 108 L98 214" stroke="#E7C17A" strokeWidth={7} strokeLinecap="round" opacity={0.85} />
       <Circle cx={65} cy={60} r={28} fill={skin} />
       <Path d="M37 58 C36 28 94 28 93 58 C88 44 77 38 65 40 C53 38 42 44 37 58 Z" fill={hair} />
-      <Circle cx={65} cy={30} r={12} fill={hair} />
+      {ponytail ? (
+        <Path d="M88 40 C104 44 106 70 98 92 C94 76 90 62 84 52 Z" fill={hair} />
+      ) : (
+        <Circle cx={65} cy={30} r={12} fill={hair} />
+      )}
       <Circle cx={65} cy={48} r={2.2} fill="#C0392B" />
       <Circle cx={37} cy={72} r={3} fill="#E7C17A" />
       <Circle cx={93} cy={72} r={3} fill="#E7C17A" />
       <Face cx={65} cy={60} mood={mood} />
+    </Svg>
+  );
+}
+
+/** Satya: a young man in a teal shirt with glasses and short hair. */
+export function Man({ size = 200, mood = 'happy' }: { size?: number; mood?: Mood }) {
+  const skin = '#D9A27A';
+  const hair = '#1E1512';
+  return (
+    <Svg width={size * (130 / 240)} height={size} viewBox="0 0 130 240">
+      <Defs>
+        <LinearGradient id="manShirt" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#3FA7B5" />
+          <Stop offset="1" stopColor="#23707B" />
+        </LinearGradient>
+      </Defs>
+      <Ellipse cx={65} cy={232} rx={40} ry={6} fill="#000" opacity={0.25} />
+      <Rect x={44} y={150} width={17} height={78} rx={7} fill="#2B3550" />
+      <Rect x={69} y={150} width={17} height={78} rx={7} fill="#2B3550" />
+      <Ellipse cx={52} cy={228} rx={12} ry={5} fill="#2A1D17" />
+      <Ellipse cx={78} cy={228} rx={12} ry={5} fill="#2A1D17" />
+      <Rect x={22} y={100} width={15} height={62} rx={7} fill="url(#manShirt)" />
+      <Rect x={93} y={100} width={15} height={62} rx={7} fill="url(#manShirt)" />
+      <Circle cx={29} cy={165} r={7.5} fill={skin} />
+      <Circle cx={101} cy={165} r={7.5} fill={skin} />
+      <Rect x={58} y={84} width={14} height={18} fill={skin} />
+      <Rect x={33} y={94} width={64} height={66} rx={20} fill="url(#manShirt)" />
+      <Path d="M54 95 L65 108 L76 95" stroke="#FFFFFF" strokeWidth={4} fill="none" strokeLinejoin="round" />
+      <Circle cx={65} cy={118} r={2.2} fill="#E8F3F5" />
+      <Circle cx={65} cy={132} r={2.2} fill="#E8F3F5" />
+      <Circle cx={65} cy={146} r={2.2} fill="#E8F3F5" />
+      <Circle cx={37} cy={60} r={5} fill={skin} />
+      <Circle cx={93} cy={60} r={5} fill={skin} />
+      <Circle cx={65} cy={58} r={28} fill={skin} />
+      <Path d="M37 54 C35 26 95 26 93 54 C88 42 76 36 62 38 C50 37 41 43 37 54 Z" fill={hair} />
+      <Path d="M60 34 C72 28 86 32 90 44 C80 38 70 38 60 40 Z" fill={hair} />
+      <Face cx={65} cy={60} mood={mood} />
+      <G stroke="#1D1D1D" strokeWidth={2.2} fill="none">
+        <Circle cx={54} cy={60} r={8} />
+        <Circle cx={76} cy={60} r={8} />
+        <Path d="M62 60 L68 60" />
+      </G>
     </Svg>
   );
 }

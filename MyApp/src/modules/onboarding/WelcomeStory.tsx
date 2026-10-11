@@ -9,7 +9,7 @@ import { RealIcon, type RealIconName } from '../../components/RealIcon';
 import { Icon } from '../../components/Icon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
-import { Kid, Mom } from './Characters';
+import { Kid, Man, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
@@ -18,10 +18,11 @@ import { Kid, Mom } from './Characters';
  * the call. Melo arrives: tell Memo once, days or months ahead, and it
  * reminds you on the day. This time Mom saves it in Memo; on the birthday it
  * reminds her (and sends Papa a WhatsApp), and Aarav calls Grandma. Ends
- * on what the app does, with an optional second part ("See more"): Aarav
- * turns drawing into a plan with daily tasks, his streak grows, he earns the
- * Bronze badge and streaks can earn real money; Mom keeps her private
- * things in the Vault, behind her own PIN. Plays like a phone
+ * on what the app does, with an optional Part 2 (a quiet link at the top
+ * right of the last slide) with a new cast: Satya turns getting fit into a
+ * plan with daily tasks, his streak grows, he earns the Bronze badge and
+ * streaks can earn real money (his friend Riya explains); he keeps his
+ * private things in the Vault, behind his own PIN. Plays like a phone
  * "story": it moves on by itself; tap the right side for next, the left for
  * back.
  *
@@ -43,8 +44,8 @@ const SCENES: Scene[] = [
   { caption: 'Two busy days fly by… and then…', duration: 15500, Body: MissedScene },
   { caption: 'That’s why Memo is here.', duration: 10500, Body: SatyaScene },
   { caption: 'This time, Mom tells Memo.', duration: 19000, Body: RemindScene },
-  { caption: 'Big goals, one small step a day.', duration: 21500, Body: PlanScene },
-  { caption: 'Private things stay private.', duration: 11000, Body: VaultScene },
+  { caption: 'Part 2 · Meet Satya. Big goals, one small step a day.', duration: 21500, Body: PlanScene },
+  { caption: 'Part 2 · Private things stay private.', duration: 11000, Body: VaultScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
 
@@ -84,8 +85,8 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (mode === '3d') web.current?.injectJavaScript(`window.story && window.story.show(${index}); true;`);
-  }, [index, mode]);
+    if (mode === '3d') web.current?.injectJavaScript(`window.story && window.story.show(${index}, ${more ? 2 : 1}); true;`);
+  }, [index, mode, more]);
 
   const go = useCallback(
     (to: number, withMore = more) => {
@@ -181,6 +182,19 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
       </View>
 
       <Animated.View style={[styles.stage, { opacity: fade }]}>
+        {last && !more ? (
+          // Optional, so it's quiet: Part 2 is Satya's story (plans, streaks, rewards, the Vault).
+          <Pressable
+            onPress={() => go(0, true)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Watch part 2: Satya's story about plans, streaks and the Vault"
+            style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}
+          >
+            <Icon name="play" size={11} color={colors.heroTextTertiary} strokeWidth={2.2} />
+            <Text style={styles.moreText}>Part 2</Text>
+          </Pressable>
+        ) : null}
         <Text style={styles.caption} accessibilityRole="header" accessibilityLiveRegion="polite">
           {mode === 'loading' ? ' ' : scene.caption}
         </Text>
@@ -201,22 +215,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         {last ? (
-          <View style={styles.endButtons}>
-            <Button label="Let’s begin" size="lg" onPress={onDone} fullWidth />
-            {more ? null : (
-              // Optional, so it's quiet: plans, streaks, rewards and the Vault.
-              <Pressable
-                onPress={() => go(0, true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Watch part 2: plans, streaks and the Vault"
-                style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}
-              >
-                <Icon name="play" size={11} color={colors.heroTextTertiary} strokeWidth={2.2} />
-                <Text style={styles.moreText}>Part 2</Text>
-              </Pressable>
-            )}
-          </View>
+          <Button label="Let’s begin" size="lg" onPress={onDone} />
         ) : (
           <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}
@@ -260,7 +259,7 @@ function Speech({ text, delay = 0, side = 'left', tone = 'light' }: { text: stri
 // ---- Scenes ------------------------------------------------------------------------
 
 interface Line {
-  who: 'Aarav' | 'Mom';
+  who: 'Aarav' | 'Mom' | 'Satya' | 'Riya';
   text: string;
   mood: 'happy' | 'sad' | 'worried' | 'surprised';
   thought?: boolean;
@@ -282,7 +281,15 @@ function DuoRow({ line, index, compact }: { line: Line; index: number; compact?:
   return (
     <Animated.View style={[styles.trioRow, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
       {/* More lines in a scene: smaller figures, so it all fits on one screen. */}
-      {line.who === 'Aarav' ? <Kid size={compact ? 82 : 120} mood={line.mood} /> : <Mom size={compact ? 92 : 130} mood={line.mood} />}
+      {line.who === 'Aarav' ? (
+        <Kid size={compact ? 82 : 120} mood={line.mood} />
+      ) : line.who === 'Satya' ? (
+        <Man size={compact ? 100 : 140} mood={line.mood} />
+      ) : line.who === 'Riya' ? (
+        <Mom size={compact ? 92 : 130} mood={line.mood} colors={['#F6B04A', '#C97A12']} ponytail />
+      ) : (
+        <Mom size={compact ? 92 : 130} mood={line.mood} />
+      )}
       <View style={styles.flex}>
         <Text style={styles.trioWho}>{line.who}</Text>
         <View style={[styles.speech, styles.speechLeft, line.thought && styles.trioThought]}>
@@ -344,10 +351,10 @@ function PlanScene() {
   return (
     <Duo
       lines={[
-        { who: 'Aarav', mood: 'happy', text: 'Mom, I want to get really good at drawing! 🎨' },
-        { who: 'Mom', mood: 'happy', text: 'Make it a plan in Memo: a few small tasks every day.' },
-        { who: 'Aarav', mood: 'surprised', text: 'Streak 7! I got the Bronze badge! 🥉' },
-        { who: 'Mom', mood: 'happy', text: 'And your streaks can earn real money too! 💰' },
+        { who: 'Satya', mood: 'happy', text: 'Riya, I want to get fit in 30 days! 💪' },
+        { who: 'Riya', mood: 'happy', text: 'Make it a plan in Memo, Satya: a few small tasks every day.' },
+        { who: 'Satya', mood: 'surprised', text: 'Streak 7! I got the Bronze badge! 🥉' },
+        { who: 'Riya', mood: 'happy', text: 'And your streaks can earn real money too! 💰' },
       ]}
     />
   );
@@ -357,8 +364,8 @@ function VaultScene() {
   return (
     <Duo
       lines={[
-        { who: 'Mom', mood: 'happy', text: 'Bank details, ID photos, voice notes? In my private Vault, behind my own PIN. 🔒' },
-        { who: 'Aarav', mood: 'happy', text: 'So only you can open it? Cool! 😎' },
+        { who: 'Satya', mood: 'happy', text: 'My bank details, ID photos and voice notes? In my private Vault, behind my own PIN. 🔒' },
+        { who: 'Riya', mood: 'happy', text: 'So only you can open it? Smart, Satya! 😎' },
       ]}
     />
   );
@@ -577,15 +584,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
-  endButtons: {
-    alignSelf: 'stretch',
-  },
   moreLink: {
-    alignSelf: 'flex-end',
+    position: 'absolute',
+    right: spacing.lg,
+    top: spacing.xs,
+    zIndex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginTop: spacing.sm,
     paddingVertical: spacing.xs,
   },
   moreText: {

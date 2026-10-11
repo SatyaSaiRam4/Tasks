@@ -427,6 +427,7 @@ function makeRoom() {
   room.add(rug);
 
   const wallMat = mat(0x4a3b52, { roughness: 1 });
+  room.userData.wall = wallMat;
   room.add(mesh(new THREE.PlaneGeometry(40, 14), wallMat, { y: 7, z: -2.2, shadow: false }));
   const windowGlow = new THREE.MeshBasicMaterial({ color: 0x2b4a8a });
   room.userData.window = windowGlow;
@@ -446,6 +447,7 @@ function makeRoom() {
   room.add(sofa);
   room.userData.sofa = sofa;
   const sofaMat = mat(0x2f6f73, { roughness: 0.95 });
+  room.userData.sofaMat = sofaMat;
   sofa.add(mesh(new THREE.BoxGeometry(1.8, 0.35, 0.7), sofaMat, { x: 1.4, y: 0.3, z: -1.7 }));
   sofa.add(mesh(new THREE.BoxGeometry(1.8, 0.6, 0.18), sofaMat, { x: 1.4, y: 0.7, z: -2.0 }));
   for (const side of [-1, 1]) sofa.add(mesh(new THREE.BoxGeometry(0.18, 0.5, 0.7), sofaMat, { x: 1.4 + side * 0.9, y: 0.45, z: -1.7 }));
@@ -768,15 +770,14 @@ function makeSparkles(count = 70) {
   return points;
 }
 
-/** Aarav's drawing plan in Memo: a title, the day, and three tasks that tick. */
-function makePlanCard() {
+/** A plan in Memo: its title, the day, and three tasks that tick. */
+function makePlanCard(title, tasks) {
   const canvas = document.createElement('canvas');
   canvas.width = 560;
   canvas.height = 380;
   const c = canvas.getContext('2d');
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const tasks = ['Sketch for 15 minutes', 'Practice shading', 'Draw one new thing'];
   const g = new THREE.Group();
   g.add(mesh(new THREE.PlaneGeometry(1.16, 0.79), new THREE.MeshBasicMaterial({ map: tex, transparent: true }), { shadow: false }));
   /** Redraws for `day` (1–7) with `done` tasks ticked today. */
@@ -795,7 +796,7 @@ function makePlanCard() {
     c.fillText('MEMO · PLAN', 36, 52);
     c.fillStyle = '#efe9dc';
     c.font = '800 38px sans-serif';
-    c.fillText('🎨 Drawing practice', 36, 100);
+    c.fillText(title, 36, 100);
     c.textAlign = 'right';
     c.fillStyle = 'rgba(239,233,220,0.7)';
     c.font = '600 26px sans-serif';
@@ -902,10 +903,17 @@ function makeCoin() {
   });
   const face = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.6, roughness: 0.3 });
   const edge = mat(0xb07a0c, { metalness: 0.8, roughness: 0.3 });
-  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 48), [edge, face, face]);
-  coin.rotation.x = Math.PI / 2;
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 48), edge);
+  rim.rotation.x = Math.PI / 2;
   const g = new THREE.Group();
-  g.add(coin);
+  g.add(rim);
+  // Flat discs for the faces, so the ₹ reads the right way round on both sides.
+  const front = new THREE.Mesh(new THREE.CircleGeometry(0.215, 48), face);
+  front.position.z = 0.026;
+  const back = new THREE.Mesh(new THREE.CircleGeometry(0.215, 48), face);
+  back.position.z = -0.026;
+  back.rotation.y = Math.PI;
+  g.add(front, back);
   return g;
 }
 
@@ -1123,6 +1131,9 @@ function ringPhone(phone, t, a, b, { x = 0.35, y = 1.35, scale = 0.5 } = {}) {
 }
 
 const AARAV = { kind: 'kid' };
+// Part 2: Satya, a young man in a shirt and glasses, and his friend Riya.
+const SATYA = { kind: 'man', skinColor: 0xd9a27a, topColor: 0x2f8f9d, bottomColor: 0x2b3550, hairColor: 0x1e1512, glasses: true };
+const RIYA = { kind: 'woman', skinColor: 0xe6b08a, topColor: 0xf0a43a, hairColor: 0x2a1a14 };
 const MOM = { kind: 'mom', skinColor: 0xe9b48f, topColor: 0xc95c7a, hairColor: 0x3b2620 };
 
 function cast(stage, spec) {
@@ -1146,13 +1157,23 @@ B.calendar = makeCalendar([
 ]);
 B.confetti = makeConfetti(90);
 B.hearts = makeHearts();
-B.plan = makePlanCard();
-B.flame = makeStreakFlame();
-B.medal = makeMedal();
-B.coin = makeCoin();
 B.things = addThings(B);
-B.scene.add(B.phone, B.card, B.calendar, B.confetti, B.hearts, B.plan, B.flame, B.medal, B.coin);
+B.scene.add(B.phone, B.card, B.calendar, B.confetti, B.hearts);
 B.calendar.position.set(1.15, 2.05, -2.15);
+
+// Part 2: Satya's flat (a teal room), with his plan, streak, badge and Vault.
+const P = makeStage();
+P.room.userData.wall.color.set(0x2c4a52);
+P.room.userData.sofaMat.color.set(0x8e3a5e);
+P.satya = cast(P, SATYA);
+P.riya = cast(P, RIYA);
+P.phone = makePhone();
+P.confetti = makeConfetti(110);
+P.plan = makePlanCard('💪 Get fit in 30 days', ['Walk for 20 minutes', 'Do 10 push-ups', 'Drink 8 glasses of water']);
+P.flame = makeStreakFlame();
+P.medal = makeMedal();
+P.coin = makeCoin();
+P.scene.add(P.phone, P.confetti, P.plan, P.flame, P.medal, P.coin);
 
 // Melo's arrival.
 const M = makeStage();
@@ -1170,12 +1191,17 @@ M.scene.add(M.melo, M.sparkles, M.flash);
 const F = makeStage();
 F.aarav = cast(F, AARAV);
 F.mom = cast(F, MOM);
+// Part 2 ends with its own cast.
+F.satya = cast(F, SATYA);
+F.riya = cast(F, RIYA);
 F.melo = new THREE.Group();
 F.melo.isGroup = true;
 F.confetti = makeConfetti(160);
 F.scene.add(F.melo, F.confetti);
 
-const PEOPLE = [B.aarav, B.mom, M.aarav, M.mom, F.aarav, F.mom];
+const PEOPLE = [B.aarav, B.mom, M.aarav, M.mom, F.aarav, F.mom, P.satya, P.riya, F.satya, F.riya];
+/** Which part is playing (the closing scene shows that part's cast). */
+let part = 1;
 // The calendar comes back for the scenes that use it.
 const showCalendar = on => (B.calendar.visible = on);
 
@@ -1293,6 +1319,9 @@ function inHand(prop, p, raise = 0) {
   prop.position.set(p.root.position.x + 0.34, p.hips.position.y + 0.12 + raise, p.root.position.z + 0.3);
   prop.rotation.set(-0.15, -0.3, 0.05);
 }
+
+/** Part 2's grown-ups are taller: the camera sits a little higher and further back. */
+const PART2_CAM = { x: 0, y: 1.45, z: 5.6, look: [0, 1.5, 0], width: 3.3 };
 
 /** Full-screen camera for Aarav and Mom side by side. */
 const STORY_CAM = { x: 0, y: 1.1, z: 4.6, look: [0, 1.15, 0], width: 2.8 };
@@ -1474,31 +1503,31 @@ const SCENES = [
     },
   },
   {
-    // Big goals, one small step a day: Aarav's drawing plan, his streak, a badge and real money.
-    stage: B,
+    // Part 2. Big goals, one small step a day: Satya's fitness plan, his streak, a badge and real money.
+    stage: P,
     steady: true,
     sky: DUSK,
-    camera: STORY_CAM,
+    camera: PART2_CAM,
     setup() {
-      B.aarav.setMood('happy');
-      B.mom.setMood('happy');
-      B.aarav.root.position.set(-0.75, 0, 0.1);
-      B.aarav.root.rotation.y = 0.35;
-      B.mom.root.position.set(0.75, 0, 0);
-      B.mom.root.rotation.y = -0.35;
-      B.calendar.visible = false;
-      B.plan.userData.draw(1, 0);
-      say(B, B.aarav, 'Mom, I want to get really good at drawing! 🎨', 0.4, { until: 3.2 });
-      say(B, B.mom, 'Make it a plan in Memo: a few small tasks every day.', 3.4, { gold: true, until: 6.6 });
-      say(B, B.aarav, 'Streak 7! I got the Bronze badge! 🥉', 12.0, { until: 14.8 });
-      say(B, B.mom, 'And your streaks can earn real money too! 💰', 15.0, { gold: true });
+      P.satya.setMood('happy');
+      P.riya.setMood('happy');
+      P.satya.root.position.set(-0.75, 0, 0.1);
+      P.satya.root.rotation.y = 0.35;
+      P.riya.root.position.set(0.75, 0, 0);
+      P.riya.root.rotation.y = -0.35;
+      P.plan.userData.draw(1, 0);
+      say(P, P.satya, 'Riya, I want to get fit in 30 days! 💪', 0.4, { until: 3.2 });
+      say(P, P.riya, 'Make it a plan in Memo, Satya: a few small tasks every day.', 3.4, { gold: true, until: 6.6 });
+      say(P, P.satya, 'Streak 7! I got the Bronze badge! 🥉', 12.0, { until: 14.8 });
+      say(P, P.riya, 'And your streaks can earn real money too! 💰', 15.0, { gold: true });
     },
     update(t) {
-      // The plan card floats above their heads, never in front of a face.
-      const pop = ease(seg(t, 4.6, 5.3)) * (1 - ease(seg(t, 14.6, 15.2)));
-      B.plan.visible = pop > 0.01;
-      B.plan.scale.setScalar(0.001 + pop);
-      B.plan.position.set(0, 1.98 + 0.03 * Math.sin(t * 1.6), -0.2);
+      // Everything floats between Satya and Riya at chest height: clear of
+      // their faces and of the speech bubbles above their heads.
+      const pop = ease(seg(t, 4.6, 5.3)) * (1 - ease(seg(t, 11.2, 11.7)));
+      P.plan.visible = pop > 0.01;
+      P.plan.scale.setScalar(0.001 + 0.8 * pop);
+      P.plan.position.set(0, 1.28 + 0.03 * Math.sin(t * 1.6), 0.25);
       // Day 1: the three tasks tick one by one; then the next days fly by.
       let day = 1;
       let done = t > 8.0 ? 3 : t > 7.3 ? 2 : t > 6.6 ? 1 : 0;
@@ -1507,71 +1536,71 @@ const SCENES = [
         day = 1 + Math.min(Math.ceil(k), 6);
         done = k >= 6 ? 3 : Math.floor((k - Math.floor(k)) * 4);
       }
-      if (B.plan.userData.day !== day || B.plan.userData.done !== done) {
-        B.plan.userData.day = day;
-        B.plan.userData.done = done;
-        B.plan.userData.draw(day, done);
+      if (P.plan.userData.day !== day || P.plan.userData.done !== done) {
+        P.plan.userData.day = day;
+        P.plan.userData.done = done;
+        P.plan.userData.draw(day, done);
       }
       // The streak: one point for each finished day.
       const streakDays = t < 8.0 ? 0 : t > 8.6 ? Math.min(1 + Math.floor((t - 8.6) / 0.5), 7) : 1;
       const flamePop = ease(seg(t, 5.6, 6.2)) * (1 - ease(seg(t, 14.6, 15.2)));
-      B.flame.visible = flamePop > 0.01;
-      B.flame.scale.setScalar(0.001 + flamePop * (1 + 0.15 * bump(seg(t, 11.6, 12.2))));
-      B.flame.position.set(0.98, 1.86, -0.1);
-      B.flame.userData.update(streakDays, t);
+      P.flame.visible = flamePop > 0.01;
+      P.flame.scale.setScalar(0.001 + 0.62 * flamePop * (1 + 0.15 * bump(seg(t, 11.6, 12.2))));
+      // Just under the plan card (and the badge), in the middle.
+      P.flame.position.set(0, 0.74, 0.32);
+      P.flame.userData.update(streakDays, t);
       // Day 7: the Bronze badge pops up and spins.
       const medalPop = ease(seg(t, 11.6, 12.2)) * (1 - ease(seg(t, 14.6, 15.2)));
-      B.medal.visible = medalPop > 0.01;
-      B.medal.scale.setScalar(0.001 + medalPop * 1.1);
-      B.medal.position.set(-0.98, 1.86 + 0.04 * Math.sin(t * 2), -0.1);
-      B.medal.rotation.y = (t - 11.6) * 2.4;
+      P.medal.visible = medalPop > 0.01;
+      P.medal.scale.setScalar(0.001 + medalPop * 1.35);
+      P.medal.position.set(-0.05, 1.3 + 0.04 * Math.sin(t * 2), 0.3);
+      P.medal.rotation.y = (t - 11.6) * 2.4;
       // Then a coin for the real-money rewards.
       const coinPop = ease(seg(t, 15.0, 15.6));
-      B.coin.visible = coinPop > 0.01;
-      B.coin.scale.setScalar(0.001 + coinPop * 1.2);
+      P.coin.visible = coinPop > 0.01;
+      P.coin.scale.setScalar(0.001 + coinPop * 1.2);
       // Between them at chest height: clear of both faces and of the speech bubble.
-      B.coin.position.set(0, 1.15 + 0.05 * Math.sin(t * 2), 0.3);
-      B.coin.rotation.y = 0.7 * Math.sin(t * 1.6);
-      moves.talk(B.aarav, t, 0.5, 3.0);
-      moves.talk(B.mom, t, 3.5, 6.3);
-      if (t > 6.6 && t < 11.4) moves.nod(B.aarav, t, 6.6, 8.2);
-      moves.jump(B.aarav, t, 12.0, 13.4);
-      moves.clap(B.mom, t, 12.2, 13.8);
-      moves.talk(B.mom, t, 15.1, 17.2);
-      B.confetti.visible = t > 12.0;
-      if (B.confetti.visible) B.confetti.userData.update(t - 12.0);
+      P.coin.position.set(0, 1.15 + 0.05 * Math.sin(t * 2), 0.3);
+      P.coin.rotation.y = 0.7 * Math.sin(t * 1.6);
+      moves.talk(P.satya, t, 0.5, 3.0);
+      moves.talk(P.riya, t, 3.5, 6.3);
+      if (t > 6.6 && t < 11.4) moves.nod(P.satya, t, 6.6, 8.2);
+      moves.jump(P.satya, t, 12.0, 13.4);
+      moves.clap(P.riya, t, 12.2, 13.8);
+      moves.talk(P.riya, t, 15.1, 17.2);
+      P.confetti.visible = t > 12.0;
+      if (P.confetti.visible) P.confetti.userData.update(t - 12.0);
     },
   },
   {
-    // Private things stay private: Mom's Vault, behind her own PIN.
-    stage: B,
+    // Part 2. Private things stay private: Satya's Vault, behind his own PIN.
+    stage: P,
     steady: true,
     sky: NIGHT,
-    camera: STORY_CAM,
+    camera: PART2_CAM,
     setup() {
-      B.aarav.setMood('happy');
-      B.mom.setMood('happy');
-      B.aarav.root.position.set(-0.7, 0, 0.1);
-      B.aarav.root.rotation.y = 0.4;
-      B.mom.root.position.set(0.7, 0, 0);
-      B.mom.root.rotation.y = -0.4;
-      B.calendar.visible = false;
-      B.phone.userData.draw({ type: 'vault-lock', dots: 0 });
-      B.phone.userData.screen = 'lock0';
-      say(B, B.mom, 'Bank details, ID photos, voice notes? In my private Vault, behind my own PIN. 🔒', 0.6, { gold: true, until: 5.4 });
-      say(B, B.aarav, 'So only you can open it? Cool! 😎', 5.6);
+      P.satya.setMood('happy');
+      P.riya.setMood('happy');
+      P.satya.root.position.set(-0.7, 0, 0.1);
+      P.satya.root.rotation.y = 0.4;
+      P.riya.root.position.set(0.7, 0, 0);
+      P.riya.root.rotation.y = -0.4;
+      P.phone.userData.draw({ type: 'vault-lock', dots: 0 });
+      P.phone.userData.screen = 'lock0';
+      say(P, P.riya, 'My bank details, ID photos and voice notes? In my private Vault, behind my own PIN. 🔒', 0.6, { gold: true, until: 5.4 });
+      say(P, P.satya, 'So only you can open it? Smart, Satya! 😎', 5.6);
     },
     update(t) {
       const dots = Math.max(0, Math.min(4, Math.floor((t - 1.4) / 0.35) + 1));
       const screen = t > 3.0 ? 'vault' : `lock${dots}`;
-      if (B.phone.userData.screen !== screen) {
-        B.phone.userData.screen = screen;
-        B.phone.userData.draw(screen === 'vault' ? { type: 'vault' } : { type: 'vault-lock', dots });
+      if (P.phone.userData.screen !== screen) {
+        P.phone.userData.screen = screen;
+        P.phone.userData.draw(screen === 'vault' ? { type: 'vault' } : { type: 'vault-lock', dots });
       }
-      ringPhone(B.phone, t, 0, 0, { x: 0.0, y: 1.3, scale: 0.9 });
-      moves.talk(B.mom, t, 0.7, 5.0);
-      moves.nod(B.aarav, t, 3.2, 4.4);
-      moves.clap(B.aarav, t, 5.8, 7.0);
+      ringPhone(P.phone, t, 0, 0, { x: 0.0, y: 1.3, scale: 0.9 });
+      moves.talk(P.riya, t, 0.7, 5.0);
+      moves.nod(P.satya, t, 3.2, 4.4);
+      moves.clap(P.satya, t, 5.8, 7.0);
     },
   },
   {
@@ -1580,19 +1609,22 @@ const SCENES = [
     sky: NIGHT,
     camera: { x: 0, y: 0.6, z: 6.0, look: [0, -0.3, 0], width: 3.4 },
     setup() {
-      F.aarav.setMood('happy');
-      F.mom.setMood('happy');
-      F.aarav.root.position.set(-1.0, 0, 0.3);
-      F.aarav.root.rotation.y = 0.25;
-      F.mom.root.position.set(1.1, 0, 0);
-      F.mom.root.rotation.y = -0.25;
+      const [left, right] = part === 2 ? [F.satya, F.riya] : [F.aarav, F.mom];
+      F.left = left;
+      F.right = right;
+      left.setMood('happy');
+      right.setMood('happy');
+      left.root.position.set(-1.05, 0, 0.3);
+      left.root.rotation.y = 0.25;
+      right.root.position.set(1.1, 0, 0);
+      right.root.rotation.y = -0.25;
     },
     update(t) {
       F.melo.visible = true;
       F.melo.position.set(0, Math.abs(Math.sin(t * 2.2)) * 0.12, 0.45);
       F.melo.rotation.z = 0.12 * Math.sin(t * 3);
-      moves.wave(F.aarav, t % 3, 0, 2.2, 'L');
-      moves.wave(F.mom, (t + 1.2) % 3, 0, 2.2, 'R');
+      moves.wave(F.left, t % 3, 0, 2.2, 'L');
+      moves.wave(F.right, (t + 1.2) % 3, 0, 2.2, 'R');
       F.confetti.visible = true;
       F.confetti.userData.update(t);
     },
@@ -1644,9 +1676,11 @@ function layout() {
   }
 }
 
-function show(index) {
+/** Shows scene `index`; `whichPart` (1 or 2) picks the closing scene's cast. */
+function show(index, whichPart = part) {
   const s = SCENES[index];
   if (!s) return;
+  part = whichPart;
   current = index;
   startedAt = performance.now();
   clearOverlay();
@@ -1691,7 +1725,7 @@ function listen(stage, t) {
   const speaker = speakerOn(stage, t);
   if (!speaker) return;
   const sx = speaker.isGroup ? speaker.position.x : speaker.root.position.x;
-  for (const p of [stage.aarav, stage.mom]) {
+  for (const p of [stage.aarav, stage.mom, stage.satya, stage.riya]) {
     if (!p || p === speaker) continue;
     const dx = sx - p.root.position.x;
     if (Math.abs(dx) > 0.15) p.head.rotation.y += 0.32 * Math.sign(dx) - 0.5 * p.root.rotation.y * 0.3;
@@ -1747,7 +1781,7 @@ function frame(now) {
   placeBubbles(t);
 }
 
-show(Number(params.get('scene') || 0));
+show(Number(params.get('scene') || 0), Number(params.get('part') || 1));
 // For checking a moment of a scene in a browser: ?scene=2&at=3 starts 3 s in.
 if (params.get('at')) startedAt -= Number(params.get('at')) * 1000 * SLOW;
 requestAnimationFrame(frame);

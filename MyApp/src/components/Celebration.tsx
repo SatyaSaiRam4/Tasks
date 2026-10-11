@@ -21,9 +21,11 @@ export interface CelebrationSpec {
 
 interface CelebrationApi {
   celebrate: (spec: CelebrationSpec) => void;
+  /** A celebration card is on screen (or waiting): hold back anything that should be seen. */
+  active: boolean;
 }
 
-const CelebrationContext = createContext<CelebrationApi>({ celebrate: () => undefined });
+const CelebrationContext = createContext<CelebrationApi>({ celebrate: () => undefined, active: false });
 
 export function useCelebration() {
   return useContext(CelebrationContext);
@@ -42,7 +44,7 @@ export function CelebrationProvider({ children }: { children: React.ReactNode })
     AccessibilityInfo.announceForAccessibility(`${spec.eyebrow}. ${spec.title}`);
   }, []);
 
-  const value = useMemo(() => ({ celebrate }), [celebrate]);
+  const value = useMemo(() => ({ celebrate, active: queue.length > 0 }), [celebrate, queue.length]);
 
   return (
     <CelebrationContext.Provider value={value}>

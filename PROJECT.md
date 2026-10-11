@@ -508,8 +508,11 @@ have streaks). Keep it honest: update the table when those apps change.
   the camera steady (`steady: true`).
 - The story plays its first part by default (the birthday: four scenes and
   the closing features). The second part, plans and streaks and the Vault,
-  is optional: a quiet “▶ Part 2” link at the bottom right of the last
-  slide, and it has its own progress bars.
+  is optional: a quiet “▶ Part 2” link at the top right of the last slide,
+  above the caption, with its own progress bars and its own cast: Satya (a
+  young man in glasses) and his friend Riya, in Satya's teal flat (stage
+  `P`, camera `PART2_CAM`). Its closing scene shows them too
+  (`story.show(index, part)`).
   Story time runs 1.15× slower than real time.
 - Badges (`useBadges` in `modules/streaks/Tiers.tsx`): a newly reached badge
   still looks locked everywhere until the first time Home is on screen.
@@ -518,5 +521,8 @@ have streaks). Keep it honest: update the table when those apps change.
   a short vibration) and its congratulations card opens. `badge_seen` on the
   server records it (mirrored on the phone), so it happens once, on any
   device; a badge is never treated as seen just because that record is
-  missing. Before the tremble it beats like a heart. Plan celebrations
-  don't mention badges.
+  missing. Before the tremble it beats like a heart. The reveal waits until
+  Home is on screen and no other celebration card is open. Plan
+  celebrations don't mention badges. Migration `d4e7a1c9b5f2` cleared
+  `badge_seen` once, so badges earned on earlier test builds get their
+  reveal.

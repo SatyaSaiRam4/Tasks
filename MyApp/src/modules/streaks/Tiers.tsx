@@ -49,7 +49,8 @@ const seenInMemory = new Map<string, number>();
 const seenOnPhone = new Map<string, number>();
 const loading = new Set<string>();
 const listeners = new Set<() => void>();
-const phoneKey = (userId: string) => `@memo/badge_seen_${userId}`;
+// v2: earlier test builds marked badges seen without revealing them.
+const phoneKey = (userId: string) => `@memo/badge_seen_v2_${userId}`;
 const notify = () => listeners.forEach(fn => fn());
 
 function loadFromPhone(userId: string) {

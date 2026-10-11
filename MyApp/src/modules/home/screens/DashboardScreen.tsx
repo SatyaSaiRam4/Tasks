@@ -49,6 +49,8 @@ export function DashboardScreen() {
   // congratulations card opens. Until then it looks locked everywhere.
   const badges = useBadges(best ?? 0);
   const focused = useIsFocused();
+  // Never behind another card (e.g. "+1 streak" right after a tick on Home).
+  const { active: celebrating } = useCelebration();
   const [reveal, setReveal] = useState(-1);
   const pending = best === undefined ? -1 : badges.pending;
   useEffect(() => {
@@ -56,10 +58,10 @@ export function DashboardScreen() {
       setReveal(-1); // left Home mid-reveal: it plays again next time
       return;
     }
-    if (pending < 0) return;
+    if (pending < 0 || celebrating || reveal >= 0) return;
     const id = setTimeout(() => setReveal(pending), 700);
     return () => clearTimeout(id);
-  }, [focused, pending]);
+  }, [focused, pending, celebrating, reveal]);
   const onRevealed = useCallback(
     (index: number) => {
       setReveal(-1);
