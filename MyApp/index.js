@@ -17,17 +17,24 @@ import { handleNotificationEvent } from './src/notifications';
 // Stops a ringing alarm when Stop is pressed while the app is closed.
 notifee.onBackgroundEvent(handleNotificationEvent);
 
+// The theme is applied once per JavaScript session. Android can mount this
+// component again in the same session (the activity is recreated, e.g. after
+// the camera or a dark-mode switch); then the app is simply shown again.
+let LoadedApp = null;
+
 function Bootstrap() {
-  const [App, setApp] = useState(null);
+  const [App, setApp] = useState(() => LoadedApp);
 
   useEffect(() => {
+    if (LoadedApp) return;
     AsyncStorage.getMany([ACCENT_STORAGE_KEY, THEME_STORAGE_KEY])
       .catch(() => [])
       .then(values => {
         applyTheme(values[THEME_STORAGE_KEY]);
         const accent = values[ACCENT_STORAGE_KEY];
         applyAccent(accent);
-        setApp(() => require('./App').default);
+        LoadedApp = require('./App').default;
+        setApp(() => LoadedApp);
       });
   }, []);
 
