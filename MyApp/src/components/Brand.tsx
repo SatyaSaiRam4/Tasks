@@ -3,26 +3,27 @@ import { Image, Platform, StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { brand, colors, shadow } from '../theme';
 
-// Transparent PNGs cut from the Memo logo.
+// The Memo mark (a gold M with a sparkle) and the stacked logo, as
+// transparent PNGs: bright gold for dark grounds, deeper gold and navy type
+// for light ones (sources and the generator are in /branding).
 const LOGO = require('../../assets/images/memo-logo.png');
+const LOGO_LIGHT = require('../../assets/images/memo-logo-light.png');
 const MARK = require('../../assets/images/memo-mark.png');
-const LOGO_RATIO = 439 / 352;
-const MARK_RATIO = 439 / 276;
+const MARK_LIGHT = require('../../assets/images/memo-mark-light.png');
+const LOGO_RATIO = 661 / 827;
+const MARK_RATIO = 639 / 579;
 
 /**
- * The neon logo is made for a dark ground. In the light theme (or when
- * `tile` is set) it sits on a small midnight tile, like an app icon, so it
- * keeps its glow instead of washing out on cream.
+ * Memo's "M" mark (without the word), `size` tall: bright gold on dark
+ * grounds, deep gold on light ones. `bright` forces the bright one (for the
+ * midnight hero cards); `tile` puts it on a midnight tile, like the app icon.
  */
-function onTile(tile?: boolean) {
-  return tile ?? !colors.isDark;
-}
-
-/** Memo's "M" mark (without the word), `size` tall. */
-export function BrandMark({ size = 32, tile }: { size?: number; tile?: boolean }) {
-  const image = <Image source={MARK} style={{ height: size, width: size * MARK_RATIO }} resizeMode="contain" accessibilityIgnoresInvertColors />;
-  if (!onTile(tile)) return image;
-  const pad = Math.round(size * 0.18);
+export function BrandMark({ size = 32, tile, bright }: { size?: number; tile?: boolean; bright?: boolean }) {
+  const image = (
+    <Image source={colors.isDark || tile || bright ? MARK : MARK_LIGHT} style={{ height: size, width: size * MARK_RATIO }} resizeMode="contain" accessibilityIgnoresInvertColors />
+  );
+  if (!tile) return image;
+  const pad = Math.round(size * 0.22);
   return <View style={[styles.tile, shadow.card, { padding: pad, borderRadius: size * 0.34 }]}>{image}</View>;
 }
 
@@ -68,14 +69,20 @@ export function BrandName({ size = 24, light = false }: { size?: number; light?:
  */
 export function Wordmark({ size = 'md', light = false }: { size?: 'sm' | 'md' | 'lg'; light?: boolean }) {
   if (size === 'lg') {
-    const image = (
-      <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityRole="header" accessibilityLabel="Memo" accessibilityIgnoresInvertColors />
+    return (
+      <Image
+        source={light || colors.isDark ? LOGO : LOGO_LIGHT}
+        style={styles.logo}
+        resizeMode="contain"
+        accessibilityRole="header"
+        accessibilityLabel="Memo"
+        accessibilityIgnoresInvertColors
+      />
     );
-    return onTile(light ? false : undefined) ? <View style={[styles.tile, styles.logoTile, shadow.float]}>{image}</View> : image;
   }
   return (
     <View style={styles.row} accessibilityRole="header" accessibilityLabel="Memo">
-      <BrandMark size={size === 'sm' ? 26 : 32} tile={light ? false : undefined} />
+      <BrandMark size={size === 'sm' ? 26 : 32} bright={light} />
       <BrandName size={size === 'sm' ? 25 : 28} light={light} />
     </View>
   );
@@ -92,12 +99,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(212, 175, 106, 0.35)',
   },
-  logoTile: {
-    padding: 18,
-    borderRadius: 32,
-  },
   logo: {
-    height: 120,
-    width: 120 * LOGO_RATIO,
+    height: 150,
+    width: 150 * LOGO_RATIO,
   },
 });

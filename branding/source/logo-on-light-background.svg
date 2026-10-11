@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560">
+  <defs>
+    <radialGradient id="bgplight" cx="50%" cy="32%" r="78%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.55" stop-color="#F8F1E3"/><stop offset="1" stop-color="#EADCC2"/></radialGradient>
+    <radialGradient id="haloplight" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#B48B45" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#B48B45" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="560" rx="0" fill="url(#bgplight)"/>
+  <circle cx="800.0" cy="800.0" r="672.0" fill="url(#haloplight)"/>
+  <defs>
+    <linearGradient id="golight" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#E9C47A"/><stop offset="0.45" stop-color="#C9963E"/><stop offset="0.8" stop-color="#9E6A1F"/><stop offset="1" stop-color="#7A4E12"/></linearGradient>
+    <linearGradient id="hlolight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="mkolight">
+      <path d="M 318 700 L 318 338 L 512 566 L 706 338 L 706 700" fill="none" stroke="#fff" stroke-width="98" stroke-linecap="round" stroke-linejoin="round"/>
+    </mask>
+    <filter id="sholight" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#3B2A10" flood-opacity="0.28"/></filter>
+  </defs>
+  <g transform="translate(20.5 41.5) scale(0.5)">
+    <g filter="url(#sholight)">
+      <path d="M 318 700 L 318 338 L 512 566 L 706 338 L 706 700" fill="none" stroke="url(#golight)" stroke-width="98" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M790 206 C797 248 808 257 848 264 C808 271 797 280 790 322 C783 280 772 271 732 264 C772 257 783 248 790 206 Z" fill="url(#golight)"/>
+      <path d="M232 286 C235 304 240 308 258 311 C240 314 235 318 232 336 C229 318 224 314 206 311 C224 308 229 304 232 286 Z" fill="url(#golight)" opacity="0.85"/>
+    </g>
+    <!-- A polished edge: a soft light along the top of the strokes. -->
+    <g mask="url(#mkolight)">
+      <path d="M 318 700 L 318 338 L 512 566 L 706 338 L 706 700" transform="translate(-9 -12)" fill="none" stroke="url(#hlolight)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g><text x="560" y="380" font-family="Cormorant" font-size="300" font-style="italic" fill="#0B1122" letter-spacing="2">Memo</text></svg>
