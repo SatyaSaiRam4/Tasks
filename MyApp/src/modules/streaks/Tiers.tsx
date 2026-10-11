@@ -1,7 +1,8 @@
-import React, { useCallback, useId, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useCelebration } from '../../components/Celebration';
 import { useGetMeQuery, useUpdateSettingsMutation } from '../users/usersApi';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { useMotion } from '../../hooks/useMotion';
 import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { colors, font, gradients, radius, spacing, type as t } from '../../theme';
 import { Sheet } from '../../components/Sheet';
@@ -42,28 +43,46 @@ export function tierIndex(best: number): number {
 }
 
 const seenInMemory = new Map<string, number>();
+const listeners = new Set<() => void>();
+function markSeen(userId: string, index: number) {
+  seenInMemory.set(userId, Math.max(seenInMemory.get(userId) ?? -1, index));
+  listeners.forEach(fn => fn());
+}
 
 /**
- * Congratulates the user once for each streak badge they reach ("Congrats!
- * You've upgraded to Bronze"). Which badge was last congratulated is kept on
- * the server (`badge_seen`), so it works the same on every device and after
- * reinstalling, and nobody is told twice.
+ * Badges appear earned only once they've been revealed on Home: until then a
+ * newly reached badge still looks locked everywhere (Home, Profile). The
+ * last revealed badge is kept on the server (`badge_seen`), so every device
+ * agrees and nobody sees the same reveal twice.
  */
-export function useBadgeCongrats() {
+export function useBadges(best: number) {
   const me = useGetMeQuery();
   const [update] = useUpdateSettingsMutation();
   const { celebrate } = useCelebration();
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const fn = () => rerender(n => n + 1);
+    listeners.add(fn);
+    return () => {
+      listeners.delete(fn);
+    };
+  }, []);
   const id = me.data?.id;
   const serverSeen = me.data?.settings.badge_seen;
-  return useCallback(
-    (best: number) => {
-      if (!id || serverSeen === undefined) return;
-      const seen = Math.max(serverSeen, seenInMemory.get(id) ?? -1);
-      const reached = tierIndex(best);
-      if (reached <= seen) return;
-      seenInMemory.set(id, reached);
-      const tier = TIERS[reached];
-      const next = TIERS[reached + 1];
+  const reached = tierIndex(best);
+  // Until the account has loaded, show what's reached (no locked flash).
+  const seen = id === undefined || serverSeen === undefined ? reached : Math.max(serverSeen, seenInMemory.get(id) ?? -1);
+  const shown = Math.min(reached, seen);
+  /** The badge waiting to be revealed, or -1. */
+  const pending = reached > seen ? reached : -1;
+
+  /** After the reveal animation: mark it seen and open its congratulations card. */
+  const congratulate = useCallback(
+    (index: number) => {
+      if (!id || index < 0) return;
+      markSeen(id, index);
+      const tier = TIERS[index];
+      const next = TIERS[index + 1];
       celebrate({
         icon: 'award',
         tone: 'primary',
@@ -80,10 +99,11 @@ export function useBadgeCongrats() {
           { label: 'Best streak', value: String(best) },
         ],
       });
-      update({ badge_seen: reached }).catch(() => undefined);
+      update({ badge_seen: index }).catch(() => undefined);
     },
-    [id, serverSeen, celebrate, update],
+    [id, best, celebrate, update],
   );
+  return { shown, pending, congratulate };
 }
 
 export function earnedCount(best: number) {
@@ -150,11 +170,12 @@ export function TierBadge({ tier, earned, size = 64 }: { tier: Tier; earned: boo
 export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
   const [shown, setShown] = useState<Tier>(TIERS[0]);
   const [open, setOpen] = useState(false);
+  const badges = useBadges(best);
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {TIERS.map(tier => {
-          const earned = best >= tier.days;
+        {TIERS.map((tier, index) => {
+          const earned = index <= badges.shown;
           return (
             <Pressable
               key={tier.key}
@@ -172,7 +193,7 @@ export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
           );
         })}
       </ScrollView>
-      <TierSheet tier={shown} visible={open} best={best} onClose={() => setOpen(false)} />
+      <TierSheet tier={shown} visible={open} best={best} earned={TIERS.indexOf(shown) <= badges.shown} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -181,14 +202,40 @@ export function TierRow({ best, size = 58 }: { best: number; size?: number }) {
  * All six badges as one small, even row (no names), for tight spots like the
  * Home streak card. Earned ones shine; tap any for its steps.
  */
-export function BadgeStrip({ best, size = 30, labels }: { best: number; size?: number; labels?: 'hero' | 'default' }) {
+export function BadgeStrip({
+  best,
+  size = 30,
+  labels,
+  reveal = -1,
+  onRevealed,
+}: {
+  best: number;
+  size?: number;
+  labels?: 'hero' | 'default';
+  /** The badge to bring to life now (it unlocks in place), or -1. */
+  reveal?: number;
+  onRevealed?: (index: number) => void;
+}) {
   const [shown, setShown] = useState<Tier>(TIERS[0]);
   const [open, setOpen] = useState(false);
+  const badges = useBadges(best);
   return (
     <>
       <View style={styles.strip}>
-        {TIERS.map(tier => {
-          const earned = best >= tier.days;
+        {TIERS.map((tier, index) => {
+          const earned = index <= badges.shown;
+          if (index === reveal) {
+            return (
+              <View key={tier.key} style={[styles.stripCell, styles.revealCell]}>
+                <RevealBadge tier={tier} size={size} onDone={() => onRevealed?.(index)} />
+                {labels ? (
+                  <Text style={[styles.stripName, labels === 'hero' && styles.stripNameHero]} numberOfLines={1}>
+                    {tier.name}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          }
           return (
             <Pressable
               key={tier.key}
@@ -214,14 +261,112 @@ export function BadgeStrip({ best, size = 30, labels }: { best: number; size?: n
           );
         })}
       </View>
-      <TierSheet tier={shown} visible={open} best={best} onClose={() => setOpen(false)} />
+      <TierSheet tier={shown} visible={open} best={best} earned={TIERS.indexOf(shown) <= badges.shown} onClose={() => setOpen(false)} />
     </>
   );
 }
 
+const SPARKS = 10;
+const SPARK_WHITE = '#FFFFFF';
+
+/**
+ * A locked badge coming to life, like a game unlock: it trembles and starts
+ * to glow, cracks open in a flash of light with sparks flying out, turns
+ * into the earned medal and settles with a bounce. Then onDone().
+ */
+function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone: () => void }) {
+  const { reduced } = useMotion();
+  const shake = useRef(new Animated.Value(0)).current;
+  const grow = useRef(new Animated.Value(0)).current;
+  const flash = useRef(new Animated.Value(0)).current;
+  const [lit, setLit] = useState(false);
+  const done = useRef(onDone);
+  done.current = onDone;
+
+  useEffect(() => {
+    if (reduced) {
+      setLit(true);
+      const id = setTimeout(() => done.current(), 300);
+      return () => clearTimeout(id);
+    }
+    const unlock = setTimeout(() => {
+      setLit(true);
+      Vibration.vibrate(40);
+    }, 1250);
+    const anim = Animated.sequence([
+      // Comes to life: a growing tremble while it swells and glows.
+      Animated.parallel([
+        Animated.timing(shake, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(grow, { toValue: 1, duration: 1200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]),
+      // Breaks open: a flash, and it pops.
+      Animated.parallel([
+        Animated.timing(flash, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(grow, { toValue: 2, duration: 220, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
+      ]),
+      // Settles back into its place.
+      Animated.spring(grow, { toValue: 3, useNativeDriver: true, bounciness: 14, speed: 6 }),
+    ]);
+    anim.start(() => setTimeout(() => done.current(), 250));
+    return () => {
+      clearTimeout(unlock);
+      anim.stop();
+    };
+  }, [reduced, shake, grow, flash]);
+
+  const rotate = shake.interpolate({
+    inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+    outputRange: ['0deg', '-3deg', '3deg', '-5deg', '5deg', '-7deg', '7deg', '-10deg', '10deg', '-12deg', '0deg'],
+  });
+  const scale = grow.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [1, 1.35, 2.1, 1.15] });
+  const glow = grow.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [0, 0.9, 1, 0.45] });
+  const ring = flash.interpolate({ inputRange: [0, 1], outputRange: [0.4, 3.4] });
+  const ringOpacity = flash.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.95, 0] });
+  const halo = size * 1.6;
+
+  return (
+    <View style={[styles.revealBox, { width: size, height: size }]} accessibilityLabel={`${tier.name} badge unlocked`}>
+      {/* The glow building up behind it. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.revealGlow, { width: halo, height: halo, borderRadius: halo / 2, backgroundColor: tier.metal[1], opacity: glow, transform: [{ scale }] }]}
+      />
+      {/* The flash ring as it breaks open. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.revealRing, { width: size, height: size, borderRadius: size / 2, opacity: ringOpacity, transform: [{ scale: ring }] }]}
+      />
+      {/* Sparks flying out. */}
+      {Array.from({ length: SPARKS }, (_, i) => {
+        const angle = (i / SPARKS) * Math.PI * 2;
+        const dist = size * (1.5 + (i % 3) * 0.35);
+        return (
+          <Animated.View
+            key={i}
+            pointerEvents="none"
+            style={[
+              styles.spark,
+              {
+                backgroundColor: i % 2 ? tier.metal[0] : SPARK_WHITE,
+                opacity: ringOpacity,
+                transform: [
+                  { translateX: flash.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * dist] }) },
+                  { translateY: flash.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * dist] }) },
+                ],
+              },
+            ]}
+          />
+        );
+      })}
+      <Animated.View style={{ transform: [{ rotate }, { scale }] }}>
+        <TierBadge tier={tier} earned={lit} size={size} />
+      </Animated.View>
+    </View>
+  );
+}
+
 /** The steps for one tier: what it takes, how far along, and the full ladder. */
-function TierSheet({ tier, visible, best, onClose }: { tier: Tier; visible: boolean; best: number; onClose: () => void }) {
-  const earned = best >= tier.days;
+function TierSheet({ tier, visible, best, earned, onClose }: { tier: Tier; visible: boolean; best: number; earned: boolean; onClose: () => void }) {
   return (
     <Sheet visible={visible} onClose={onClose}>
       <View style={styles.sheetHead}>
@@ -277,6 +422,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  revealCell: {
+    zIndex: 10,
+    elevation: 10,
+  },
+  revealBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revealGlow: {
+    position: 'absolute',
+  },
+  revealRing: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  spark: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   stripCell: {
     alignItems: 'center',

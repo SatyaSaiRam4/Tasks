@@ -6,6 +6,7 @@ import { brand, colors, font, gradients, radius, spacing } from '../../theme';
 import { Gradient } from '../../components/Gradient';
 import { Button } from '../../components/Button';
 import { RealIcon, type RealIconName } from '../../components/RealIcon';
+import { Icon } from '../../components/Icon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
 import { Kid, Mom } from './Characters';
@@ -174,6 +175,18 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
           <Pressable onPress={onDone} hitSlop={12} accessibilityRole="button" style={styles.skip}>
             <Text style={styles.skipText}>Skip</Text>
           </Pressable>
+        ) : !more ? (
+          // The optional second part: plans, streaks, rewards and the Vault.
+          <Pressable
+            onPress={() => go(MORE_START, true)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Watch part 2: plans, streaks and the Vault"
+            style={({ pressed }) => [styles.morePill, pressed && styles.pressed]}
+          >
+            <Icon name="play" size={11} color={brand.midnight} strokeWidth={2.6} />
+            <Text style={styles.moreText}>Part 2</Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -198,13 +211,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         {last ? (
-          <View style={styles.endButtons}>
-            <Button label="Let’s begin" size="lg" onPress={onDone} fullWidth />
-            {/* The second part is optional: plans, streaks, rewards and the Vault. */}
-            {more ? null : (
-              <Button label="See more: plans, streaks & Vault" variant="ghost" icon="play" onPress={() => go(MORE_START, true)} />
-            )}
-          </View>
+          <Button label="Let’s begin" size="lg" onPress={onDone} />
         ) : (
           <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}
@@ -565,9 +572,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
-  endButtons: {
-    alignSelf: 'stretch',
-    gap: spacing.xs,
+  morePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: brand.champagne,
+  },
+  moreText: {
+    ...font.bold,
+    fontSize: 12.5,
+    color: brand.midnight,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   hint: {
     ...font.medium,

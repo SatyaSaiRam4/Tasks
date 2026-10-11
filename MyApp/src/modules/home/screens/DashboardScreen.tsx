@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
@@ -22,7 +22,7 @@ import { formatDateTime } from '../../../utils/date';
 import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks/streaksApi';
 import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
-import { BadgeStrip, useBadgeCongrats } from '../../streaks/Tiers';
+import { BadgeStrip, useBadges } from '../../streaks/Tiers';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -44,16 +44,29 @@ export function DashboardScreen() {
   const { celebrate } = useCelebration();
   const best = data?.streak.best_streak;
 
-  // A new badge is revealed here, on Home, with its own celebration: right
-  // after coming back from the plan where it was earned (once Home is on
-  // screen and its streak has refreshed).
-  const congratulateBadge = useBadgeCongrats();
+  // A new badge is revealed here, the first time Home is on screen after it
+  // was earned: the locked badge comes to life in the streak card, then its
+  // congratulations card opens. Until then it looks locked everywhere.
+  const badges = useBadges(best ?? 0);
   const focused = useIsFocused();
+  const [reveal, setReveal] = useState(-1);
+  const pending = best === undefined ? -1 : badges.pending;
   useEffect(() => {
-    if (!focused || best === undefined) return;
-    const id = setTimeout(() => congratulateBadge(best), 650);
+    if (!focused) {
+      setReveal(-1); // left Home mid-reveal: it plays again next time
+      return;
+    }
+    if (pending < 0) return;
+    const id = setTimeout(() => setReveal(pending), 700);
     return () => clearTimeout(id);
-  }, [focused, best, congratulateBadge]);
+  }, [focused, pending]);
+  const onRevealed = useCallback(
+    (index: number) => {
+      setReveal(-1);
+      badges.congratulate(index);
+    },
+    [badges],
+  );
   const celebrated = useRef(false);
 
   // Celebrate finished categories the user hasn't seen yet.
@@ -119,6 +132,8 @@ export function DashboardScreen() {
           lit={streak.today.plans_done > 0}
           onPress={() => navigation.navigate('Consistency')}
           onWallet={() => navigation.navigate('Wallet')}
+          reveal={reveal}
+          onRevealed={onRevealed}
         />
       </FadeIn>
 
@@ -173,6 +188,8 @@ function StreakHero({
   lit,
   onPress,
   onWallet,
+  reveal,
+  onRevealed,
 }: {
   count: number;
   best: number;
@@ -180,6 +197,8 @@ function StreakHero({
   lit: boolean;
   onPress: () => void;
   onWallet: () => void;
+  reveal: number;
+  onRevealed: (index: number) => void;
 }) {
   return (
     <Card tone="hero" onPress={onPress} contentStyle={styles.streak} accessibilityLabel={`Streak ${count}. Today plus ${today}. Best ${best}. Open streak history.`}>
@@ -194,7 +213,7 @@ function StreakHero({
         <Stat label="Best" value={String(best)} />
       </View>
       <View style={styles.badges}>
-        <BadgeStrip best={best} size={28} labels="hero" />
+        <BadgeStrip best={best} size={28} labels="hero" reveal={reveal} onRevealed={onRevealed} />
       </View>
       <Pressable onPress={onWallet} style={({ pressed }) => [styles.quote, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Earn money with streaks. Open Wallet.">
         <RealIcon name="coin" size={20} />

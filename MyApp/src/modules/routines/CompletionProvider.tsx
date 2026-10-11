@@ -10,7 +10,6 @@ import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
-import { TIERS } from '../streaks/Tiers';
 
 interface Target {
   actionId: string;
@@ -51,17 +50,16 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
     try {
       const result = await complete({ id: current.actionId, method: mode }).unwrap();
       close();
-      // A badge reached by this tick is revealed on Home (see useBadgeCongrats).
-      const badgeWaiting = Boolean(result.plan_just_finished) && TIERS.some(tier => tier.days === result.best_streak);
+      // A badge reached by this tick isn't mentioned here: it's revealed the
+      // next time Home is on screen (see useBadges).
       if (result.day_just_secured) {
         celebrate({
           icon: 'flame',
           tone: 'streak',
           eyebrow: 'Day complete',
           title: result.plan_just_finished ? 'Congrats! +1 streak' : `Streak ${result.current_streak}`,
-          subtitle: badgeWaiting
-            ? 'All of today’s plans are done. A new badge is waiting for you on Home! 🏅'
-            : result.current_streak > 1
+          subtitle:
+            result.current_streak > 1
               ? 'All of today’s plans are done. Brilliant!'
               : 'All of today’s plans are done. Come back tomorrow to keep it going.',
           stats: [
@@ -79,7 +77,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           title: 'Congrats! You earned 1 streak',
           subtitle: `${result.plan_name ? `“${result.plan_name}” is done for today. ` : ''}${
             left > 0 ? `${left} more plan${left === 1 ? '' : 's'} to go today.` : ''
-          }${badgeWaiting ? ' A new badge is waiting for you on Home! 🏅' : ''}`.trim(),
+          }`.trim(),
           stats: [
             { label: 'Current', value: String(result.current_streak) },
             { label: 'Best', value: String(result.best_streak) },
