@@ -16,6 +16,8 @@ export interface WalletRedemption {
 
 export interface Wallet {
   best_streak: number;
+  /** Includes today's finished plans, like the dashboard. */
+  live_best_streak?: number;
   earned: number;
   redeemed: number;
   balance: number;

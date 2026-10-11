@@ -20,7 +20,7 @@ export interface TokenResponse {
 }
 
 /** Endpoints that send a file (multipart form): fetch sets their content type. */
-const UPLOAD_ENDPOINTS = new Set(['uploadVaultAudio', 'uploadPhoto']);
+const UPLOAD_ENDPOINTS = new Set(['uploadVaultAudio', 'uploadPhoto', 'uploadVaultImage']);
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,

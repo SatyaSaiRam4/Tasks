@@ -122,7 +122,7 @@ function UnlockedVault() {
             title={showDeleted ? 'Bin' : 'Vault'}
             right={
               <View style={styles.titleIcons}>
-                {showDeleted ? null : <IconButton icon="trash" accessibilityLabel="Open the bin" onPress={() => openDeleted(true)} />}
+                {showDeleted ? null : <IconButton glyph={<RealIcon name="bin" size={24} />} accessibilityLabel="Open the bin" onPress={() => openDeleted(true)} />}
                 <IconButton icon="lock" accessibilityLabel="Lock Vault" onPress={lock} />
               </View>
             }
@@ -241,6 +241,7 @@ function UnlockedVault() {
                             <Text style={[t.caption, styles.preview]} numberOfLines={1}>
                               {formatClock(e.created_at)}
                               {e.has_audio ? ` · 🎙 ${Math.floor((e.audio_seconds ?? 0) / 60)}:${String((e.audio_seconds ?? 0) % 60).padStart(2, '0')}` : ''}
+                              {e.image_count ? ` · 📷 ${e.image_count}` : ''}
                               {e.preview ? ` · ${e.preview}` : ''}
                             </Text>
                           </View>

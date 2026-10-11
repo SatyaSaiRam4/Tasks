@@ -253,7 +253,8 @@ export function SettingsScreen() {
           </View>
         </View>
         {toggle('animations_enabled', 'Animations', 'Celebrations, counters and transitions', false, 'sparkles')}
-        {toggle('reduced_motion', 'Reduced motion', 'Keep only essential movement', true, 'eye')}
+        {toggle('reduced_motion', 'Reduced motion', 'Keep only essential movement', false, 'eye')}
+        {toggle('tap_sound', 'Tap sound', 'A soft click when you tap', true, 'zap')}
       </ListGroup>
 
       <SectionHeader title="Notifications" />

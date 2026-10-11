@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -44,7 +44,6 @@ export function ConsistencyScreen() {
   const history = useGetHistoryQuery(today ? { from, to: today } : undefined, { skip: !today });
   const completions = useGetTrackCompletionsQuery();
   const warningsOn = useAppSelector(s => s.preferences.notifyStreakWarnings);
-  const heatmapScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const { columns } = useLayout();
 
   const s = streak.data;
@@ -125,15 +124,8 @@ export function ConsistencyScreen() {
           <SectionHeader title="Six-month calendar" />
           <Card>
             {history.data ? (
-              <ScrollView
-                ref={heatmapScroll}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                // Start at the newest weeks (today) once the calendar is measured.
-                onContentSizeChange={() => heatmapScroll.current?.scrollToEnd({ animated: false })}
-              >
-                <Heatmap days={history.data} cell={14} legend={false} />
-              </ScrollView>
+              // Only the weeks scroll sideways; Monday to Sunday stay in place.
+              <Heatmap days={history.data} cell={14} legend={false} scrollable />
             ) : (
               <Skeleton height={130} />
             )}

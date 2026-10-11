@@ -310,3 +310,41 @@ def test_vault_voice_note_is_encrypted_and_private(client, auth, db):
     bad = client.put(f"{API}/vault/entries/{note['id']}/audio", files={"file": ("x.txt", b"hi", "text/plain")}, data={"seconds": "1"}, headers=vh)
     assert bad.status_code == 415
     assert client.delete(f"{API}/vault/entries/{note['id']}/audio", headers=vh).json()["has_audio"] is False
+
+
+def test_forgot_vault_pin_resets_with_the_account_password_and_keeps_notes(client, auth):
+    vh = unlock_headers(client, auth)
+    note = client.post(f"{API}/vault/entries", json={"title": "Keep me", "content": "safe"}, headers=vh).json()
+    wrong = client.post(f"{API}/vault/reset-pin", json={"password": "not-it", "new_pin": "1357"}, headers=auth)
+    assert wrong.status_code == 403
+    ok = client.post(f"{API}/vault/reset-pin", json={"password": "password123", "new_pin": "1357"}, headers=auth)
+    assert ok.status_code == 200
+    assert client.post(f"{API}/vault/unlock", json={"pin": "2468"}, headers=auth).status_code == 403
+    token = client.post(f"{API}/vault/unlock", json={"pin": "1357"}, headers=auth).json()["vault_token"]
+    again = client.get(f"{API}/vault/entries/{note['id']}", headers={**auth, "X-Vault-Token": token})
+    assert again.status_code == 200 and again.json()["content"] == "safe"
+
+
+def test_vault_photos_are_encrypted_private_and_limited(client, auth, db):
+    vh = unlock_headers(client, auth)
+    note = client.post(f"{API}/vault/entries", json={"title": "ID card"}, headers=vh).json()
+    up = client.post(f"{API}/vault/entries/{note['id']}/images", files={"file": ("id.png", PNG, "image/png")}, headers=vh)
+    assert up.status_code == 200, up.text
+    body = up.json()
+    assert body["image_count"] == 1 and len(body["images"]) == 1
+    image_id = body["images"][0]["id"]
+    stored = db.execute(text("SELECT data FROM vault_images WHERE id = :id"), {"id": image_id}).scalar()
+    assert PNG not in bytes(stored)
+    got = client.get(f"{API}/vault/entries/{note['id']}/images/{image_id}", headers=vh)
+    assert got.status_code == 200 and got.content == PNG
+    # Locked Vault, or another user: no photo.
+    assert client.get(f"{API}/vault/entries/{note['id']}/images/{image_id}", headers=auth).status_code == 403
+    sam, _ = register(client, email="sam@example.com", name="Sam")
+    sam_vh = unlock_headers(client, sam)
+    assert client.get(f"{API}/vault/entries/{note['id']}/images/{image_id}", headers=sam_vh).status_code == 404
+    listed = client.get(f"{API}/vault/entries", headers=vh).json()
+    assert listed[0]["image_count"] == 1
+    bad = client.post(f"{API}/vault/entries/{note['id']}/images", files={"file": ("a.txt", b"hi", "text/plain")}, headers=vh)
+    assert bad.status_code == 415
+    gone = client.delete(f"{API}/vault/entries/{note['id']}/images/{image_id}", headers=vh)
+    assert gone.status_code == 200 and gone.json()["images"] == []

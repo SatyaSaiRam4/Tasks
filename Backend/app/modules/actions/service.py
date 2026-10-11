@@ -203,7 +203,9 @@ def _check_today(user: User, requested: date | None) -> date:
     return day
 
 
-def _result(db: Session, user: User, action_id: UUID, day: date, was_secured: bool, new_codes: list[str], already: bool) -> CompletionResult:
+def _result(
+    db: Session, user: User, action_id: UUID, day: date, before: engine.TodayStatus, new_codes: list[str], already: bool, track: Track | None = None
+) -> CompletionResult:
     live = db.scalar(
         select(ActionCompletion).where(
             ActionCompletion.action_id == action_id,
@@ -212,6 +214,8 @@ def _result(db: Session, user: User, action_id: UUID, day: date, was_secured: bo
         )
     )
     today = engine.today_status(db, user)
+    # A plan whose tasks for today are now all done adds a point to the streak.
+    plan_just_finished = not already and today.plans_done > before.plans_done
     return CompletionResult(
         action_id=action_id,
         date=day,
@@ -219,7 +223,11 @@ def _result(db: Session, user: User, action_id: UUID, day: date, was_secured: bo
         completed_at=live.completed_at if live else None,
         already_completed=already,
         day_secured=today.secured,
-        day_just_secured=today.secured and not was_secured,
+        day_just_secured=today.secured and not before.secured,
+        plan_just_finished=plan_just_finished,
+        plan_name=track.name if plan_just_finished and track is not None else None,
+        plans_due=today.plans_due,
+        plans_done=today.plans_done,
         today_required=today.required,
         today_completed=today.completed,
         current_streak=today.current_streak,
@@ -247,7 +255,7 @@ def complete_action(db: Session, user: User, action_id: UUID, confirmed: bool, m
     if track is None or not is_due(action, track, day):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "This action isn't scheduled for today.")
 
-    was_secured = engine.today_status(db, user).secured
+    before = engine.today_status(db, user)
     existing = db.scalar(
         select(ActionCompletion).where(
             ActionCompletion.action_id == action.id,
@@ -256,7 +264,7 @@ def complete_action(db: Session, user: User, action_id: UUID, confirmed: bool, m
         )
     )
     if existing is not None:
-        return _result(db, user, action.id, day, was_secured, [], already=True)
+        return _result(db, user, action.id, day, before, [], already=True)
 
     db.add(
         ActionCompletion(
@@ -273,17 +281,17 @@ def complete_action(db: Session, user: User, action_id: UUID, confirmed: bool, m
     except IntegrityError:
         # A concurrent request recorded it first; the unique index kept it single.
         db.rollback()
-        return _result(db, user, action.id, day, was_secured, [], already=True)
+        return _result(db, user, action.id, day, before, [], already=True)
 
     new_codes = engine.finalize_user(db, user, check_achievements=True)  # commits
-    return _result(db, user, action.id, day, was_secured, new_codes, already=False)
+    return _result(db, user, action.id, day, before, new_codes, already=False, track=track)
 
 
 def uncomplete_action(db: Session, user: User, action_id: UUID, requested: date | None) -> CompletionResult:
     engine.finalize_user(db, user)
     day = _check_today(user, requested)
     action = get_owned_action(db, user.id, action_id)
-    was_secured = engine.today_status(db, user).secured
+    before = engine.today_status(db, user)
     live = db.scalar(
         select(ActionCompletion).where(
             ActionCompletion.action_id == action.id,
@@ -294,4 +302,4 @@ def uncomplete_action(db: Session, user: User, action_id: UUID, requested: date 
     if live is not None:
         live.revoked_at = utc_now()  # kept for the audit trail
         db.commit()
-    return _result(db, user, action.id, day, was_secured, [], already=False)
+    return _result(db, user, action.id, day, before, [], already=False)

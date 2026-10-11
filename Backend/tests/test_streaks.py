@@ -98,6 +98,22 @@ def test_completion_result_reports_day_secured(client, auth):
     assert r2["current_streak"] == 1  # today counts once secured
 
 
+def test_finishing_one_plan_is_reported_for_its_celebration(client, auth):
+    first = make_track(client, auth)
+    second = make_track(client, auth, name="Reading")
+    a1 = make_action(client, auth, first["id"], title="One")
+    a2 = make_action(client, auth, first["id"], title="Two")
+    make_action(client, auth, second["id"], title="Other plan")
+    r1 = complete(client, auth, a1["id"]).json()
+    assert r1["plan_just_finished"] is False and r1["plans_done"] == 0
+    r2 = complete(client, auth, a2["id"]).json()
+    assert r2["plan_just_finished"] is True and r2["plan_name"] == first["name"]
+    assert r2["day_just_secured"] is False and r2["plans_done"] == 1 and r2["plans_due"] == 2
+    assert r2["current_streak"] == 1
+    again = complete(client, auth, a2["id"]).json()
+    assert again["already_completed"] is True and again["plan_just_finished"] is False
+
+
 def test_totals_count_a_secured_today_like_the_streak_does(client, auth):
     track = make_track(client, auth)
     action = make_action(client, auth, track["id"])

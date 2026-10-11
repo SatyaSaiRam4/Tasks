@@ -47,14 +47,22 @@ const seenInMemory = new Map<string, number>();
 /**
  * Congratulates the user once for each badge they reach ("You reached
  * Bronze!"). The first check on a device only records the badges already
- * held, so nobody is congratulated for old news.
+ * held, so nobody is congratulated for old news, unless the badge was
+ * reached by the tick that is being checked.
  */
-export async function celebrateNewTier(userId: string, best: number, celebrate: (spec: CelebrationSpec) => void) {
+export async function celebrateNewTier(
+  userId: string,
+  best: number,
+  celebrate: (spec: CelebrationSpec) => void,
+  /** True when this very tick added the streak point, so a badge reached exactly now is news. */
+  justEarned = false,
+) {
   const reached = tierIndex(best);
+  const reachedNow = justEarned && reached >= 0 && TIERS[reached].days === best;
   let seen = seenInMemory.get(userId);
   if (seen === undefined) {
     const raw = await AsyncStorage.getItem(seenKey(userId)).catch(() => null);
-    seen = raw === null ? reached : Number(raw);
+    seen = raw === null ? (reachedNow ? reached - 1 : reached) : Number(raw);
     // A check that ran while this one waited may already have recorded more.
     seen = Math.max(seen, seenInMemory.get(userId) ?? -1);
   }

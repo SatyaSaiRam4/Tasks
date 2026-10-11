@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -16,27 +16,43 @@ import {
   useCreateVaultEntryMutation,
   useDeleteVaultAudioMutation,
   useDeleteVaultEntryMutation,
+  useDeleteVaultImageMutation,
   useFlagVaultEntryMutation,
   useGetVaultEntryQuery,
   useUpdateVaultEntryMutation,
   useUploadVaultAudioMutation,
+  useUploadVaultImageMutation,
+  type VaultEntry,
 } from '../vaultApi';
 import { VoiceNote, type Recording } from '../VoiceNote';
+import { VaultPhotos } from '../VaultPhotos';
+import type { PickedPhoto } from '../../users/pickPhoto';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
-/** A private note: a title, the text and an optional voice recording. Deleted notes can be restored. */
+/** A private note: a title, the text, an optional voice recording and photos. Deleted notes can be restored. */
 export function VaultEntryScreen() {
   const navigation = useNavigation();
   const params = useRoute<RouteProp<RootStackParamList, 'VaultEntry'>>().params;
   const entryId = params?.entryId;
   const unlocked = useAppSelector(selectVaultUnlocked);
-  const existing = useGetVaultEntryQuery(entryId ?? '', { skip: !entryId || !unlocked });
+  // Once the note is saved or deleted the screen is on its way out: stop
+  // listening for it, and keep showing what was there, so it doesn't flash
+  // a "Deleted note" or an error before closing.
+  const [leaving, setLeaving] = useState(false);
+  const query = useGetVaultEntryQuery(entryId ?? '', { skip: !entryId || !unlocked || leaving });
+  const last = useRef<VaultEntry | undefined>(undefined);
+  if (query.data) last.current = query.data;
+  const entry = leaving ? last.current : query.data;
   const [create, { isLoading: creating }] = useCreateVaultEntryMutation();
   const [update, { isLoading: updating }] = useUpdateVaultEntryMutation();
   const [flag, { isLoading: flagging }] = useFlagVaultEntryMutation();
   const [remove, { isLoading: erasing }] = useDeleteVaultEntryMutation();
   const [uploadAudio, { isLoading: uploading }] = useUploadVaultAudioMutation();
   const [deleteAudio] = useDeleteVaultAudioMutation();
+  const [uploadImage, { isLoading: uploadingImage }] = useUploadVaultImageMutation();
+  const [deleteImage] = useDeleteVaultImageMutation();
+  const [newPhotos, setNewPhotos] = useState<PickedPhoto[]>([]);
+  const [removedPhotos, setRemovedPhotos] = useState<string[]>([]);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [audioRemoved, setAudioRemoved] = useState(false);
 
@@ -51,56 +67,64 @@ export function VaultEntryScreen() {
   }, [unlocked, navigation]);
 
   useEffect(() => {
-    const e = existing.data;
-    if (!e) return;
-    setTitle(e.title ?? '');
-    setContent(e.content);
-  }, [existing.data]);
+    if (!query.data) return;
+    setTitle(query.data.title ?? '');
+    setContent(query.data.content);
+  }, [query.data]);
 
-  const deleted = Boolean(existing.data?.deleted_at);
+  const deleted = Boolean(entry?.deleted_at);
+  const savedPhotos = entry?.images ?? [];
+  const keptPhotos = savedPhotos.filter(p => !removedPhotos.includes(p.id)).length + newPhotos.length;
 
   const save = async () => {
     setError(null);
-    const hasVoice = Boolean(recording) || (Boolean(existing.data?.has_audio) && !audioRemoved);
-    if (!content.trim() && !title.trim() && !hasVoice) return setError('Write something or record a voice note to save.');
-    const body = { title: title.trim() || (hasVoice && !content.trim() ? 'Voice note' : null), content: content || title.trim() };
+    const hasVoice = Boolean(recording) || (Boolean(entry?.has_audio) && !audioRemoved);
+    if (!content.trim() && !title.trim() && !hasVoice && !keptPhotos) return setError('Write something, record a voice note or add a photo to save.');
+    const fallbackTitle = content.trim() ? null : hasVoice ? 'Voice note' : keptPhotos ? 'Photos' : null;
+    const body = { title: title.trim() || fallbackTitle, content: content || title.trim() };
+    setLeaving(true);
     try {
       const saved = entryId ? await update({ id: entryId, ...body }).unwrap() : await create(body).unwrap();
-      // The recording goes up once the note exists.
+      // Recording and photos go up once the note exists.
       if (recording) await uploadAudio({ id: saved.id, uri: recording.uri, seconds: recording.seconds }).unwrap();
-      else if (audioRemoved && existing.data?.has_audio) await deleteAudio(saved.id).unwrap();
+      else if (audioRemoved && entry?.has_audio) await deleteAudio(saved.id).unwrap();
+      for (const id of removedPhotos) await deleteImage({ id: saved.id, imageId: id }).unwrap();
+      for (const photo of newPhotos) await uploadImage({ id: saved.id, ...photo }).unwrap();
       Toast.success('Saved.', 1);
       navigation.goBack();
     } catch (err) {
+      setLeaving(false);
       setError(getErrorMessage(err, 'Could not save.'));
     }
   };
 
   const moveToDeleted = async (restore: boolean) => {
+    setLeaving(true);
     try {
       await flag({ id: entryId!, flag: restore ? 'restore' : 'trash' }).unwrap();
-      setConfirm(null);
       navigation.goBack();
     } catch (err) {
+      setLeaving(false);
       Toast.fail(getErrorMessage(err), 2);
     }
   };
 
   const erase = async () => {
+    setLeaving(true);
     try {
       await remove(entryId!).unwrap();
-      setConfirm(null);
       navigation.goBack();
     } catch (err) {
+      setLeaving(false);
       Toast.fail(getErrorMessage(err), 2);
     }
   };
 
-  if (entryId && existing.isError) {
+  if (entryId && query.isError && !leaving) {
     return (
       <Screen edges={['top', 'bottom']}>
         <ScreenHeader close />
-        <ErrorState message={getErrorMessage(existing.error)} onRetry={existing.refetch} />
+        <ErrorState message={getErrorMessage(query.error)} onRetry={query.refetch} />
       </Screen>
     );
   }
@@ -109,7 +133,7 @@ export function VaultEntryScreen() {
     <View style={styles.flex} onTouchStart={touchVault}>
       <Screen edges={['top', 'bottom']} glowColor={colors.violet}>
         <ScreenHeader title={!entryId ? 'New note' : deleted ? 'Deleted note' : 'Note'} subtitle="Private vault" close />
-        {entryId && existing.isLoading ? (
+        {entryId && !entry ? (
           <Skeleton height={300} rounded={radius.lg} />
         ) : (
           <>
@@ -138,7 +162,7 @@ export function VaultEntryScreen() {
 
             <VoiceNote
               entryId={entryId}
-              savedSeconds={existing.data?.has_audio ? existing.data.audio_seconds ?? 1 : null}
+              savedSeconds={entry?.has_audio ? entry.audio_seconds ?? 1 : null}
               recording={recording}
               removed={audioRemoved}
               onRecorded={r => {
@@ -152,6 +176,17 @@ export function VaultEntryScreen() {
               disabled={deleted}
             />
 
+            <VaultPhotos
+              entryId={entryId}
+              saved={savedPhotos}
+              pending={newPhotos}
+              removedIds={removedPhotos}
+              onAdd={photo => setNewPhotos(list => [...list, photo])}
+              onRemovePending={index => setNewPhotos(list => list.filter((_, i) => i !== index))}
+              onRemoveSaved={id => setRemovedPhotos(list => [...list, id])}
+              disabled={deleted}
+            />
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {deleted ? (
               <View style={styles.actions}>
@@ -160,14 +195,14 @@ export function VaultEntryScreen() {
               </View>
             ) : (
               <View style={styles.actions}>
-                <Button label="Save" size="lg" onPress={save} loading={creating || updating || uploading} />
+                <Button label="Save" size="lg" onPress={save} loading={creating || updating || uploading || uploadingImage} />
                 {entryId ? <Button label="Delete" icon="trash" variant="dangerGhost" onPress={() => setConfirm('delete')} /> : null}
               </View>
             )}
           </>
         )}
         <ConfirmSheet
-          visible={confirm === 'delete'}
+          visible={confirm === 'delete' && !leaving}
           icon="trash"
           destructive
           title="Delete this note?"
@@ -178,7 +213,7 @@ export function VaultEntryScreen() {
           onCancel={() => setConfirm(null)}
         />
         <ConfirmSheet
-          visible={confirm === 'erase'}
+          visible={confirm === 'erase' && !leaving}
           icon="trash"
           destructive
           title="Delete forever?"

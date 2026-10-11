@@ -14,6 +14,8 @@ export interface PreferencesState {
   notifyActions: boolean;
   notifyReminders: boolean;
   notifyStreakWarnings: boolean;
+  /** A soft click on every tap (Settings, off by default). */
+  tapSound: boolean;
   /** Bumped when the alarm sound or length changes, so scheduled alarms are redone. */
   alarmVersion: number;
   /** The welcome story is open (first sign-in, or replayed from Settings). */
@@ -29,6 +31,7 @@ const initialState: PreferencesState = {
   notifyActions: true,
   notifyReminders: true,
   notifyStreakWarnings: true,
+  tapSound: false,
   alarmVersion: 0,
   storyOpen: false,
 };

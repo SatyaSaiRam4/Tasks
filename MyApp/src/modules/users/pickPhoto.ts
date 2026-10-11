@@ -1,4 +1,4 @@
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary, type ImageLibraryOptions } from 'react-native-image-picker';
 
 /** Photos can be up to 10 MB (the server checks too). */
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -6,21 +6,17 @@ export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export type PickedPhoto = { uri: string; type: string; name: string };
 
 /**
- * Lets the user choose a photo from the gallery, resized to a sharp avatar
- * size. Returns null if they cancel; throws a readable message if the photo
- * can't be used.
+ * Lets the user choose a photo from the gallery (or take one with the
+ * camera), resized to `maxSide` pixels. Returns null if they cancel; throws
+ * a readable message if the photo can't be used.
  */
-export async function pickPhoto(): Promise<PickedPhoto | null> {
-  const result = await launchImageLibrary({
-    mediaType: 'photo',
-    selectionLimit: 1,
-    maxWidth: 800,
-    maxHeight: 800,
-    quality: 0.8,
-  });
+export async function pickPhoto({ maxSide = 800, camera = false }: { maxSide?: number; camera?: boolean } = {}): Promise<PickedPhoto | null> {
+  const options: ImageLibraryOptions = { mediaType: 'photo', selectionLimit: 1, maxWidth: maxSide, maxHeight: maxSide, quality: 0.8 };
+  const result = camera ? await launchCamera({ ...options, saveToPhotos: false }) : await launchImageLibrary(options);
   if (result.didCancel) return null;
   if (result.errorCode) {
-    throw new Error(result.errorCode === 'permission' ? 'Allow Memo to open your photos in Settings.' : result.errorMessage || 'Could not open your photos.');
+    if (result.errorCode === 'camera_unavailable') throw new Error('No camera is available on this phone.');
+    throw new Error(result.errorCode === 'permission' ? 'Allow Memo to use your photos in Settings.' : result.errorMessage || 'Could not open your photos.');
   }
   const asset = result.assets?.[0];
   if (!asset?.uri) return null;

@@ -46,8 +46,8 @@ const STEPS: Step[] = [
   },
   {
     tab: 'HomeTab',
-    title: () => '5. Streaks earn money',
-    text: 'At 500 streak points you get ₹10, at 1000 you get ₹20. Tap the wallet at the top to redeem.',
+    title: () => '5. Streaks earn rewards',
+    text: 'Keep your streak growing and it earns real rewards. Tap your profile picture at the top, then Wallet, to see them.',
     gesture: 'cheer',
   },
   {
@@ -59,7 +59,7 @@ const STEPS: Step[] = [
   {
     tab: 'VaultTab',
     title: () => 'Private Vault',
-    text: 'Write private notes here. They are locked with your own PIN, and only you can open them.',
+    text: 'Keep private notes, voice notes and photos here. They are locked with your own PIN, and only you can open them.',
     gesture: 'lookRight',
   },
   { tab: 'HomeTab', title: () => 'You are ready!', text: 'Make your first plan now. You can watch this tour again in Settings.', gesture: 'cheer' },

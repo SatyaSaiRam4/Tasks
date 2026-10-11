@@ -136,6 +136,11 @@ export interface CompletionResult {
   already_completed: boolean;
   day_secured: boolean;
   day_just_secured: boolean;
+  /** This tick finished one plan for today: +1 streak. */
+  plan_just_finished?: boolean;
+  plan_name?: string | null;
+  plans_due?: number;
+  plans_done?: number;
   today_required: number;
   today_completed: number;
   current_streak: number;
@@ -144,7 +149,7 @@ export interface CompletionResult {
 }
 
 // Everything a completion changes.
-const COMPLETION_TAGS = ['Agenda', 'Track', 'Streak', 'Dashboard', 'Profile', 'Achievement'] as const;
+const COMPLETION_TAGS = ['Agenda', 'Track', 'Streak', 'Dashboard', 'Profile', 'Achievement', 'Wallet'] as const;
 const DEFINITION_TAGS = ['Agenda', 'Track', 'Action', 'Streak', 'Dashboard'] as const;
 
 export const routinesApi = baseApi.injectEndpoints({

@@ -4,17 +4,18 @@ from datetime import timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import config, security
 from app.core.timeutil import utc_now
+from app.integrations.email import EmailNotConfigured, EmailSendFailed, send_email
 from app.modules.auth.models import User
 from app.modules.users.models import UserSettings
 
 from .crypto import decrypt_bytes, decrypt_payload, encrypt_bytes, encrypt_payload
-from .models import VaultCredential, VaultEntry
-from .schemas import VaultEntryOut, VaultEntrySummary, VaultFolderOut, VaultSessionOut, VaultStatusOut
+from .models import VaultCredential, VaultEntry, VaultImage
+from .schemas import VaultEntryOut, VaultEntrySummary, VaultFolderOut, VaultImageOut, VaultSessionOut, VaultStatusOut
 
 VIEWS = ("all", "favorites", "pinned", "archived", "trash")
 
@@ -100,6 +101,32 @@ def change_pin(db: Session, user: User, current_pin: str, new_pin: str) -> Vault
     return _issue(db, user)
 
 
+def reset_pin(db: Session, user: User, password: str, new_pin: str) -> VaultSessionOut:
+    """Forgot the PIN. Notes are encrypted with the server's key, not the PIN,
+    so after the account password is checked a new PIN opens the same notes."""
+    if not security.verify_password(password, user.password_hash):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Incorrect account password.")
+    cred = db.get(VaultCredential, user.id)
+    if cred is None:
+        cred = VaultCredential(user_id=user.id, pin_hash=security.hash_password(new_pin), failed_attempts=0)
+        db.add(cred)
+    else:
+        cred.pin_hash = security.hash_password(new_pin)
+        cred.failed_attempts = 0
+        cred.locked_until = None
+    db.commit()
+    try:
+        send_email(
+            user.email,
+            "Your Memo Vault PIN was reset",
+            f"Hi {user.display_name},\n\nYour Vault PIN was just reset with your account password. "
+            "If this wasn't you, change your Memo password now.\n\n— Memo",
+        )
+    except (EmailNotConfigured, EmailSendFailed):
+        pass  # The reset itself worked; the notice is a courtesy.
+    return _issue(db, user)
+
+
 # ---- entries -----------------------------------------------------------------
 
 
@@ -129,9 +156,24 @@ def _summary(entry: VaultEntry, data: dict) -> dict:
     }
 
 
-def _full(entry: VaultEntry) -> VaultEntryOut:
+def _image_counts(db: Session, entry_ids: list[UUID]) -> dict[UUID, int]:
+    if not entry_ids:
+        return {}
+    rows = db.execute(
+        select(VaultImage.entry_id, func.count()).where(VaultImage.entry_id.in_(entry_ids)).group_by(VaultImage.entry_id)
+    ).all()
+    return {entry_id: count for entry_id, count in rows}
+
+
+def _full(db: Session, entry: VaultEntry) -> VaultEntryOut:
     data = decrypt_payload(entry.ciphertext)
-    return VaultEntryOut(**_summary(entry, data), content=data.get("content") or "")
+    images = db.scalars(select(VaultImage).where(VaultImage.entry_id == entry.id).order_by(VaultImage.created_at)).all()
+    return VaultEntryOut(
+        **_summary(entry, data),
+        image_count=len(images),
+        content=data.get("content") or "",
+        images=[VaultImageOut(id=i.id, mime=i.mime, created_at=i.created_at) for i in images],
+    )
 
 
 def list_entries(
@@ -155,6 +197,7 @@ def list_entries(
     entries = db.scalars(stmt.order_by(VaultEntry.pinned.desc(), VaultEntry.updated_at.desc())).all()
 
     needle = (q or "").strip().lower()
+    counts = _image_counts(db, [e.id for e in entries])
     out: list[VaultEntrySummary] = []
     for entry in entries:
         data = decrypt_payload(entry.ciphertext)
@@ -167,7 +210,7 @@ def list_entries(
             haystack = " ".join([data.get("title") or "", data.get("content") or "", *tags]).lower()
             if needle not in haystack:
                 continue
-        out.append(VaultEntrySummary(**_summary(entry, data)))
+        out.append(VaultEntrySummary(**_summary(entry, data), image_count=counts.get(entry.id, 0)))
     return out
 
 
@@ -185,7 +228,7 @@ def folders(db: Session, user: User) -> list[VaultFolderOut]:
 
 
 def get_entry(db: Session, user: User, entry_id: UUID) -> VaultEntryOut:
-    return _full(_owned_entry(db, user.id, entry_id))
+    return _full(db, _owned_entry(db, user.id, entry_id))
 
 
 def create_entry(db: Session, user: User, data: dict) -> VaultEntryOut:
@@ -205,7 +248,7 @@ def create_entry(db: Session, user: User, data: dict) -> VaultEntryOut:
     db.add(entry)
     db.commit()
     db.refresh(entry)
-    return _full(entry)
+    return _full(db, entry)
 
 
 def update_entry(db: Session, user: User, entry_id: UUID, fields: dict) -> VaultEntryOut:
@@ -223,7 +266,7 @@ def update_entry(db: Session, user: User, entry_id: UUID, fields: dict) -> Vault
     entry.updated_at = utc_now()
     db.commit()
     db.refresh(entry)
-    return _full(entry)
+    return _full(db, entry)
 
 
 def set_flag(db: Session, user: User, entry_id: UUID, flag: str, value: bool) -> VaultEntryOut:
@@ -234,7 +277,7 @@ def set_flag(db: Session, user: User, entry_id: UUID, flag: str, value: bool) ->
         setattr(entry, flag, value)
     db.commit()
     db.refresh(entry)
-    return _full(entry)
+    return _full(db, entry)
 
 
 def delete_permanently(db: Session, user: User, entry_id: UUID) -> None:
@@ -277,7 +320,7 @@ def set_audio(db: Session, user: User, entry_id: UUID, data: bytes, mime: str, s
     entry.audio_seconds = max(1, min(int(seconds), 600))
     db.commit()
     db.refresh(entry)
-    return _full(entry)
+    return _full(db, entry)
 
 
 def get_audio(db: Session, user: User, entry_id: UUID) -> tuple[bytes, str]:
@@ -294,4 +337,55 @@ def delete_audio(db: Session, user: User, entry_id: UUID) -> VaultEntryOut:
     entry.audio_seconds = None
     db.commit()
     db.refresh(entry)
-    return _full(entry)
+    return _full(db, entry)
+
+
+# ---- photos ------------------------------------------------------------------
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_IMAGES_PER_NOTE = 6
+IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"}
+
+
+def add_image(db: Session, user: User, entry_id: UUID, data: bytes, mime: str) -> VaultEntryOut:
+    """Attaches a photo to a note, encrypted like everything else in the Vault."""
+    entry = _owned_entry(db, user.id, entry_id)
+    if entry.deleted_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Restore this note before adding photos.")
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The photo is empty.")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Photos can be up to 10 MB.")
+    if mime not in IMAGE_TYPES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Choose a JPEG, PNG or WebP photo.")
+    if _image_counts(db, [entry.id]).get(entry.id, 0) >= MAX_IMAGES_PER_NOTE:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"A note can hold up to {MAX_IMAGES_PER_NOTE} photos.")
+    db.add(VaultImage(entry_id=entry.id, user_id=user.id, data=encrypt_bytes(data), mime="image/jpeg" if mime == "image/jpg" else mime))
+    entry.updated_at = utc_now()
+    db.commit()
+    db.refresh(entry)
+    return _full(db, entry)
+
+
+def _owned_image(db: Session, user: User, entry_id: UUID, image_id: UUID) -> VaultImage:
+    image = db.scalar(
+        select(VaultImage).where(VaultImage.id == image_id, VaultImage.entry_id == entry_id, VaultImage.user_id == user.id)
+    )
+    if image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Photo not found.")
+    return image
+
+
+def get_image(db: Session, user: User, entry_id: UUID, image_id: UUID) -> tuple[bytes, str]:
+    image = _owned_image(db, user, entry_id, image_id)
+    return decrypt_bytes(image.data), image.mime
+
+
+def delete_image(db: Session, user: User, entry_id: UUID, image_id: UUID) -> VaultEntryOut:
+    image = _owned_image(db, user, entry_id, image_id)
+    db.delete(image)
+    entry = _owned_entry(db, user.id, entry_id)
+    entry.updated_at = utc_now()
+    db.commit()
+    db.refresh(entry)
+    return _full(db, entry)

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, font, spacing, type as t, withAlpha } from '../theme';
 
 export interface HeatmapDay {
@@ -28,9 +28,21 @@ function cellColor(status: string): string {
 /**
  * A contribution-graph style consistency calendar: one column per week,
  * Monday at the top. Colors are paired with a legend and accessibility
- * labels so status never depends on color alone.
+ * labels so status never depends on color alone. With `scrollable`, only
+ * the weeks scroll sideways (starting at today); the weekday labels stay put.
  */
-export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]; cell?: number; legend?: boolean }) {
+export function Heatmap({
+  days,
+  cell = 14,
+  legend = true,
+  scrollable = false,
+}: {
+  days: HeatmapDay[];
+  cell?: number;
+  legend?: boolean;
+  scrollable?: boolean;
+}) {
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const weeks = useMemo(() => {
     if (!days.length) return [] as (HeatmapDay | null)[][];
     const first = new Date(`${days[0].date}T00:00:00`);
@@ -55,11 +67,11 @@ export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]
         <View style={{ marginRight: gap, marginTop: 18 }}>
           {WEEKDAYS.map((d, i) => (
             <Text key={i} style={[styles.weekday, { height: cell, marginBottom: gap, lineHeight: cell }]}>
-              {i % 2 === 0 ? d : ''}
+              {d}
             </Text>
           ))}
         </View>
-        <View style={styles.row}>
+        <Weeks scrollable={scrollable} scroller={scroller}>
           {weeks.map((week, wi) => {
             const firstDay = week.find(Boolean);
             const showMonth = firstDay && (wi === 0 || new Date(`${firstDay.date}T00:00:00`).getDate() <= 7);
@@ -86,10 +98,35 @@ export function Heatmap({ days, cell = 14, legend = true }: { days: HeatmapDay[]
               </View>
             );
           })}
-        </View>
+        </Weeks>
       </View>
       {legend ? <HeatmapLegend /> : null}
     </View>
+  );
+}
+
+/** The week columns: a plain row, or a sideways scroller that opens on the newest weeks. */
+function Weeks({
+  scrollable,
+  scroller,
+  children,
+}: {
+  scrollable: boolean;
+  scroller: React.RefObject<React.ComponentRef<typeof ScrollView> | null>;
+  children: React.ReactNode;
+}) {
+  if (!scrollable) return <View style={styles.row}>{children}</View>;
+  return (
+    <ScrollView
+      ref={scroller}
+      horizontal
+      style={styles.flex}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+      onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -115,6 +152,9 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   row: {
     flexDirection: 'row',
   },

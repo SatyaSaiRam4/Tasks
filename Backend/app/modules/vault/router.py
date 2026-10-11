@@ -11,6 +11,7 @@ from app.modules.auth.models import User
 from . import service
 from .schemas import (
     PinChange,
+    PinReset,
     PinSetup,
     PinUnlock,
     VaultEntryCreate,
@@ -75,6 +76,14 @@ def change_pin(payload: PinChange, response: Response, current_user: User = Depe
     return service.change_pin(db, current_user, payload.current_pin, payload.new_pin)
 
 
+@router.post("/reset-pin", response_model=VaultSessionOut)
+def reset_pin(payload: PinReset, response: Response, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Forgot the PIN: the account password sets a new one. Notes are kept."""
+    _no_store(response)
+    rate_limit.hit(f"vault-reset:{current_user.id}", limit=5, window_seconds=600)
+    return service.reset_pin(db, current_user, payload.password, payload.new_pin)
+
+
 @router.get("/entries", response_model=list[VaultEntrySummary])
 def list_entries(
     view: str = "all",
@@ -137,6 +146,29 @@ def get_audio(entry_id: UUID, user: User = Depends(get_vault_user), db: Session 
 @router.delete("/entries/{entry_id}/audio", response_model=VaultEntryOut)
 def delete_audio(entry_id: UUID, user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
     return service.delete_audio(db, user, entry_id)
+
+
+@router.post("/entries/{entry_id}/images", response_model=VaultEntryOut)
+async def add_image(
+    entry_id: UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(get_vault_user),
+    db: Session = Depends(get_db),
+):
+    """Attaches a photo (an ID card, a document) to a note, encrypted."""
+    data = await file.read(service.MAX_IMAGE_BYTES + 1)
+    return service.add_image(db, user, entry_id, data, (file.content_type or "").split(";")[0].strip().lower())
+
+
+@router.get("/entries/{entry_id}/images/{image_id}")
+def get_image(entry_id: UUID, image_id: UUID, user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
+    data, mime = service.get_image(db, user, entry_id, image_id)
+    return Response(content=data, media_type=mime, headers={"Cache-Control": "no-store"})
+
+
+@router.delete("/entries/{entry_id}/images/{image_id}", response_model=VaultEntryOut)
+def delete_image(entry_id: UUID, image_id: UUID, user: User = Depends(get_vault_user), db: Session = Depends(get_db)):
+    return service.delete_image(db, user, entry_id, image_id)
 
 
 _FLAG_ROUTES = {

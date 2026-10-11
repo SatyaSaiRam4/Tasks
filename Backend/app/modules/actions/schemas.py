@@ -150,6 +150,10 @@ class CompletionResult(BaseModel):
     already_completed: bool = False
     day_secured: bool  # all required actions for today are now done
     day_just_secured: bool  # …and this request is what secured it
+    plan_just_finished: bool = False  # this request finished one plan for today (+1 streak)
+    plan_name: str | None = None
+    plans_due: int = 0
+    plans_done: int = 0
     today_required: int
     today_completed: int
     current_streak: int

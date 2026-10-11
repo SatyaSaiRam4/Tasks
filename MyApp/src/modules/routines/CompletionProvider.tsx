@@ -58,11 +58,27 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           icon: 'flame',
           tone: 'streak',
           eyebrow: 'Day complete',
-          title: result.current_streak > 1 ? `Streak ${result.current_streak}` : 'Your streak has started',
+          title: result.plan_just_finished ? 'Congrats! +1 streak' : `Streak ${result.current_streak}`,
           subtitle:
             result.current_streak > 1
-              ? 'All of today’s tasks are done.'
-              : 'All of today’s tasks are done. Come back tomorrow to make it two.',
+              ? 'All of today’s plans are done. Brilliant!'
+              : 'All of today’s plans are done. Come back tomorrow to keep it going.',
+          stats: [
+            { label: 'Current', value: String(result.current_streak) },
+            { label: 'Best', value: String(result.best_streak) },
+          ],
+        });
+      } else if (result.plan_just_finished) {
+        // One plan finished for today: that's a streak point, so celebrate it.
+        const left = (result.plans_due ?? 0) - (result.plans_done ?? 0);
+        celebrate({
+          icon: 'flame',
+          tone: 'streak',
+          eyebrow: 'Plan complete',
+          title: 'Congrats! You earned 1 streak',
+          subtitle: `${result.plan_name ? `“${result.plan_name}” is done for today. ` : ''}${
+            left > 0 ? `${left} more plan${left === 1 ? '' : 's'} to go today.` : ''
+          }`.trim(),
           stats: [
             { label: 'Current', value: String(result.current_streak) },
             { label: 'Best', value: String(result.best_streak) },
@@ -72,7 +88,11 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
         const left = result.today_required - result.today_completed;
         Toast.success(left > 0 ? `Done. ${left} left today.` : 'Done.', 1.2);
       }
-      if (user) celebrateNewTier(user.id, result.best_streak, celebrate).catch(() => undefined);
+      // Achievements earned with this tick get their own congratulations.
+      for (const a of result.new_achievements ?? []) {
+        celebrate({ icon: 'award', tone: 'primary', eyebrow: 'New achievement', title: a.title, subtitle: a.description });
+      }
+      if (user) celebrateNewTier(user.id, result.best_streak, celebrate, Boolean(result.plan_just_finished)).catch(() => undefined);
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
     } finally {

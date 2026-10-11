@@ -27,6 +27,7 @@ import { VaultAutoLock } from './src/modules/vault/VaultAutoLock';
 import { Wordmark } from './src/components/Brand';
 import { Glow } from './src/components/Gradient';
 import { Backdrop } from './src/layouts/Backdrop';
+import { TapSound } from './src/components/TapSound';
 
 // Recolors antd-mobile-rn's own chrome (Toast, DatePicker) to match the selected theme.
 const antTheme = {
@@ -111,11 +112,13 @@ function App() {
         <ReduxProvider store={store}>
           <AntProvider locale={enUS} theme={antTheme}>
             <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} />
-            <CelebrationProvider>
-              <CompletionProvider>
-                <AppContent />
-              </CompletionProvider>
-            </CelebrationProvider>
+            <TapSound>
+              <CelebrationProvider>
+                <CompletionProvider>
+                  <AppContent />
+                </CompletionProvider>
+              </CelebrationProvider>
+            </TapSound>
           </AntProvider>
         </ReduxProvider>
       </SafeAreaProvider>

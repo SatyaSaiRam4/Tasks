@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, font, spacing, type as t } from '../../theme';
 import { PinPad } from '../../components/PinPad';
 import { RealIcon } from '../../components/RealIcon';
 import { FadeIn } from '../../components/Feedback';
 import { getErrorMessage } from '../../utils/apiError';
+import { ForgotPin } from './ForgotPin';
 import { useSetupVaultMutation, useUnlockVaultMutation, type VaultStatus } from './vaultApi';
 
 const PIN_LENGTH = 4;
@@ -17,6 +18,7 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
   const [first, setFirst] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState(0);
+  const [forgot, setForgot] = useState(false);
   const lockedUntil = status.locked_until ? new Date(status.locked_until).getTime() : 0;
   const [now, setNow] = useState(Date.now());
   const lockedOut = lockedUntil > now;
@@ -73,7 +75,7 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
   const subtitle = !status.has_pin
     ? first
       ? 'Enter the same 4 digits again.'
-      : '4 digits to keep your notes private. It can’t be recovered.'
+      : '4 digits to keep your notes private. Forgot it later? Your account password sets a new one.'
     : lockedOut
       ? `Too many tries. Try again in ${Math.ceil((lockedUntil - now) / 1000)}s.`
       : 'Enter your 4-digit PIN.';
@@ -93,6 +95,18 @@ export function VaultLock({ status, onLockedRefresh }: { status: VaultStatus; on
         ) : null}
       </View>
       <PinPad value={pin} onChange={setPin} length={PIN_LENGTH} errorKey={errorKey} disabled={lockedOut || settingUp || unlocking} />
+      {status.has_pin ? (
+        <Pressable onPress={() => setForgot(true)} hitSlop={10} style={styles.forgot} accessibilityRole="button">
+          <Text style={styles.forgotText}>Forgot PIN?</Text>
+        </Pressable>
+      ) : null}
+      <ForgotPin
+        visible={forgot}
+        onClose={() => {
+          setForgot(false);
+          onLockedRefresh();
+        }}
+      />
     </FadeIn>
   );
 }
@@ -122,6 +136,16 @@ const styles = StyleSheet.create({
   messageSlot: {
     minHeight: 40,
     justifyContent: 'center',
+  },
+  forgot: {
+    alignSelf: 'center',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
+  forgotText: {
+    ...font.semibold,
+    color: colors.gold,
+    fontSize: 15,
   },
   message: {
     ...font.semibold,

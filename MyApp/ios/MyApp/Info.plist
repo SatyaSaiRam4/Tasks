@@ -34,8 +34,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Memo can take a photo for your profile or your private Vault.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Memo uses a photo you choose as your profile picture.</string>
+	<string>Memo uses photos you choose for your profile picture and your private Vault.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Memo records voice notes for your private Vault.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
