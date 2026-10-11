@@ -1604,7 +1604,7 @@ const SCENES = [
 let current = -1;
 let startedAt = 0;
 /** Story time runs this much slower than real time, so there's time to read. */
-const SLOW = 1.3;
+const SLOW = 1.15;
 
 function resetStage(stage) {
   for (const key of ['phone', 'card', 'confetti', 'sparkles', 'melo', 'hearts', 'plan', 'flame', 'medal', 'coin']) if (stage[key]) stage[key].visible = false;

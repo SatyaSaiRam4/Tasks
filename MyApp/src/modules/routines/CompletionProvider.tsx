@@ -10,7 +10,7 @@ import { RealIcon } from '../../components/RealIcon';
 import { useCelebration } from '../../components/Celebration';
 import { getErrorMessage } from '../../utils/apiError';
 import { useCompleteActionMutation, useUncompleteActionMutation } from './routinesApi';
-import { useBadgeCongrats } from '../streaks/Tiers';
+import { TIERS } from '../streaks/Tiers';
 
 interface Target {
   actionId: string;
@@ -38,7 +38,6 @@ export function useCompletion() {
 export function CompletionProvider({ children }: { children: React.ReactNode }) {
   const mode = useAppSelector(s => s.preferences.confirmationMode);
   const { celebrate } = useCelebration();
-  const congratulateBadge = useBadgeCongrats();
   const [target, setTarget] = useState<Target | null>(null);
   const [complete, { isLoading: completing }] = useCompleteActionMutation();
   const [uncomplete, { isLoading: undoing }] = useUncompleteActionMutation();
@@ -52,14 +51,17 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
     try {
       const result = await complete({ id: current.actionId, method: mode }).unwrap();
       close();
+      // A badge reached by this tick is revealed on Home (see useBadgeCongrats).
+      const badgeWaiting = Boolean(result.plan_just_finished) && TIERS.some(tier => tier.days === result.best_streak);
       if (result.day_just_secured) {
         celebrate({
           icon: 'flame',
           tone: 'streak',
           eyebrow: 'Day complete',
           title: result.plan_just_finished ? 'Congrats! +1 streak' : `Streak ${result.current_streak}`,
-          subtitle:
-            result.current_streak > 1
+          subtitle: badgeWaiting
+            ? 'All of today’s plans are done. A new badge is waiting for you on Home! 🏅'
+            : result.current_streak > 1
               ? 'All of today’s plans are done. Brilliant!'
               : 'All of today’s plans are done. Come back tomorrow to keep it going.',
           stats: [
@@ -77,7 +79,7 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
           title: 'Congrats! You earned 1 streak',
           subtitle: `${result.plan_name ? `“${result.plan_name}” is done for today. ` : ''}${
             left > 0 ? `${left} more plan${left === 1 ? '' : 's'} to go today.` : ''
-          }`.trim(),
+          }${badgeWaiting ? ' A new badge is waiting for you on Home! 🏅' : ''}`.trim(),
           stats: [
             { label: 'Current', value: String(result.current_streak) },
             { label: 'Best', value: String(result.best_streak) },
@@ -91,7 +93,6 @@ export function CompletionProvider({ children }: { children: React.ReactNode }) 
       for (const a of result.new_achievements ?? []) {
         celebrate({ icon: 'award', tone: 'primary', eyebrow: 'New achievement', title: a.title, subtitle: a.description });
       }
-      congratulateBadge(result.best_streak);
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not save this.'), 2);
     } finally {

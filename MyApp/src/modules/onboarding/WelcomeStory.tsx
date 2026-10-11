@@ -16,11 +16,11 @@ import { Kid, Mom } from './Characters';
  * birthday, two days away. Two busy days fly by, she forgets, and they miss
  * the call. Melo arrives: tell Memo once, days or months ahead, and it
  * reminds you on the day. This time Mom saves it in Memo; on the birthday it
- * reminds her (and sends Papa a WhatsApp), and Aarav calls Grandma. Then
- * Aarav turns drawing into a plan with daily tasks: his streak grows, he
- * earns the Bronze badge, and streaks can earn real money. Mom keeps her
- * private things in the Vault, behind her own PIN. Ends on what the app
- * does. Plays like a phone
+ * reminds her (and sends Papa a WhatsApp), and Aarav calls Grandma. Ends
+ * on what the app does, with an optional second part ("See more"): Aarav
+ * turns drawing into a plan with daily tasks, his streak grows, he earns the
+ * Bronze badge and streaks can earn real money; Mom keeps her private
+ * things in the Vault, behind her own PIN. Plays like a phone
  * "story": it moves on by itself; tap the right side for next, the left for
  * back.
  *
@@ -38,14 +38,19 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { caption: 'Meet Aarav. Grandma’s birthday is in 2 days.', duration: 14000, Body: AskScene },
-  { caption: 'Two busy days fly by… and then…', duration: 18000, Body: MissedScene },
-  { caption: 'That’s why Memo is here.', duration: 12000, Body: SatyaScene },
-  { caption: 'This time, Mom tells Memo.', duration: 22000, Body: RemindScene },
-  { caption: 'Big goals, one small step a day.', duration: 25000, Body: PlanScene },
-  { caption: 'Private things stay private.', duration: 12500, Body: VaultScene },
+  { caption: 'Meet Aarav. Grandma’s birthday is in 2 days.', duration: 12500, Body: AskScene },
+  { caption: 'Two busy days fly by… and then…', duration: 15500, Body: MissedScene },
+  { caption: 'That’s why Memo is here.', duration: 10500, Body: SatyaScene },
+  { caption: 'This time, Mom tells Memo.', duration: 19000, Body: RemindScene },
+  { caption: 'Big goals, one small step a day.', duration: 21500, Body: PlanScene },
+  { caption: 'Private things stay private.', duration: 11000, Body: VaultScene },
   { caption: 'Memo remembers, so you don’t have to.', duration: 0, Body: FeaturesScene },
 ];
+
+/** The story plays these scenes; "See more" adds plans, streaks and the Vault before the end. */
+const MAIN_STORY = [0, 1, 2, 3, 6];
+const FULL_STORY = [0, 1, 2, 3, 4, 5, 6];
+const MORE_START = FULL_STORY.indexOf(4);
 
 const STORY_PAGE = 'file:///android_asset/web/story/index.html';
 /** Room for the progress bars and caption above the panels, and the hint below. */
@@ -57,13 +62,17 @@ type Mode = 'loading' | '3d' | 'flat';
 export function WelcomeStory({ onDone }: { onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const { reduced } = useMotion();
-  const [index, setIndex] = useState(0);
+  // `step` walks through the chosen story; `index` is the scene it shows.
+  const [step, setStep] = useState(0);
+  const [more, setMore] = useState(false);
+  const order = more ? FULL_STORY : MAIN_STORY;
+  const index = order[step];
   const [mode, setMode] = useState<Mode>(Platform.OS === 'android' ? 'loading' : 'flat');
   const web = useRef<React.ComponentRef<typeof WebView>>(null);
   const progress = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(1)).current;
   const scene = SCENES[index];
-  const last = index === SCENES.length - 1;
+  const last = step === order.length - 1;
 
   // Give the 3D stage a few seconds to start; otherwise play the flat story.
   useEffect(() => {
@@ -76,18 +85,23 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
   }, [index, mode]);
 
   const go = useCallback(
-    (to: number) => {
-      if (to < 0 || to >= SCENES.length) return;
+    (to: number, withMore = more) => {
+      const length = (withMore ? FULL_STORY : MAIN_STORY).length;
+      if (to < 0 || to >= length) return;
+      const apply = () => {
+        setMore(withMore);
+        setStep(to);
+      };
       if (reduced) {
-        setIndex(to);
+        apply();
         return;
       }
       Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
-        setIndex(to);
+        apply();
         Animated.timing(fade, { toValue: 1, duration: 260, useNativeDriver: true }).start();
       });
     },
-    [fade, reduced],
+    [fade, reduced, more],
   );
 
   // Each scene fills its bar, then moves on by itself (not the last one).
@@ -101,10 +115,10 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
     }
     const run = Animated.timing(progress, { toValue: 1, duration: scene.duration, easing: Easing.linear, useNativeDriver: false });
     run.start(({ finished }) => {
-      if (finished) go(index + 1);
+      if (finished) go(step + 1);
     });
     return () => run.stop();
-  }, [index, scene.duration, reduced, progress, go, mode]);
+  }, [step, index, scene.duration, reduced, progress, go, mode]);
 
   const Body = scene.Body;
 
@@ -146,11 +160,11 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.bars}>
-          {SCENES.map((_, i) => (
+          {order.map((_, i) => (
             <View key={i} style={styles.bar}>
-              {i < index ? (
+              {i < step ? (
                 <View style={[styles.barFill, styles.full]} />
-              ) : i === index ? (
+              ) : i === step ? (
                 <Animated.View style={[styles.barFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
               ) : null}
             </View>
@@ -176,15 +190,21 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
       {!last && mode !== 'loading' ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <View style={[styles.zones, { top: insets.top + 56 }]}>
-            <Pressable style={styles.flex} onPress={() => go(index - 1)} accessibilityLabel="Previous" accessibilityRole="button" />
-            <Pressable style={styles.flex} onPress={() => go(index + 1)} accessibilityLabel="Next" accessibilityRole="button" />
+            <Pressable style={styles.flex} onPress={() => go(step - 1)} accessibilityLabel="Previous" accessibilityRole="button" />
+            <Pressable style={styles.flex} onPress={() => go(step + 1)} accessibilityLabel="Next" accessibilityRole="button" />
           </View>
         </View>
       ) : null}
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         {last ? (
-          <Button label="Let’s begin" size="lg" onPress={onDone} />
+          <View style={styles.endButtons}>
+            <Button label="Let’s begin" size="lg" onPress={onDone} fullWidth />
+            {/* The second part is optional: plans, streaks, rewards and the Vault. */}
+            {more ? null : (
+              <Button label="See more: plans, streaks & Vault" variant="ghost" icon="play" onPress={() => go(MORE_START, true)} />
+            )}
+          </View>
         ) : (
           <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}
@@ -544,6 +564,10 @@ const styles = StyleSheet.create({
   bottom: {
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+  },
+  endButtons: {
+    alignSelf: 'stretch',
+    gap: spacing.xs,
   },
   hint: {
     ...font.medium,

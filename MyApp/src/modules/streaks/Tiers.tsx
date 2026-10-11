@@ -67,7 +67,8 @@ export function useBadgeCongrats() {
       celebrate({
         icon: 'award',
         tone: 'primary',
-        eyebrow: 'Level up',
+        art: <TierBadge tier={tier} earned size={170} />,
+        eyebrow: 'New badge unlocked',
         title: `Congrats! You’ve upgraded to ${tier.name}`,
         subtitle: tier.reward
           ? `Streak ${tier.days} reached, and ${tier.reward} has been added to your Wallet.`

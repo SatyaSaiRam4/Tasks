@@ -506,3 +506,10 @@ have streaks). Keep it honest: update the table when those apps change.
   the Bronze badge, real money), Mom's private Vault, and the closing
   features. Dust drifts in the lamp light; scenes with floating props keep
   the camera steady (`steady: true`).
+- The story plays its first part by default (the birthday: four scenes and
+  the closing features). The second part, plans and streaks and the Vault,
+  is optional: “See more” on the last slide. Story time runs 1.15× slower
+  than real time.
+- A badge reached by a tick is revealed on Home: when Home is on screen
+  again, the badge spins in on its own celebration. The plan-complete
+  celebration says a new badge is waiting there.

@@ -15,6 +15,8 @@ export interface CelebrationSpec {
   subtitle?: string;
   stats?: { label: string; value: string }[];
   tone?: 'streak' | 'success' | 'primary';
+  /** A picture in place of the emblem, e.g. the badge just earned. It spins in. */
+  art?: React.ReactNode;
 }
 
 interface CelebrationApi {
@@ -110,7 +112,22 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
           <Glow color={accent} size={420} intensity={0.22} style={styles.cardGlow} />
           <Sheen color={gradients.heroSheen} inset="20%" />
           <View style={styles.iconArea}>
-            <Emblem icon={spec.icon} size={190} tint={accent} ring={ring} />
+            {spec.art ? (
+              <Animated.View
+                style={{
+                  transform: [
+                    { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
+                    // Reduced motion: no spin (the burst value stays at 0 then).
+                    { rotateY: reduced ? '0deg' : burst.interpolate({ inputRange: [0, 1], outputRange: ['-540deg', '0deg'] }) },
+                  ],
+                }}
+              >
+                <Glow color={accent} size={260} intensity={0.35} style={styles.artGlow} />
+                {spec.art}
+              </Animated.View>
+            ) : (
+              <Emblem icon={spec.icon} size={190} tint={accent} ring={ring} />
+            )}
           </View>
           <View style={styles.eyebrow}>
             <Eyebrow label={spec.eyebrow} color={accent} />
@@ -162,6 +179,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
+  },
+  artGlow: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: -50,
   },
   eyebrow: {
     alignItems: 'center',
