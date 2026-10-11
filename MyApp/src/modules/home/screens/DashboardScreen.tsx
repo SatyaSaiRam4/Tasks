@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -44,11 +44,16 @@ export function DashboardScreen() {
   const { celebrate } = useCelebration();
   const best = data?.streak.best_streak;
 
-  // A badge reached since the last visit gets its congratulations here.
+  // A new badge is revealed here, on Home, with its own celebration: right
+  // after coming back from the plan where it was earned (once Home is on
+  // screen and its streak has refreshed).
   const congratulateBadge = useBadgeCongrats();
+  const focused = useIsFocused();
   useEffect(() => {
-    if (best !== undefined) congratulateBadge(best);
-  }, [best, congratulateBadge]);
+    if (!focused || best === undefined) return;
+    const id = setTimeout(() => congratulateBadge(best), 650);
+    return () => clearTimeout(id);
+  }, [focused, best, congratulateBadge]);
   const celebrated = useRef(false);
 
   // Celebrate finished categories the user hasn't seen yet.
