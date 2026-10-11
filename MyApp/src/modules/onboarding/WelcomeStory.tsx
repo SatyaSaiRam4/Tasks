@@ -9,7 +9,7 @@ import { RealIcon, type RealIconName } from '../../components/RealIcon';
 import { Icon } from '../../components/Icon';
 import { useMotion } from '../../hooks/useMotion';
 import { SatyaModel } from '../satya/SatyaModel';
-import { Kid, Man, Mom } from './Characters';
+import { Girl, Kid, Man, Mom } from './Characters';
 
 /**
  * The welcome story, shown once to new users right after they sign in (and
@@ -195,7 +195,7 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
             <Text style={styles.moreText}>Part 2</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.caption} accessibilityRole="header" accessibilityLiveRegion="polite">
+        <Text style={[styles.caption, last && !more && styles.captionUnderLink]} accessibilityRole="header" accessibilityLiveRegion="polite">
           {mode === 'loading' ? ' ' : scene.caption}
         </Text>
         <View style={styles.flex}>
@@ -286,7 +286,7 @@ function DuoRow({ line, index, compact }: { line: Line; index: number; compact?:
       ) : line.who === 'Satya' ? (
         <Man size={compact ? 100 : 140} mood={line.mood} />
       ) : line.who === 'Riya' ? (
-        <Mom size={compact ? 92 : 130} mood={line.mood} colors={['#F6B04A', '#C97A12']} ponytail />
+        <Girl size={compact ? 92 : 130} mood={line.mood} />
       ) : (
         <Mom size={compact ? 92 : 130} mood={line.mood} />
       )}
@@ -465,6 +465,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
   },
+  // A clear gap between the Part 2 link above and the caption below.
+  captionUnderLink: {
+    marginTop: spacing.lg,
+  },
   scene: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -584,11 +588,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
+  // In the flow above the caption (not on top of it), at the right.
   moreLink: {
-    position: 'absolute',
-    right: spacing.lg,
-    top: spacing.xs,
-    zIndex: 2,
+    alignSelf: 'flex-end',
+    marginTop: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,

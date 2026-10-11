@@ -509,9 +509,12 @@ have streaks). Keep it honest: update the table when those apps change.
 - The story plays its first part by default (the birthday: four scenes and
   the closing features). The second part, plans and streaks and the Vault,
   is optional: a quiet “▶ Part 2” link at the top right of the last slide,
-  above the caption, with its own progress bars and its own cast: Satya (a
-  young man in glasses) and his friend Riya, in Satya's teal flat (stage
-  `P`, camera `PART2_CAM`). Its closing scene shows them too
+  above the caption (with a clear gap), with its own progress bars and its
+  own cast, drawn unlike Part 1: Satya (neat beard, glasses, a navy jacket
+  over a white shirt, a watch, sneakers) and his friend Riya (long open
+  hair, a pink top and jeans, hoops), in Satya's teal flat (stage `P`,
+  camera `PART2_CAM`). Speech bubbles in full-screen scenes stay below the
+  app's caption. Its closing scene shows them too
   (`story.show(index, part)`).
   Story time runs 1.15× slower than real time.
 - Badges (`useBadges` in `modules/streaks/Tiers.tsx`): a newly reached badge
@@ -522,7 +525,11 @@ have streaks). Keep it honest: update the table when those apps change.
   server records it (mirrored on the phone), so it happens once, on any
   device; a badge is never treated as seen just because that record is
   missing. Before the tremble it beats like a heart. The reveal waits until
-  Home is on screen and no other celebration card is open. Plan
+  Home is on screen and no other celebration card is open; Home scrolls the
+  streak card into view first. The gating rule is `badgeState()` (tested in
+  `__tests__/badges.test.ts`). Achievements earned on other screens are
+  queued for Home too (`modules/streaks/homeQueue.ts`), and the “Plan
+  finished” card waits for any reveal, so no card ever covers it. Plan
   celebrations don't mention badges. Migration `d4e7a1c9b5f2` cleared
   `badge_seen` once, so badges earned on earlier test builds get their
   reveal.

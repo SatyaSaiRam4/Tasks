@@ -70,10 +70,14 @@ function makePerson({
   bottomColor = 0x2b3550,
   glasses = false,
   mustache = false,
+  beard = false,
+  jacketColor = null,
 }) {
   // kind: 'kid', 'woman' (kurta, ponytail), 'bride' (bun, veil, jewellery),
-  // 'man' (shirt and trousers) or 'groom' (sherwani and turban).
+  // 'man' (shirt and trousers, optional jacket and beard), 'groom' (sherwani
+  // and turban) or 'casual' (a young woman in a top and jeans, long open hair).
   const kid = kind === 'kid';
+  const casual = kind === 'casual';
   const bride = kind === 'bride';
   const man = kind === 'man';
   const groom = kind === 'groom';
@@ -81,8 +85,8 @@ function makePerson({
   const skin = mat(kid ? 0xf3c9a6 : skinColor, { roughness: 0.75 });
   const hair = mat(kid ? 0x2a1e1a : hairColor, { roughness: 0.9 });
   const top = mat(kid ? 0x3f7cf0 : topColor, { roughness: bride ? 0.55 : 0.8, metalness: bride ? 0.08 : 0.02 });
-  const bottom = mat(kid ? 0x26345e : male ? bottomColor : 0x5a2b3f, { roughness: 0.85 });
-  const shoe = mat(kid ? 0xf2f2f2 : male ? 0x2a1d17 : 0x5a2b3f);
+  const bottom = mat(kid ? 0x26345e : male || casual ? bottomColor : 0x5a2b3f, { roughness: 0.85 });
+  const shoe = mat(kid || casual || jacketColor ? 0xf2f2f2 : male ? 0x2a1d17 : 0x5a2b3f);
   const ink = mat(0x1e1512, { roughness: 0.3 });
   const gold = mat(0xe7c17a, { metalness: 0.6, roughness: 0.3 });
 
@@ -114,6 +118,24 @@ function makePerson({
       body.add(collar);
     }
     for (let i = 0; i < 3; i++) body.add(mesh(new THREE.SphereGeometry(0.012, 8, 6), mat(0xf2f2f2), { y: 0.45 - i * 0.1, z: 0.2 }, false));
+    if (jacketColor) {
+      // An open jacket over the shirt: two front panels, the back and lapels.
+      const jacket = mat(jacketColor, { roughness: 0.7 });
+      body.add(mesh(new THREE.CapsuleGeometry(0.208, 0.2, 8, 16, 1), jacket, { y: 0.3, z: -0.012 }));
+      for (const side of [-1, 1]) {
+        const panel = mesh(new THREE.BoxGeometry(0.11, 0.42, 0.03), jacket, { x: side * 0.13, y: 0.29, z: 0.19 });
+        panel.rotation.y = side * 0.35;
+        body.add(panel);
+        const lapel = mesh(new THREE.BoxGeometry(0.05, 0.16, 0.02), mat(0x1b2438), { x: side * 0.08, y: 0.45, z: 0.205 }, false);
+        lapel.rotation.z = side * 0.35;
+        body.add(lapel);
+      }
+    }
+  } else if (casual) {
+    // A fitted top with a round neck, and a little star print.
+    body.add(mesh(new THREE.CapsuleGeometry(0.175, 0.2, 8, 16), top, { y: 0.3 }));
+    body.add(mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 20), mat(0xffffff), { y: 0.5, z: 0.11 }, false));
+    body.add(mesh(new THREE.CircleGeometry(0.04, 5), mat(0xfff1a8), { y: 0.33, z: 0.178 }, false));
   } else if (groom) {
     // A long cream sherwani with a gold border and a red stole.
     const coat = [
@@ -165,11 +187,16 @@ function makePerson({
     }
   }
 
-  const shoulderY = kid ? torsoH * 0.82 : male ? 0.5 : 0.46 * s;
-  const shoulderX = kid ? 0.25 * s : male ? 0.25 : 0.22 * s;
+  const shoulderY = kid ? torsoH * 0.82 : male ? 0.5 : casual ? 0.47 : 0.46 * s;
+  const shoulderX = kid ? 0.25 * s : male ? 0.25 : casual ? 0.215 : 0.22 * s;
   const armLen = kid ? 0.3 * s : male ? 0.38 : 0.36 * s;
-  const armL = limb(0.055 * s, armLen, top, 0.065 * s, skin);
-  const armR = limb(0.055 * s, armLen, top, 0.065 * s, skin);
+  const sleeve = jacketColor ? mat(jacketColor, { roughness: 0.7 }) : top;
+  const armL = limb(0.055 * s, armLen, sleeve, 0.065 * s, skin);
+  const armR = limb(0.055 * s, armLen, sleeve, 0.065 * s, skin);
+  if (jacketColor) {
+    // A wristwatch.
+    armL.add(mesh(new THREE.TorusGeometry(0.052, 0.014, 8, 16), mat(0xd4af6a, { metalness: 0.7, roughness: 0.3 }), { y: -armLen * 0.86 }, false));
+  }
   armL.position.set(-shoulderX, shoulderY, 0);
   armR.position.set(shoulderX, shoulderY, 0);
   armL.rotation.z = -0.12;
@@ -218,6 +245,15 @@ function makePerson({
       plume.rotation.x = -0.4;
       head.add(plume);
     }
+    if (beard) {
+      // A short, neat beard along the jaw and chin, below the mouth.
+      const stubble = mat(0x3d2c24, { roughness: 1 });
+      const jaw = mesh(new THREE.SphereGeometry(headR * 1.02, 28, 14, 0, Math.PI * 2, Math.PI * 0.68, Math.PI * 0.22), stubble, {}, false);
+      head.add(jaw);
+      const stache = mesh(new THREE.CapsuleGeometry(headR * 0.035, headR * 0.3, 4, 8), stubble, { y: -headR * 0.16, z: headR * 0.97 }, false);
+      stache.rotation.z = Math.PI / 2;
+      head.add(stache);
+    }
     if (mustache) {
       const m = mesh(new THREE.CapsuleGeometry(headR * 0.06, headR * 0.3, 4, 8), hair, { y: -headR * 0.18, z: headR * 0.95 }, false);
       m.rotation.z = Math.PI / 2;
@@ -230,6 +266,21 @@ function makePerson({
         head.add(lens);
       }
       head.add(mesh(new THREE.BoxGeometry(headR * 0.3, headR * 0.03, headR * 0.03), frameMat, { y: headR * 0.1, z: headR * 0.98 }, false));
+    }
+  } else if (casual) {
+    // Long open hair falling behind the shoulders, a side fringe, hoops.
+    const fall = mesh(new THREE.CapsuleGeometry(headR * 0.82, headR * 1.3, 8, 16), hair, { y: -headR * 0.75, z: -headR * 0.42 });
+    fall.scale.set(1.18, 1, 0.55);
+    head.add(fall);
+    for (const side of [-1, 1]) {
+      head.add(mesh(new THREE.CapsuleGeometry(headR * 0.2, headR * 1.0, 6, 10), hair, { x: side * headR * 0.86, y: -headR * 0.45, z: -headR * 0.05 }));
+    }
+    const fringe = mesh(new THREE.SphereGeometry(headR * 0.62, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), hair, { x: -headR * 0.22, y: headR * 0.58, z: headR * 0.38 });
+    fringe.scale.set(1.35, 0.45, 0.95);
+    fringe.rotation.z = 0.25;
+    head.add(fringe);
+    for (const side of [-1, 1]) {
+      head.add(mesh(new THREE.TorusGeometry(headR * 0.14, headR * 0.03, 8, 18), gold, { x: side * headR * 1.03, y: -headR * 0.38 }, false));
     }
   } else {
     if (kind === 'woman') {
@@ -1131,9 +1182,11 @@ function ringPhone(phone, t, a, b, { x = 0.35, y = 1.35, scale = 0.5 } = {}) {
 }
 
 const AARAV = { kind: 'kid' };
-// Part 2: Satya, a young man in a shirt and glasses, and his friend Riya.
-const SATYA = { kind: 'man', skinColor: 0xd9a27a, topColor: 0x2f8f9d, bottomColor: 0x2b3550, hairColor: 0x1e1512, glasses: true };
-const RIYA = { kind: 'woman', skinColor: 0xe6b08a, topColor: 0xf0a43a, hairColor: 0x2a1a14 };
+// Part 2's cast looks nothing like Part 1's: Satya (beard, glasses, a navy
+// jacket over a white shirt, a watch, sneakers) and his friend Riya (long
+// open hair, a pink top and jeans, hoops).
+const SATYA = { kind: 'man', skinColor: 0xc98f66, topColor: 0xf2f4f7, bottomColor: 0x3a3f4a, hairColor: 0x161010, glasses: true, beard: true, jacketColor: 0x2b3a5c };
+const RIYA = { kind: 'casual', skinColor: 0xf0c4a0, topColor: 0xe85d8a, bottomColor: 0x3b5ba5, hairColor: 0x3a2318 };
 const MOM = { kind: 'mom', skinColor: 0xe9b48f, topColor: 0xc95c7a, hairColor: 0x3b2620 };
 
 function cast(stage, spec) {
@@ -1292,7 +1345,9 @@ function placeBubbles(t) {
     const bw = b.el.offsetWidth;
     const bh = b.el.offsetHeight;
     const left = Math.min(Math.max(x - bw / 2, 10), v.w - bw - 10);
-    const top = Math.min(Math.max(y - bh, 30), v.h - bh - 8);
+    // Full-screen scenes keep bubbles below the app's caption at the top.
+    const minTop = v.small ? 30 : Math.max(30, TOP - 24);
+    const top = Math.min(Math.max(y - bh, minTop), v.h - bh - 8);
     b.el.style.transform = `translate(${left}px, ${v.y + top}px)`;
     b.el.style.setProperty('--tail', `${Math.min(Math.max(x - left, 18), bw - 18)}px`);
   }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +23,7 @@ import { useGetDashboardQuery, useGetTrackCompletionsQuery } from '../../streaks
 import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
 import { BadgeStrip, useBadges } from '../../streaks/Tiers';
+import { hasQueuedForHome, subscribeHomeQueue, takeQueuedForHome } from '../../streaks/homeQueue';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -51,6 +52,7 @@ export function DashboardScreen() {
   const focused = useIsFocused();
   // Never behind another card (e.g. "+1 streak" right after a tick on Home).
   const { active: celebrating } = useCelebration();
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [reveal, setReveal] = useState(-1);
   const pending = best === undefined ? -1 : badges.pending;
   useEffect(() => {
@@ -59,9 +61,23 @@ export function DashboardScreen() {
       return;
     }
     if (pending < 0 || celebrating || reveal >= 0) return;
-    const id = setTimeout(() => setReveal(pending), 700);
+    // Bring the streak card into view, let any closing card fade away, then begin.
+    scroller.current?.scrollTo({ y: 0, animated: true });
+    const id = setTimeout(() => setReveal(pending), 1000);
     return () => clearTimeout(id);
   }, [focused, pending, celebrating, reveal]);
+  // Achievements earned elsewhere wait for Home too, after any badge reveal.
+  const [queued, setQueued] = useState(hasQueuedForHome());
+  useEffect(() => subscribeHomeQueue(() => setQueued(hasQueuedForHome())), []);
+  useEffect(() => {
+    if (!focused || !queued || celebrating || reveal >= 0 || pending >= 0) return;
+    const id = setTimeout(() => {
+      takeQueuedForHome().forEach(spec => celebrate(spec));
+      setQueued(false);
+    }, 900);
+    return () => clearTimeout(id);
+  }, [focused, queued, celebrating, reveal, pending, celebrate]);
+
   const onRevealed = useCallback(
     (index: number) => {
       setReveal(-1);
@@ -71,9 +87,10 @@ export function DashboardScreen() {
   );
   const celebrated = useRef(false);
 
-  // Celebrate finished categories the user hasn't seen yet.
+  // Celebrate finished categories the user hasn't seen yet (after any badge
+  // reveal, so nothing ever covers it).
   useEffect(() => {
-    if (!completions.data?.length || celebrated.current) return;
+    if (!completions.data?.length || celebrated.current || reveal >= 0 || pending >= 0) return;
     celebrated.current = true;
     AsyncStorage.getItem(SEEN_COMPLETIONS_KEY)
       .then(raw => {
@@ -94,7 +111,7 @@ export function DashboardScreen() {
         return AsyncStorage.setItem(SEEN_COMPLETIONS_KEY, JSON.stringify([...seen]));
       })
       .catch(() => undefined);
-  }, [completions.data, celebrate]);
+  }, [completions.data, celebrate, reveal, pending]);
 
   if (isLoading) {
     return (
@@ -123,7 +140,7 @@ export function DashboardScreen() {
   const hidden = plans.length - shown.length;
 
   return (
-    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading}>
+    <Screen onRefresh={refetch} refreshing={isFetching && !isLoading} scrollRef={scroller}>
       <TopBar />
 
       <FadeIn>
