@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core import config
@@ -122,8 +123,28 @@ def get_or_create_state(db: Session, user: User) -> StreakState:
             bonus_points=0,
         )
         db.add(state)
-        db.flush()
+        try:
+            db.flush()
+        except IntegrityError:
+            # Another request created it at the same moment: use that one.
+            db.rollback()
+            state = db.get(StreakState, user.id)
     return state
+
+
+def _lock_state(db: Session, user: User) -> StreakState:
+    """The user's StreakState, locked (SELECT ... FOR UPDATE) until commit.
+
+    Several requests often arrive together (Home loads the dashboard, streak,
+    wallet and plans at once), and right after midnight each would try to
+    finalize the same day and insert the same DailyRecord. With the row
+    locked they take turns: the second waits, then re-reads the state and
+    finds the day already finalized."""
+    get_or_create_state(db, user)
+    db.commit()  # make sure the row exists for everyone before locking it
+    return db.execute(
+        select(StreakState).where(StreakState.user_id == user.id).with_for_update().execution_options(populate_existing=True)
+    ).scalar_one()
 
 
 def compute_bonus(duration_days: int, required_total: int, completed_total: int) -> int:
@@ -188,14 +209,15 @@ def _evaluate_track_completions(
 def finalize_user(db: Session, user: User, check_achievements: bool = False) -> list[str]:
     """Finalizes every ended, unjudged day for `user` and scores ended Tracks.
 
-    Idempotent and safe to call on every request. Achievements are checked
+    Idempotent and safe to call on every request, also many at once (the
+    user's streak row is locked while it runs). Achievements are checked
     only when a day was finalized here or `check_achievements` is set (after a
     completion), since the check costs several queries. Returns codes of any
     newly earned achievements. Commits.
     """
     from app.modules.achievements.service import evaluate_achievements
 
-    state = get_or_create_state(db, user)
+    state = _lock_state(db, user)
     today = local_today(user.timezone)
     yesterday = today - timedelta(days=1)
 
