@@ -231,12 +231,14 @@ the **light** theme.
   - Slides move on by themselves; tap right for next, left for back, or Skip.
 - **Melo on Home** (`MeloCorner.tsx`, `web/satya/melo.js`, built with
   `npm run build:melo`): he arrives as a ball in his own robe red that rolls
-  in from one side and flips open; he pops out and strolls off, turns his
-  face to you mid-walk, goes bright red (blush lines, steam) and runs off
-  the screen; then, Chopper-style, he leans back in from the edge with half
-  of him showing to check whether you're still watching (twice; a tap finds
-  him) and comes back to give his tip in a speech bubble. A tap at any time
-  makes him blush bright red with red hearts. He also reacts to the user's
+  in from one side and flips open in a burst of gold, red and white stars
+  with a ripple across the floor; he pops out and strolls off, turns his
+  face to you mid-walk, blushes (soft pink, steam puffs) and dashes off the
+  screen in a kick of dust; then, Chopper-style, he leans back in from the
+  edge with half of him showing and a sweat drop to check whether you're
+  still watching (twice; a tap finds him) and comes back to give his tip in
+  a speech bubble. A tap at any time makes him blush with red hearts.
+  Particles have darker edges so they show on the light and dark themes. He also reacts to the user's
   day (proud, worried, sleepy). Check it in a browser: serve `MyApp/assets`
   and open `web/satya/index.html?mode=stroll&at=40&hold=peek&f=0.5`
   (`at` fast-forwards; `hold` freezes a phase).

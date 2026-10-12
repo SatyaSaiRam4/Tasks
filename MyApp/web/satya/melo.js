@@ -541,6 +541,14 @@ function start() {
         scene.add(ball);
         const flash = new THREE.PointLight(0xffe2a8, 0, H * 6, 1.6);
         scene.add(flash);
+        // A ring of light that ripples out across the floor as the ball opens.
+        const wave = new THREE.Mesh(
+          new THREE.RingGeometry(0.82, 1, 64),
+          new THREE.MeshBasicMaterial({ color: 0xe8a33a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+        );
+        wave.rotation.x = -Math.PI / 2;
+        wave.position.y = 0.004;
+        scene.add(wave);
         /** World x that appears at screen position `ndc` (-1 left edge, 1 right edge) at depth z. */
         const xAtScreen = (ndc, z = 0) => {
           const a = new THREE.Vector3(0, H * 0.5, z).project(camera).x;
@@ -604,10 +612,17 @@ function start() {
             if (k > 450 && !st.opened) {
               st.opened = true;
               stroller.visible = true;
-              emit('sparkle', 6, 50);
+              // Ta-da: stars fly out in gold, red and white, sparkles and a soft poof.
+              floaters.burst(0, ballR * 1.3, 0.12, 18, H, [0xffc23a, 0xe0384f, 0xffffff, 0xff9a2e]);
+              emit('sparkle', 6, 60);
               for (let i = 0; i < 5; i++) floaters.emit('puff', (i - 2) * ballR * 0.5, ballR * 1.2, 0.1, H * 0.25);
               motion.now('hop');
             }
+            // The ripple across the floor.
+            const r = Math.max(0, (k - 450) / 650);
+            wave.visible = r > 0 && r < 1;
+            wave.scale.setScalar(ballR * (1 + 6 * ease(Math.min(1, r))));
+            wave.material.opacity = 0.75 * (1 - Math.min(1, r));
             // He springs up out of it with an overshoot.
             const g = Math.max(0, (k - 450) / 550);
             st.pop = g <= 0 ? 0 : g < 0.6 ? ease(g / 0.6) * 1.15 : 1.15 - 0.15 * Math.min(1, (g - 0.6) / 0.4);
@@ -617,6 +632,7 @@ function start() {
               st.opened = false;
               st.pop = 1;
               ball.visible = false;
+              wave.visible = false;
               flash.intensity = 0;
               // Off for a casual stroll to one side.
               st.walkSide = Math.random() < 0.5 ? -1 : 1;
@@ -653,7 +669,7 @@ function start() {
           if (st.phase === 'blush') {
             // Goes bright red, steam puffing off his head, a tiny shy wiggle.
             st.face = 0;
-            st.blush = Math.min(2, (k / 400) * 2);
+            st.blush = Math.min(1.6, (k / 400) * 1.6);
             if (k > 250 && !st.steamed) {
               st.steamed = true;
               steam(3);
@@ -665,6 +681,10 @@ function start() {
               st.x1 = xAtScreen(st.walkSide * 1.35);
               setPhase(time, 'flee');
               motion.now('');
+              // Anime dash: dust kicks back from his feet.
+              for (let i = 0; i < 4; i++) {
+                setTimeout(() => floaters.emit('dust', st.x - st.walkSide * W * (0.2 + i * 0.12), H * 0.06, 0.05, H * 0.28, -st.walkSide * H * 0.5), i * 70);
+              }
             }
             return true;
           }
@@ -691,6 +711,11 @@ function start() {
             const f = Math.min(1, k / T.peek);
             const lean = f < 0.2 ? ease(f / 0.2) : f < 0.78 ? 1 : 1 - ease((f - 0.78) / 0.22);
             const depth = st.peeks === 0 ? 0.93 : 0.88; // the second time, a little braver
+            if (f > 0.25 && !st.sweated) {
+              st.sweated = true;
+              const h = headAt();
+              floaters.emit('sweat', h.x - st.walkSide * W * 0.3, h.y + H * 0.05, h.z + 0.08, H * 0.2);
+            }
             st.x = run(xAtScreen(st.walkSide * 1.35), xAtScreen(st.walkSide * depth), lean);
             st.lean = -st.walkSide * lean;
             st.face = -st.walkSide * 0.35 * lean;
@@ -698,6 +723,7 @@ function start() {
             st.plead = 1;
             st.tremble = 0.35 * lean;
             if (f >= 1) {
+              st.sweated = false;
               st.peeks += 1;
               setPhase(time, st.peeks >= 2 ? 'back' : 'gone');
               if (st.peeks < 2) st.t0 = time - T.gone + 700; // a shorter wait before the second peek
@@ -776,7 +802,7 @@ function start() {
               motion.now('hop');
               st.face = 0;
               st.wiggleUntil = time + 2600;
-              st.blush = 2;
+              st.blush = 1.6;
               st.flushUntil = time + 4200;
               steam(4);
               emit('heart', 5, 220);
