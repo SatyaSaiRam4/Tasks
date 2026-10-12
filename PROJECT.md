@@ -229,6 +229,15 @@ the **light** theme.
     Bronze badge, and coins rain for real-money rewards. Then he shows his
     private Vault, whose padlock springs open with his PIN.
   - Slides move on by themselves; tap right for next, left for back, or Skip.
+- **Melo on Home** (`MeloCorner.tsx`, `web/satya/melo.js`, built with
+  `npm run build:melo`): he arrives as a golden ball that rolls in from one
+  side and pops into Melo in the middle, looks around, spots you ("!") and
+  hides behind a little column that rises from the floor, only half hidden,
+  trembling and peeking out, then comes out shyly (tap him to find him).
+  Then he strolls, stops to give a tip in a speech bubble, and reacts to
+  the user's day (proud, worried, sleepy). Check a moment in a browser with
+  `assets/web/satya/index.html?mode=stroll&at=8` (seconds, played in
+  fast-forward).
 - **Melo's tour:** nine short steps (making a plan, adding tasks, ticking,
   streak points, rewards, reminders, the Vault) with typed-out text and a
   gesture each, plus Back and Skip.
