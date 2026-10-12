@@ -12,6 +12,7 @@ from app.modules.tracks.router import router as tracks_router
 from app.modules.users.router import router as users_router
 from app.modules.vault.router import router as vault_router
 from app.modules.wallet.router import router as wallet_router
+from app.modules.whatsapp.router import router as whatsapp_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -25,5 +26,6 @@ api_router.include_router(achievements_router)
 api_router.include_router(reminders_router)
 api_router.include_router(vault_router)
 api_router.include_router(wallet_router)
+api_router.include_router(whatsapp_router)
 api_router.include_router(admin_router)
 api_router.include_router(maintenance_router)

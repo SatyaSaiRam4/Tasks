@@ -35,7 +35,13 @@ def _poll_due_reminders() -> None:
         if whatsapp_ready:
             from app.modules.auth.models import User
 
+            from app.modules.whatsapp.service import is_verified
+
             for reminder in reminders_service.get_due_whatsapp_reminders(db):
+                # Never message a number whose owner hasn't verified it, or said STOP.
+                if not is_verified(db, reminder.whatsapp_number):
+                    reminders_service.mark_whatsapp_result(db, reminder.id, False)
+                    continue
                 user = db.get(User, reminder.user_id)
                 variables = whatsapp_variables(
                     MSG91_WHATSAPP_TEMPLATE_STYLE,

@@ -154,7 +154,7 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   |---|---|---|
   | Notification (free) | This phone, quietly | 🔔 **Call the electrician** · 6:30 PM · Bring the warranty card |
   | Alarm (free) | This phone, loud, until Stop | ⏰ **Call the electrician** · It's 6:30 PM… Press Stop when you're on it. |
-  | WhatsApp (premium) | Any number, even with the phone off | A personal message with the name, reminder, date and time |
+  | WhatsApp (premium) | Any **verified** number, even with the phone off | A personal message with the name, reminder, date and time |
 
 - **"Ring like an alarm"** shows a full-screen, looping alarm with a Stop
   button that stops by itself after 10, 30 or 60 seconds. The sound
@@ -162,6 +162,17 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   Settings, which also has *Test alarm*.
 - Task notifications read ✅ **Walk 20 minutes** · Time for this task in
   "Fitness". The 8 PM streak warning reads 🔥 **2 tasks left today**.
+- **WhatsApp numbers must be verified by their owner** (so nobody can use
+  Memo to message someone else's number to tease them). Under the number
+  in the reminder editor, *Verify this number* shows a code such as
+  `MEMO 482913`; the owner sends it **from that number** to Memo's WhatsApp
+  number. For your own number, *Open WhatsApp* sends it in one tap; for a
+  friend's, *Share the code* and they send it. The app sees the result
+  within seconds. The code lasts 30 minutes. Replying **STOP** (or
+  UNSUBSCRIBE, CANCEL, END, QUIT) stops all reminders to that number; to get
+  them again it has to be verified again (START alone isn't enough). The
+  server refuses WhatsApp reminders for unverified numbers, and the worker
+  never sends to them (see [7.4](#74-whatsapp-number-verification)).
 
 ### 2.6 Private Vault
 
@@ -256,8 +267,9 @@ honest and update it if those apps change.
 
 ### 2.11 Android home-screen widget
 
-Shows the streak, today's tasks and the next reminder; tap to open Memo.
-Nothing from the Vault is shown. Add it with a long press on the home
+Shows the streak, today's tasks and the next reminder, with Melo standing on
+the right (`res/drawable-nodpi/melo_widget.png`, rendered from his 3D model);
+tap to open Memo. Nothing from the Vault is shown. Add it with a long press on the home
 screen → Widgets → Memo.
 
 ### 2.12 Admin
@@ -328,6 +340,7 @@ of users. Admin screens never give access to anyone's Vault.
 | `reminders` | Reminders, snooze, complete, WhatsApp scheduling |
 | `vault` | PIN, sessions, encrypted notes, voice notes, photos, bin |
 | `wallet` | Milestones, balance, redemptions |
+| `whatsapp` | WhatsApp number consent: verification codes, the MSG91 inbound webhook, STOP |
 | `dashboard` | One call with everything Home needs |
 | `admin` | Statistics and user management |
 | `maintenance` | The daily cleanup endpoint |
@@ -453,7 +466,7 @@ Main tables (PostgreSQL):
 |---|---|
 | `users` | Account, display name, public ID, timezone, profile photo (`photo`, `photo_mime`, `photo_version`), role |
 | `user_settings` | Theme-independent preferences: confirmation mode, notifications, privacy switches, Vault auto-lock, Melo, `tap_sound`, `badge_seen` |
-| `refresh_sessions`, `password_reset_codes` | Sign-in sessions and reset codes |
+| `refresh_sessions`, `password_reset_codes`, `email_verification_codes` | Sign-in sessions, password-reset codes and sign-up email codes (`users.email_verified_at`, `users.google_sub` for Google sign-in) |
 | `tracks` | Plans |
 | `actions` | Tasks |
 | `action_completions` | Ticks (un-ticks are kept for the audit trail) |
@@ -466,6 +479,7 @@ Main tables (PostgreSQL):
 | `vault_entries` | Encrypted notes (+ encrypted voice note) |
 | `vault_images` | Encrypted photos of Vault notes |
 | `wallet_redemptions` | Redemption requests |
+| `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (code waiting, stored as a hash), `VERIFIED`, `STOPPED` |
 
 **Migrations** (`Backend/alembic/versions/`, oldest first):
 
@@ -481,6 +495,9 @@ Main tables (PostgreSQL):
 | `a7c3e9f15b20` | Vault photos, tap sound |
 | `c1d8f4a2e6b3` | `badge_seen` |
 | `d4e7a1c9b5f2` | One-time reset of `badge_seen` |
+| `b9e3f7a2c4d1` | Email verification at sign-up |
+| `e6c2d9a4f8b3` | Google sign-in (`users.google_sub`) |
+| `e5b2c8d14a71` | WhatsApp number consent (`whatsapp_contacts`) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -509,6 +526,7 @@ refresh, forgot/reset password and the health checks needs
 | Vault notes | `GET/POST /vault/entries`, `GET/PATCH/DELETE /vault/entries/{id}`, `POST /vault/entries/{id}/{pin,unpin,favorite,unfavorite,archive,unarchive,trash,restore}`, `GET /vault/folders`, `POST /vault/trash/empty` |
 | Vault media | `PUT/GET/DELETE /vault/entries/{id}/audio`, `POST /vault/entries/{id}/images`, `GET/DELETE /vault/entries/{id}/images/{image_id}` |
 | Wallet | `GET /wallet`, `POST /wallet/redeem` |
+| WhatsApp consent | `POST /whatsapp/verify`, `GET /whatsapp/status?phone=…`; `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in) |
 | Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role` |
 | Maintenance | `POST /maintenance/cleanup` (header `X-Cron-Secret`) |
 
@@ -530,6 +548,8 @@ Interactive docs are at `/docs` on a running server.
 | `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM` | Email through Resend |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`, `SMTP_DEBUG` | Email through SMTP (Gmail needs an App Password; ports 587 and 465 both work). `SMTP_SERVER`/`SMTP_EMAIL` are accepted aliases |
 | `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_INTEGRATED_NUMBER`, `MSG91_WHATSAPP_TEMPLATE_NAME`, `MSG91_WHATSAPP_NAMESPACE`, `MSG91_WHATSAPP_TEMPLATE_STYLE` | WhatsApp reminders (optional) |
+| `MSG91_INBOUND_SECRET` | Secret in the URL MSG91 forwards incoming WhatsApp messages to (number verification and STOP). Without it the inbound endpoint is off |
+| `GOOGLE_CLIENT_IDS` | Comma-separated OAuth client IDs accepted for Google sign-in |
 | `REMINDER_POLL_SECONDS`, `STREAK_FINALIZE_MINUTES` | Worker timing |
 | `TRACK_BONUS_*` | Plan completion bonus rules |
 | `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The admin account created at start-up. Never use the example values |
@@ -578,6 +598,35 @@ cd Backend && python -m app.integrations.email you@example.com
 
   Footer `Sent by Memo.`. Get it approved in MSG91, then set
   `MSG91_WHATSAPP_TEMPLATE_NAME` and `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed`.
+
+### 7.4 WhatsApp number verification
+
+Verification works the other way round from an SMS OTP, so it **needs no
+extra WhatsApp template**: the user's own message to Memo is what proves the
+number is theirs (`Backend/app/modules/whatsapp/`).
+
+1. The app calls `POST /whatsapp/verify` with the number. The server stores
+   a hashed 6-digit code (30 minutes) and returns the message
+   (`MEMO 482913`) and a `https://wa.me/<Memo's number>?text=MEMO%20482913`
+   link.
+2. The owner sends that message from the number to Memo's WhatsApp number.
+3. MSG91 forwards incoming messages to
+   `POST /api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`. A matching
+   code marks the number `VERIFIED`; STOP marks it `STOPPED`.
+4. The app polls `GET /whatsapp/status?phone=…` while the sheet is open.
+
+**MSG91 setup:** in MSG91 → WhatsApp → Webhook, add the inbound URL above
+for *incoming messages*, with a long random `MSG91_INBOUND_SECRET` set on
+Render. MSG91's inbound payload field names differ between its old and new
+webhooks, so the server accepts several (`customer_number`/`customerNumber`/
+`from`/`sender` for the number; `content.text`/`text`/`body`/`message` for
+the text). The first time, send a test message and check the Render log
+line `WhatsApp inbound: [...]`: it should say `verified` or `stopped`.
+
+**Free alternatives**, if MSG91 inbound isn't available on the account:
+Meta's own WhatsApp Cloud API (free messages inside the 24-hour window after
+the user writes in; templates outside it), or a Telegram bot (free, no
+templates; the user starts the bot, which is itself consent).
 
 ---
 
@@ -748,6 +797,9 @@ block. On Render this isn't needed.
 | Reminders late on Android | Allow exact alarms; turn off battery optimisation for Memo |
 | Password-reset email doesn't arrive | Run the email check in [7.1](#71-backend-environment-backendenv-or-render-environment-variables); Gmail needs an App Password |
 | The Vault locked while choosing a photo | Fixed: pickers no longer lock it. Pull the latest code |
+| WhatsApp verification never completes | Check the MSG91 inbound webhook URL and `MSG91_INBOUND_SECRET`, then the Render log line `WhatsApp inbound: [...]` ([7.4](#74-whatsapp-number-verification)). `ignored: no code waiting` means the code was sent from a different number than the one being verified |
+| WhatsApp reminders show *Failed* | The number isn't verified, or its owner replied STOP: verify it again from the reminder |
+| Android build: `Keystore file … memo-debug.keystore not found` | Debug builds are signed with your own `memo-debug.keystore` (its SHA-1 is registered for Google sign-in). Copy it into `MyApp/android/app/`; it isn't in git |
 
 ---
 

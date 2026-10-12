@@ -30,6 +30,8 @@ import {
   useUpdateReminderMutation,
 } from '../remindersApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
+import { WhatsAppVerify } from '../WhatsAppVerify';
+import type { ContactStatus } from '../whatsappApi';
 
 /** A bare 10-digit number is almost always an Indian mobile number typed without +91. */
 function normalizeWhatsapp(raw: string): string {
@@ -64,6 +66,7 @@ export function ReminderEditorScreen() {
   const [day, setDay] = useState(params?.date && params.date >= todayKey ? params.date : todayKey);
   const [time, setTime] = useState<string | null>(params?.date && params.date > todayKey ? '09:00:00' : defaultTime());
   const [whatsapp, setWhatsapp] = useState(false);
+  const [waStatus, setWaStatus] = useState<ContactStatus>('NONE');
   const [alarm, setAlarm] = useState(false);
   const [number, setNumber] = useState('');
   const [alarmPrompt, setAlarmPrompt] = useState(false);
@@ -95,6 +98,8 @@ export function ReminderEditorScreen() {
     if (at.getTime() <= Date.now() && !sameTime) return setError('That time has already passed. Pick a later time.');
     const phone = whatsapp ? normalizeWhatsapp(number) : '';
     if (whatsapp && !/^\+\d{8,15}$/.test(phone)) return setError('Enter a WhatsApp number, e.g. 9876543210.');
+    const unchanged = editing && existing.data?.whatsapp_number === phone;
+    if (whatsapp && waStatus !== 'VERIFIED' && !unchanged) return setError('Verify this WhatsApp number first (tap "Verify this number").');
 
     const payload = { title: title.trim(), note: note.trim() || null, remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined, alarm_enabled: alarm };
     try {
@@ -183,6 +188,7 @@ export function ReminderEditorScreen() {
         {whatsapp ? (
           <View style={styles.mtLg}>
             <TextField label="WhatsApp number" value={number} onChangeText={setNumber} placeholder="9876543210" keyboardType="phone-pad" />
+            {/^\+\d{8,15}$/.test(normalizeWhatsapp(number)) ? <WhatsAppVerify phone={normalizeWhatsapp(number)} onStatus={setWaStatus} /> : null}
           </View>
         ) : null}
 

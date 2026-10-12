@@ -5,7 +5,18 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.modules.whatsapp import service as whatsapp
+
 from .models import Reminder, ReminderStatus, WhatsAppStatus
+
+
+def _require_verified(db: Session, phone: str | None) -> None:
+    """WhatsApp reminders only go to a number whose owner has verified it."""
+    if phone and not whatsapp.is_verified(db, phone):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Verify this WhatsApp number first: its owner sends the Memo code from it.",
+        )
 
 
 def _whatsapp_status_for(whatsapp_number: str | None) -> WhatsAppStatus:
@@ -41,6 +52,7 @@ def list_reminders(
 
 def create_reminder(db: Session, user_id: UUID, data: dict) -> Reminder:
     _validate_track(db, user_id, data.get("track_id"))
+    _require_verified(db, data.get("whatsapp_number"))
     reminder = Reminder(
         user_id=user_id,
         title=data["title"],
@@ -72,6 +84,8 @@ def update_reminder(db: Session, user_id: UUID, reminder_id: UUID, fields: dict)
         fields.pop("alarm_enabled", None)
     if fields.get("track_id") is not None:
         _validate_track(db, user_id, fields["track_id"])
+    if fields.get("whatsapp_number") and fields["whatsapp_number"] != reminder.whatsapp_number:
+        _require_verified(db, fields["whatsapp_number"])
 
     for key, value in fields.items():
         setattr(reminder, key, value)
