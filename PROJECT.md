@@ -481,7 +481,7 @@ refresh, forgot/reset password and the health checks needs
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password`; `GET /auth/me` |
+| Auth | `POST /auth/register` (emails a 6-digit code, no tokens), `/auth/verify-email` (code → tokens), `/auth/resend-code`, `/auth/login` (403 `EMAILNOTVERIFIED` until verified), `/auth/google` (Google ID token → tokens; needs `GOOGLE_CLIENT_IDS`), `/auth/refresh`, `/auth/logout`, `/auth/logout-all`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password`; `GET /auth/me` |
 | Me and settings | `GET/PATCH /users/me`, `GET /users/me/profile`, `GET/PATCH /users/me/settings`, `POST /users/me/onboarding/complete`, `POST /users/me/onboarding/reset` |
 | Photos | `PUT/DELETE /users/me/photo` (multipart, ≤ 10 MB), `GET /users/{public_id}/photo` |
 | Friends | `GET /users/search?public_id=…` |

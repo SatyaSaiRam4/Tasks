@@ -29,6 +29,7 @@ engine = create_engine(TEST_DATABASE_URL)
 TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 TABLES = [
+    "email_verification_codes",
     "wallet_redemptions",
     "user_achievements",
     "track_completions",
@@ -91,6 +92,29 @@ def clock(monkeypatch):
     return c
 
 
+# Emails the app "sent" during a test: (to, subject, text). Codes are read from here.
+OUTBOX: list[tuple[str, str, str]] = []
+
+
+@pytest.fixture(autouse=True)
+def capture_email(monkeypatch):
+    import app.modules.auth.service as auth_service
+
+    OUTBOX.clear()
+    monkeypatch.setattr(auth_service, "send_email", lambda to, subject, text: OUTBOX.append((to, subject, text)))
+    yield OUTBOX
+
+
+def last_code(email: str) -> str:
+    """The most recent 6-digit code emailed to `email`."""
+    import re
+
+    for to, _subject, text in reversed(OUTBOX):
+        if to == email.lower():
+            return re.search(r"\b(\d{6})\b", text).group(1)
+    raise AssertionError(f"no email sent to {email}")
+
+
 @pytest.fixture(autouse=True)
 def clean_db():
     with engine.begin() as conn:
@@ -117,6 +141,10 @@ def register(client, email="alex@example.com", name="Alex", tz="UTC"):
         json={"email": email, "password": "password123", "display_name": name, "timezone": tz},
     )
     assert res.status_code == 201, res.text
+    assert res.json()["verification_required"] is True
+    # Prove the email with the code it was sent, which signs the user in.
+    res = client.post("/api/v1/auth/verify-email", json={"email": email, "code": last_code(email)})
+    assert res.status_code == 200, res.text
     body = res.json()
     return {"Authorization": f"Bearer {body['access_token']}"}, body["user"]
 

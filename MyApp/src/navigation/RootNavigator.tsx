@@ -5,7 +5,7 @@
  * NavigationContainer live in this one file so the whole app's flow reads
  * top to bottom:
  *
- *   Signed out → Login / Register / ForgotPassword / ResetPassword
+ *   Signed out → Login / Register / VerifyEmail / ForgotPassword / ResetPassword
  *   Signed in → Main tabs (Home · Plans · Reminders · Vault · Profile)
  *               + stack screens pushed on top of the tabs. The tab bar (or
  *               the desktop rail) is drawn over every signed-in screen, so
@@ -44,6 +44,7 @@ import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../modules/auth/screens/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../modules/auth/screens/ResetPasswordScreen';
+import { VerifyEmailScreen } from '../modules/auth/screens/VerifyEmailScreen';
 import { SatyaTour } from '../modules/onboarding/SatyaTour';
 import { WelcomeStory } from '../modules/onboarding/WelcomeStory';
 import { SheetHost } from '../components/SheetHost';
@@ -81,6 +82,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  VerifyEmail: { email: string };
   ForgotPassword: undefined;
   ResetPassword: { email?: string } | undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
@@ -385,6 +387,7 @@ export function RootNavigator() {
           <RootStack.Screen name="Register" component={RegisterScreen} />
           <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <RootStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         </RootStack.Group>
       ) : (
         <RootStack.Group>

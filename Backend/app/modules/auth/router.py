@@ -11,15 +11,30 @@ from .models import User
 from .schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    GoogleSignInRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendCodeRequest,
     ResetPasswordRequest,
     TokenResponse,
     UserOut,
+    VerificationPending,
+    VerifyEmailRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+EMAIL_DOWN = "We couldn't send the email right now. Please try again in a minute."
+
+
+def _send_or_503(fn, *args) -> None:
+    """Runs something that emails a code; a broken mail setup becomes a clear 503."""
+    try:
+        fn(*args)
+    except (EmailNotConfigured, EmailSendFailed):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, EMAIL_DOWN)
 
 
 def _tokens(db: Session, user: User) -> TokenResponse:
@@ -27,19 +42,48 @@ def _tokens(db: Session, user: User) -> TokenResponse:
     return TokenResponse(access_token=access_token, refresh_token=refresh_token, user=UserOut.from_user(user))
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=VerificationPending, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+    """Creates the account and emails a code; it signs in through /verify-email."""
     rate_limit.hit(f"register:{rate_limit.client_ip(request)}", limit=5, window_seconds=600)
     user = service.register_user(db, payload.email, payload.password, payload.display_name, payload.timezone)
-    return _tokens(db, user)
+    _send_or_503(service.send_verification_code, db, user)
+    return VerificationPending(email=user.email)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     rate_limit.hit(f"login-ip:{rate_limit.client_ip(request)}", limit=20, window_seconds=300)
     rate_limit.hit(f"login-email:{payload.email.lower()}", limit=8, window_seconds=300)
-    user = service.authenticate_user(db, payload.email, payload.password, payload.timezone)
+    # An unverified account gets a code and a 403 EMAILNOTVERIFIED instead of tokens.
+    try:
+        user = service.authenticate_user(db, payload.email, payload.password, payload.timezone)
+    except (EmailNotConfigured, EmailSendFailed):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, EMAIL_DOWN)
     return _tokens(db, user)
+
+
+@router.post("/google", response_model=TokenResponse)
+def google(payload: GoogleSignInRequest, request: Request, db: Session = Depends(get_db)):
+    """Sign in (or sign up) with a Google ID token from the app."""
+    rate_limit.hit(f"google-ip:{rate_limit.client_ip(request)}", limit=20, window_seconds=300)
+    user = service.google_sign_in(db, payload.id_token, payload.timezone)
+    return _tokens(db, user)
+
+
+@router.post("/verify-email", response_model=TokenResponse)
+def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_db)):
+    rate_limit.hit(f"verify-ip:{rate_limit.client_ip(request)}", limit=20, window_seconds=600)
+    user = service.verify_email(db, payload.email, payload.code)
+    return _tokens(db, user)
+
+
+@router.post("/resend-code", status_code=status.HTTP_202_ACCEPTED)
+def resend_code(payload: ResendCodeRequest, request: Request, db: Session = Depends(get_db)):
+    rate_limit.hit(f"resend-ip:{rate_limit.client_ip(request)}", limit=10, window_seconds=900)
+    rate_limit.hit(f"resend-email:{payload.email.lower()}", limit=5, window_seconds=900)
+    _send_or_503(service.resend_verification_code, db, payload.email)
+    return {"message": "If that account still needs verifying, a new code is on its way."}
 
 
 @router.post("/refresh", response_model=TokenResponse)

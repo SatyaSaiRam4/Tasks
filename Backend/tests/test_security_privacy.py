@@ -168,8 +168,8 @@ def test_password_reset_flow(client, monkeypatch):
     sent = {}
     import app.modules.auth.service as auth_service
 
-    monkeypatch.setattr(auth_service, "send_email", lambda to, subject, body: sent.update(to=to, body=body))
     register(client, email="reset@example.com")
+    monkeypatch.setattr(auth_service, "send_email", lambda to, subject, body: sent.update(to=to, body=body))
     assert client.post(f"{API}/auth/forgot-password", json={"email": "reset@example.com"}).status_code == 202
     # Unknown emails get the same answer and send nothing.
     sent_before = dict(sent)

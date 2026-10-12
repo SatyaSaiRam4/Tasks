@@ -3,11 +3,18 @@ import { credentialsSet, loggedOut } from './authSlice';
 import { saveSession, clearSession } from '../../utils/storage';
 import { deviceTimezone } from '../../utils/date';
 import { cancelAllScheduled } from '../../notifications';
+import { signOutOfGoogle } from './google';
 
 export interface RegisterRequest {
   email: string;
   password: string;
   display_name: string;
+}
+
+/** Sign-up result: the account signs in once the emailed code is verified. */
+export interface VerificationPending {
+  verification_required: true;
+  email: string;
 }
 
 export interface LoginRequest {
@@ -24,13 +31,21 @@ async function signOutLocally(dispatch: (a: unknown) => unknown) {
   dispatch(loggedOut());
   await clearSession().catch(() => undefined);
   await cancelAllScheduled().catch(() => undefined);
+  // So the next Google sign-in offers the account picker again.
+  await signOutOfGoogle();
 }
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: builder => ({
-    register: builder.mutation<TokenResponse, RegisterRequest>({
+    // Creates the account and emails a code; nothing signs in until verifyEmail.
+    register: builder.mutation<VerificationPending, RegisterRequest>({
       // The device's timezone decides what "today" means for streaks.
       query: body => ({ url: '/auth/register', method: 'POST', body: { ...body, timezone: deviceTimezone() } }),
+    }),
+
+    // The emailed 6-digit code proves the address is real, and signs in.
+    verifyEmail: builder.mutation<TokenResponse, { email: string; code: string }>({
+      query: body => ({ url: '/auth/verify-email', method: 'POST', body }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
@@ -39,6 +54,23 @@ export const authApi = baseApi.injectEndpoints({
           // surfaced by the caller
         }
       },
+    }),
+
+    // Sign in (or sign up) with a Google ID token; Google has verified the email.
+    googleSignIn: builder.mutation<TokenResponse, { id_token: string }>({
+      query: body => ({ url: '/auth/google', method: 'POST', body: { ...body, timezone: deviceTimezone() } }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          await persist(dispatch, data);
+        } catch {
+          // surfaced by the caller
+        }
+      },
+    }),
+
+    resendCode: builder.mutation<{ message: string }, { email: string }>({
+      query: body => ({ url: '/auth/resend-code', method: 'POST', body }),
     }),
 
     login: builder.mutation<TokenResponse, LoginRequest>({
@@ -91,6 +123,9 @@ export const authApi = baseApi.injectEndpoints({
 
 export const {
   useRegisterMutation,
+  useVerifyEmailMutation,
+  useResendCodeMutation,
+  useGoogleSignInMutation,
   useLoginMutation,
   useLogoutMutation,
   useLogoutAllMutation,

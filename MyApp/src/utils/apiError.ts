@@ -70,6 +70,13 @@ export function getErrorMessage(
   return fallback;
 }
 
+/** The backend's error code (e.g. "EMAILNOTVERIFIED"), if any. */
+export function errorCode(error: unknown): string | null {
+  if (!isFetchBaseQueryError(error)) return null;
+  const data = error.data as BackendErrorBody | undefined;
+  return data?.error?.code ?? null;
+}
+
 /** HTTP status of an RTK Query error, if any. */
 export function errorStatus(error: unknown): number | null {
   return isFetchBaseQueryError(error) && typeof error.status === 'number' ? error.status : null;

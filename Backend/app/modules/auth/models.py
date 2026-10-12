@@ -40,6 +40,11 @@ class User(Base):
     photo_mime: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # Bumped on every change, so apps fetch the new photo instead of a cached one.
     photo_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # Set once the user proves they own the email (a code sent to it, or Google
+    # sign-in). Until then the account can't sign in.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The Google account (its stable "sub" ID) linked for Google sign-in, if any.
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     onboarding_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
@@ -54,6 +59,22 @@ class User(Base):
 
 class PasswordResetCode(Base):
     __tablename__ = "password_reset_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class EmailVerificationCode(Base):
+    """A one-time code emailed to prove the user owns their address."""
+
+    __tablename__ = "email_verification_codes"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
