@@ -29,12 +29,15 @@ from app.integrations.messages import consent_variables
 from app.integrations.msg91 import is_configured, send_whatsapp_reminder
 from app.modules.auth.models import User
 
-from .models import ContactStatus, WhatsAppContact
+from .models import ContactStatus, WhatsAppContact, WhatsAppInboundLog
 
 # The owner has this long to tap 👍 (or reply YES) after being asked; after
 # that the request expires and the user asks again (3 times a day at most:
 # see the router). STOP always works.
 ANSWER_WINDOW = timedelta(minutes=1)
+# A 👍 that MSG91 delivers late still counts up to this long after the ask
+# (the app shows the 1-minute countdown; the network can be slower).
+LATE_GRACE = timedelta(minutes=10)
 # After this many refusals within a day, the number can't be asked again until the day is over.
 MAX_REFUSALS = 3
 REFUSAL_PERIOD = timedelta(hours=24)
@@ -172,8 +175,13 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
     contact = db.get(WhatsAppContact, phone)
     # A 👍/YES counts only inside the 1-minute window after being asked, or
     # when the owner turns a stopped number back on themselves.
-    if kind == "YES" and contact is not None and contact.status == ContactStatus.PENDING and _expired(contact):
-        return "ignored: answered after the 1-minute window"
+    if (
+        kind == "YES"
+        and contact is not None
+        and contact.status == ContactStatus.PENDING
+        and (contact.asked_at is None or utc_now() - contact.asked_at > LATE_GRACE)
+    ):
+        return "ignored: answered more than 10 minutes after the ask"
     if kind == "YES" and contact is not None and contact.status == ContactStatus.VERIFIED:
         return "verified (already)"
     if contact is None:
@@ -261,3 +269,14 @@ def messages_from(payload) -> list[tuple[str | None, str | None]]:
         text = _find(item, TEXT_KEYS) if isinstance(item, dict) else None
         out.append((sender, text))
     return out
+
+
+def log_call(db: Session, token_ok: bool, summary: str, raw: bytes) -> None:
+    """Keeps one webhook call in whatsapp_inbound_log, with phone numbers masked."""
+    try:
+        text_ = raw.decode("utf-8", "replace")
+        masked = re.sub(r"(\+?\d{6,})(\d{4})", lambda m: "…" + m.group(2), text_)
+        db.add(WhatsAppInboundLog(token_ok=token_ok, summary=summary[:2000], payload=masked[:4000]))
+        db.commit()
+    except Exception:  # noqa: BLE001 - logging must never break the webhook
+        db.rollback()

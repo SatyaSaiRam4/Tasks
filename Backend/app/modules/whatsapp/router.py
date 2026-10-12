@@ -65,11 +65,13 @@ async def inbound(request: Request, token: str = Query(default=""), db: Session 
     URL (?token=...) or a custom header (x-memo-token). Always answers 200:
     MSG91 pauses a webhook after any 4XX."""
     given = token or request.headers.get("x-memo-token", "")
-    if not MSG91_INBOUND_SECRET or given != MSG91_INBOUND_SECRET:
-        # Logged, so a missing or wrong secret shows up in the server log.
-        logger.warning("WhatsApp inbound refused: %s", "MSG91_INBOUND_SECRET is not set on the server" if not MSG91_INBOUND_SECRET else "wrong token in the webhook URL or header")
-        return {"ok": False}
     raw = await request.body()
+    if not MSG91_INBOUND_SECRET or given != MSG91_INBOUND_SECRET:
+        # Logged (and kept in the inbound log), so a missing or wrong secret is easy to spot.
+        reason = "MSG91_INBOUND_SECRET is not set on the server" if not MSG91_INBOUND_SECRET else "wrong token in the webhook URL or header"
+        logger.warning("WhatsApp inbound refused: %s", reason)
+        service.log_call(db, False, f"refused: {reason}", raw)
+        return {"ok": False}
     try:
         payload = json.loads(raw or b"{}")
     except ValueError:
@@ -81,6 +83,7 @@ async def inbound(request: Request, token: str = Query(default=""), db: Session 
     keys = sorted(payload.keys()) if isinstance(payload, dict) else f"list[{len(payload)}]"
     service.recent.appendleft({"at": datetime.now(timezone.utc).isoformat(), "keys": keys, "messages": summary})
     logger.info("WhatsApp inbound: %s (payload keys %s)", summary, keys)
+    service.log_call(db, True, json.dumps(summary, ensure_ascii=False), raw)
     return {"ok": True, "results": results}
 
 
