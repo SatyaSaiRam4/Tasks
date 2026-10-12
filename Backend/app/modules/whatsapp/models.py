@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -42,3 +42,17 @@ class WhatsAppContact(Base):
     stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
+
+
+class WhatsAppInboundLog(Base):
+    """Every call MSG91 makes to the inbound webhook (numbers masked), so it's
+    possible to see exactly what arrived, when, and what Memo did with it. The
+    daily cleanup keeps 7 days."""
+
+    __tablename__ = "whatsapp_inbound_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False, index=True)
+    token_ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)  # [(masked sender, text, result)]
+    payload: Mapped[str] = mapped_column(Text, nullable=False)  # the body, numbers masked, cut to 4 KB

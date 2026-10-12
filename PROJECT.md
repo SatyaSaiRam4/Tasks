@@ -506,6 +506,7 @@ Main tables (PostgreSQL):
 | `f7a3d9b2c6e4` | Consent by YES reply: drops the code column, `asked_at` |
 | `a8d4e1f6b2c9` | Clears stale "asked" times left from the code version (those numbers looked asked but never got the message) |
 | `b3f6c2a9d8e1` | WhatsApp refusals count (3 a day, then try tomorrow) |
+| `c9e1a4d7f3b6` | `whatsapp_inbound_log`: every webhook call, numbers masked (kept 7 days) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -648,6 +649,12 @@ reads the old webhook's `customer_number`/`content` and Meta's
 `entry/changes/messages` shape.
 
 **Checking it works:**
+- Database: every webhook call is kept for 7 days in `whatsapp_inbound_log`
+  (`received_at`, `token_ok`, `summary` = sender (masked), text and result,
+  `payload` with numbers masked). `SELECT received_at, token_ok, summary
+  FROM whatsapp_inbound_log ORDER BY received_at DESC LIMIT 20;` shows at
+  once whether MSG91 is calling, with the right token, and what it sent. A
+  👍 delivered late by MSG91 still counts up to 10 minutes after the ask.
 - Render log, every webhook call: `WhatsApp inbound: [{'from': '…3323',
   'text': '👍', 'result': 'verified'}]`. A refused call logs `WhatsApp
   inbound refused: MSG91_INBOUND_SECRET is not set on the server` or `wrong
