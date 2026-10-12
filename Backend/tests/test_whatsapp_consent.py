@@ -54,3 +54,29 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     # Only the owner can turn it back on, by sending YES themselves.
     assert _inbound(client, "+91 98765 43210", "yes") == ["verified"]
     assert _reminder(client, auth).status_code == 201
+
+
+def test_inbound_reads_every_msg91_shape():
+    """MSG91 doesn't document its inbound body exactly, so all the likely shapes must work."""
+    shapes = [
+        # Old webhook: direction as a number, content as a JSON string.
+        {"customer_number": "919876543210", "direction": "1", "content": '{"text": "Yes"}', "message_type": "text"},
+        # Old webhook with an object.
+        {"customer_number": "919876543210", "direction": "inbound", "content": {"text": "YES"}},
+        # New webhook, camelCase.
+        {"customerNumber": "919876543210", "text": "yes please"},
+        # Meta's own shape.
+        {"entry": [{"changes": [{"value": {"contacts": [{"wa_id": "919876543210"}], "messages": [{"from": "919876543210", "type": "text", "text": {"body": "YES"}}]}}]}]},
+        # A quick-reply button, and a thumbs up.
+        {"customer_number": "919876543210", "content": {"button": {"text": "Yes", "payload": "Yes"}}},
+        {"customer_number": "919876543210", "content": {"text": "👍"}},
+    ]
+    for shape in shapes:
+        messages = wa.messages_from(shape)
+        assert len(messages) == 1, shape
+        sender, text = messages[0]
+        assert wa.normalize(sender) == PHONE, shape
+        assert wa.classify(text) == "YES", (shape, text)
+    # Our own outgoing delivery reports are skipped.
+    assert wa.messages_from({"customer_number": "919876543210", "direction": "outbound", "content": {"text": "Reply YES"}}) == []
+    assert wa.classify("STOP") == "STOP" and wa.classify("who is this") is None

@@ -1,8 +1,9 @@
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core import rate_limit
@@ -34,6 +35,8 @@ class StatusOut(BaseModel):
     status: str  # NONE, PENDING (asked, waiting for YES), VERIFIED or STOPPED
     asked_at: datetime | None = None
     business_number: str = ""
+    last_reply: str | None = None
+    last_reply_at: datetime | None = None
 
 
 @router.post("/verify", response_model=StatusOut)
@@ -56,12 +59,27 @@ async def inbound(request: Request, token: str = Query(default=""), db: Session 
     """MSG91 forwards incoming WhatsApp messages here (set the webhook URL to
     .../api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>)."""
     if not MSG91_INBOUND_SECRET or token != MSG91_INBOUND_SECRET:
+        # Logged, so a missing or wrong secret shows up in the server log.
+        logger.warning("WhatsApp inbound refused: %s", "MSG91_INBOUND_SECRET is not set on the server" if not MSG91_INBOUND_SECRET else "wrong token in the webhook URL")
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    raw = await request.body()
     try:
-        payload = await request.json()
+        payload = json.loads(raw or b"{}")
     except ValueError:
         form = await request.form()
         payload = dict(form)
-    results = [service.handle_inbound(db, sender, text) for sender, text in service.messages_from(payload)]
-    logger.info("WhatsApp inbound: %s", results)
+    messages = service.messages_from(payload)
+    results = [service.handle_inbound(db, sender, text) for sender, text in messages]
+    summary = [{"from": service.mask(service.normalize(s)), "text": (t or "")[:30], "result": r} for (s, t), r in zip(messages, results)]
+    keys = sorted(payload.keys()) if isinstance(payload, dict) else f"list[{len(payload)}]"
+    service.recent.appendleft({"at": datetime.now(timezone.utc).isoformat(), "keys": keys, "messages": summary})
+    logger.info("WhatsApp inbound: %s (payload keys %s)", summary, keys)
     return {"ok": True, "results": results}
+
+
+@router.get("/inbound/recent")
+def recent_inbound(current_user: User = Depends(get_current_user)):
+    """Admins: the last webhook calls (numbers masked), to check MSG91 is forwarding replies."""
+    if current_user.role != "ADMIN" and getattr(current_user.role, "value", None) != "ADMIN":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admins only.")
+    return {"secret_set": bool(MSG91_INBOUND_SECRET), "calls": list(service.recent)}

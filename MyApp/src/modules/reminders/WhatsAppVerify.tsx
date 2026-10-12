@@ -59,6 +59,7 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
           <Text style={[styles.text, styles.flex]}>Asked on WhatsApp. Waiting for them to reply YES…</Text>
         </View>
         <Text style={styles.hint}>Memo sent this number one message: “Reply YES to allow, or STOP”. You can save now; reminders go out once they reply YES.</Text>
+        <Diagnosis info={info} />
       </View>
     );
   }
@@ -84,6 +85,25 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
       <Text style={styles.hint}>Memo will send this number one WhatsApp message asking them to reply YES (or STOP). No codes.</Text>
       <Button label="Ask for permission on WhatsApp" icon="message" variant="secondary" onPress={askNow} loading={asking.isLoading} style={styles.mtSm} />
     </View>
+  );
+}
+
+/**
+ * While waiting: what has actually reached Memo from this number, so it's
+ * clear whether they replied something other than YES, or whether replies
+ * aren't reaching the server at all (MSG91's incoming-message webhook).
+ */
+function Diagnosis({ info }: { info: { asked_at: string | null; last_reply: string | null } | null }) {
+  if (!info) return null;
+  if (info.last_reply) {
+    return <Text style={styles.hint}>Memo got their reply “{info.last_reply}”, which isn't YES. Ask them to reply just YES.</Text>;
+  }
+  const waited = info.asked_at ? Date.now() - new Date(info.asked_at).getTime() : 0;
+  if (waited < 2 * 60_000) return null;
+  return (
+    <Text style={[styles.hint, { color: colors.warning }]}>
+      No reply has reached Memo from this number yet. If they've already replied YES, Memo's WhatsApp isn't passing replies on to the app; the admin needs to check the MSG91 incoming-message webhook.
+    </Text>
   );
 }
 
