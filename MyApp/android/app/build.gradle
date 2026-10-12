@@ -79,7 +79,7 @@ android {
 
     namespace "com.myapp"
     // Satya's 3D guide: MyApp/assets/models/*.glb and the bundled
-    // <model-viewer> page (MyApp/assets/web/satya) ship as Android assets,
+    // three.js page (MyApp/assets/web/satya) ship as Android assets,
     // so the model renders offline from file:///android_asset/.
     sourceSets {
         main {
@@ -95,7 +95,12 @@ android {
     }
     signingConfigs {
         debug {
-            storeFile file('debug.keystore')
+            // Memo's own debug key. The React Native template's debug.keystore is
+            // shared by every RN project, so "com.myapp" + its SHA-1 is already
+            // registered in Google Cloud by others and can't be used for Google
+            // sign-in. This key's SHA-1 is unique to Memo:
+            // 18:CB:52:CB:05:D0:E3:82:AC:CB:CA:84:2C:A5:53:F6:EB:0B:E9:42
+            storeFile file('memo-debug.keystore')
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'

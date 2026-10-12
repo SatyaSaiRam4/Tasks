@@ -19,6 +19,8 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { findRobe, robeName } from '../satya/meloName.js';
 
 const params = new URLSearchParams(location.search);
 const reduced = params.get('motion') === 'reduced';
@@ -1324,13 +1326,37 @@ const showCalendar = on => (B.calendar.visible = on);
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
 (function loadMelo() {
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', '../../models/model.glb');
-  xhr.responseType = 'arraybuffer';
-  xhr.onload = () => {
-    if (!xhr.response || !xhr.response.byteLength) return;
-    new GLTFLoader().parse(xhr.response, '', gltf => {
+  const get = url =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = () => (xhr.response && xhr.response.byteLength ? resolve(xhr.response) : reject(new Error('empty')));
+      xhr.onerror = reject;
+      xhr.send();
+    });
+  Promise.all([get('../../models/model.glb'), get('../../fonts/CormorantGaramond-Bold.ttf').catch(() => null)]).then(([glb, ttf]) => {
+    new GLTFLoader().parse(glb, '', gltf => {
       const model = gltf.scene;
+      // His name in champagne gold on his robe, as on the guide page. Built
+      // before the model is scaled, then attached so it moves with him.
+      if (ttf) {
+        try {
+          const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+          const name = robeName(ttf, findRobe(model), model, env);
+          // The story is lit brighter than the guide page; keep the champagne from washing out.
+          // Deeper champagne here (brand.champagne, champagneDeep edges).
+          name.material[0].color.set(0xd8b673);
+          name.material[1].color.set(0xb48b45);
+          for (const m of name.material) {
+            m.envMapIntensity = 0.8;
+            m.emissive.set(0x000000);
+          }
+          model.add(name);
+        } catch (e) {
+          // No font, no name; Melo carries on.
+        }
+      }
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
@@ -1339,15 +1365,14 @@ const showCalendar = on => (B.calendar.visible = on);
       model.position.set(-center.x * k, -box.min.y * k, -center.z * k);
       model.traverse(o => {
         if (o.isMesh) {
-          o.castShadow = true;
+          o.castShadow = !o.userData.isName; // the lettering casts none
           o.receiveShadow = true;
         }
       });
       M.melo.add(model);
       F.melo.add(model.clone(true));
     });
-  };
-  xhr.send();
+  });
 })();
 
 // ---- Speech bubbles and panel labels --------------------------------------------------------

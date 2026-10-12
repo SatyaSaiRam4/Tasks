@@ -12,11 +12,12 @@ const LOAD_TIMEOUT_MS = 8000;
 
 type Phase = 'loading' | 'ready' | 'fallback';
 
-/** Whole-puppet moves Melo can make (see assets/web/satya/index.html). */
+/** Whole-puppet moves Melo can make (see web/satya/melo.js). */
 export type SatyaGesture = 'talk' | 'wave' | 'hop' | 'nod' | 'spin' | 'lookLeft' | 'lookRight' | 'cheer' | 'walk' | 'think';
 
 /**
- * Melo, rendered from the bundled GLB through <model-viewer> in a WebView.
+ * Melo, rendered from the bundled GLB with three.js in a WebView, his name
+ * in gold on his robe (assets/web/satya, built from web/satya/melo.js).
  * Never blocks the screen: a shimmering figure shows while it loads, and an
  * animated orb is the fallback if WebGL is missing, the model fails, or
  * loading takes too long.

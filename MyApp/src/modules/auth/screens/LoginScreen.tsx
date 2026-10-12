@@ -5,10 +5,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, font, spacing } from '../../../theme';
 import { TextField } from '../../../components/TextField';
 import { Button } from '../../../components/Button';
-import { getErrorMessage } from '../../../utils/apiError';
+import { errorCode, getErrorMessage } from '../../../utils/apiError';
 import { useLoginMutation } from '../authApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { AuthLayout } from './AuthLayout';
+import { GoogleButton } from '../../../components/GoogleButton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -28,6 +29,11 @@ export function LoginScreen() {
     try {
       await login({ email: email.trim().toLowerCase(), password }).unwrap();
     } catch (err) {
+      // Right password, email not proven yet: a code was just sent.
+      if (errorCode(err) === 'EMAILNOTVERIFIED') {
+        navigation.navigate('VerifyEmail', { email: email.trim().toLowerCase() });
+        return;
+      }
       setError(getErrorMessage(err, 'Could not sign you in.'));
     }
   };
@@ -76,6 +82,7 @@ export function LoginScreen() {
         <Text style={styles.link}>Forgot password?</Text>
       </Pressable>
       <Button label="Sign in" onPress={submit} disabled={!canSubmit} loading={isLoading} size="lg" iconRight="arrow-right" />
+      <GoogleButton onError={setError} />
     </AuthLayout>
   );
 }

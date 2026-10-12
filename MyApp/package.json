@@ -8,13 +8,15 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "build:story": "esbuild web/story/story.js --bundle --minify --format=iife --target=chrome90 --outfile=assets/web/story/story.bundle.js"
+    "build:story": "esbuild web/story/story.js --bundle --minify --format=iife --target=chrome90 --outfile=assets/web/story/story.bundle.js",
+    "build:melo": "esbuild web/satya/melo.js --bundle --minify --format=iife --target=chrome90 --outfile=assets/web/satya/melo.bundle.js"
   },
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",
     "@ant-design/react-native": "^5.4.3",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/netinfo": "^12.0.1",
+    "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native/new-app-screen": "0.87.1",
     "@react-navigation/bottom-tabs": "^7.19.2",
     "@react-navigation/native": "^7.4.1",

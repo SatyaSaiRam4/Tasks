@@ -34,3 +34,11 @@ export const API_BASE_URL = `${origin.replace(/\/+$/, '')}${API_PREFIX}`;
 
 /** Network request timeout, in milliseconds. */
 export const API_TIMEOUT_MS = 15000;
+
+/**
+ * Google sign-in: the "Web application" OAuth client ID from Google Cloud
+ * Console (it ends in .apps.googleusercontent.com). The app asks Google for
+ * an ID token for this client, and the backend's GOOGLE_CLIENT_IDS must list
+ * the same ID. Public by design, not a secret. Empty hides the Google button.
+ */
+export const GOOGLE_WEB_CLIENT_ID = '767574220578-iiqqa3hsofo25mg4bmsvn4hkoncr831o.apps.googleusercontent.com';

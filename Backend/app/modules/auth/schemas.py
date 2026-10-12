@@ -35,6 +35,32 @@ class LoginRequest(BaseModel):
         return _tz(value)
 
 
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class GoogleSignInRequest(BaseModel):
+    id_token: str = Field(min_length=20, max_length=4096)
+    timezone: str | None = Field(default=None, max_length=64)
+
+    @field_validator("timezone")
+    @classmethod
+    def check_tz(cls, value: str | None) -> str | None:
+        return _tz(value)
+
+
+class ResendCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class VerificationPending(BaseModel):
+    """Sign-up worked; the account signs in once the emailed code is entered."""
+
+    verification_required: bool = True
+    email: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

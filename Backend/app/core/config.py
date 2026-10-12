@@ -64,6 +64,11 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 RESEND_FROM = (os.getenv("RESEND_FROM") or "Memo <onboarding@resend.dev>").strip()
 
 EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "auto").strip().lower()
+
+# Google sign-in: the OAuth client ID(s) the app asks Google for tokens with
+# (the "Web application" client ID; comma-separated if there are several).
+# Empty turns Google sign-in off.
+GOOGLE_CLIENT_IDS = [c.strip() for c in os.getenv("GOOGLE_CLIENT_IDS", "").split(",") if c.strip()]
 # When true, OTP/reset codes are printed to the console instead of emailed.
 SMTP_DEBUG = os.getenv("SMTP_DEBUG", "true").lower() in ("1", "true", "yes")
 

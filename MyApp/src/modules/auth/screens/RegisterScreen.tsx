@@ -9,6 +9,7 @@ import { getErrorMessage } from '../../../utils/apiError';
 import { useRegisterMutation } from '../authApi';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { AuthLayout } from './AuthLayout';
+import { GoogleButton } from '../../../components/GoogleButton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -34,8 +35,9 @@ export function RegisterScreen() {
     if (!canSubmit) return;
     setError(null);
     try {
-      // On success the navigator moves to Melo's first-time tour automatically.
-      await register({ display_name: name.trim(), email: email.trim().toLowerCase(), password }).unwrap();
+      // The account signs in once the code we email is entered.
+      const { email: sentTo } = await register({ display_name: name.trim(), email: email.trim().toLowerCase(), password }).unwrap();
+      navigation.navigate('VerifyEmail', { email: sentTo });
     } catch (err) {
       setError(getErrorMessage(err, 'Could not create your account.'));
     }
@@ -97,6 +99,7 @@ export function RegisterScreen() {
         error={passwordError ?? error}
       />
       <Button label="Create account" onPress={submit} disabled={!canSubmit} loading={isLoading} size="lg" iconRight="arrow-right" />
+      <GoogleButton onError={setError} />
     </AuthLayout>
   );
 }
