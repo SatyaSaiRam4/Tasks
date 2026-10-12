@@ -2,17 +2,38 @@
  * Google sign-in on the device (@react-native-google-signin/google-signin).
  * The app gets an ID token from Google and the backend checks it with Google
  * (POST /auth/google). Off until GOOGLE_WEB_CLIENT_ID is set in config/env.ts.
+ *
+ * The library is loaded only when needed, and only if its native part is in
+ * this build of the app: an app installed before the library was added (or
+ * a build without it) simply has no Google button, instead of crashing.
  */
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
+import { TurboModuleRegistry } from 'react-native';
+import type * as GoogleSigninModule from '@react-native-google-signin/google-signin';
 import { GOOGLE_WEB_CLIENT_ID } from '../../config/env';
 
-export const googleEnabled = Boolean(GOOGLE_WEB_CLIENT_ID);
+type Lib = typeof GoogleSigninModule;
 
-let configured = false;
-function configure() {
-  if (configured) return;
-  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
-  configured = true;
+/** True when this build contains the native Google Sign-In module. */
+function hasNativeModule(): boolean {
+  try {
+    return TurboModuleRegistry.get('RNGoogleSignin') != null;
+  } catch {
+    return false;
+  }
+}
+
+export const googleEnabled = Boolean(GOOGLE_WEB_CLIENT_ID) && hasNativeModule();
+
+let lib: Lib | null = null;
+/** The library, configured once; null when Google sign-in isn't available. */
+function google(): Lib | null {
+  if (!googleEnabled) return null;
+  if (!lib) {
+    const loaded: Lib = require('@react-native-google-signin/google-signin');
+    loaded.GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    lib = loaded;
+  }
+  return lib;
 }
 
 /**
@@ -20,7 +41,9 @@ function configure() {
  * user backed out. Throws a readable Error for real failures.
  */
 export async function getGoogleIdToken(): Promise<string | null> {
-  configure();
+  const g = google();
+  if (!g) throw new Error('Google sign-in isn’t available in this version of the app.');
+  const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = g;
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     const response = await GoogleSignin.signIn();
@@ -42,12 +65,11 @@ export async function getGoogleIdToken(): Promise<string | null> {
   }
 }
 
+/** Signs out of Google too, so the next sign-in shows the account picker. Never throws. */
 export async function signOutOfGoogle(): Promise<void> {
-  if (!googleEnabled) return;
   try {
-    configure();
-    await GoogleSignin.signOut();
+    await google()?.GoogleSignin.signOut();
   } catch {
-    // not signed in with Google: nothing to do
+    // not signed in with Google, or not available: nothing to do
   }
 }
