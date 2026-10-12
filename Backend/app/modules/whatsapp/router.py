@@ -32,8 +32,9 @@ class VerifyIn(BaseModel):
 
 class StatusOut(BaseModel):
     phone: str
-    status: str  # NONE, PENDING (asked, waiting for YES), VERIFIED or STOPPED
+    status: str  # NONE, PENDING (asked, inside the 1-minute window), EXPIRED, VERIFIED or STOPPED
     asked_at: datetime | None = None
+    expires_at: datetime | None = None
     business_number: str = ""
     last_reply: str | None = None
     last_reply_at: datetime | None = None
@@ -57,12 +58,15 @@ def contact_status(phone: str = Query(...), current_user: User = Depends(get_cur
 
 @router.post("/inbound")
 async def inbound(request: Request, token: str = Query(default=""), db: Session = Depends(get_db)):
-    """MSG91 forwards incoming WhatsApp messages here (set the webhook URL to
-    .../api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>)."""
-    if not MSG91_INBOUND_SECRET or token != MSG91_INBOUND_SECRET:
+    """MSG91 (Webhook (New), event "On Inbound Report Received") forwards
+    incoming WhatsApp messages and button taps here. The secret comes in the
+    URL (?token=...) or a custom header (x-memo-token). Always answers 200:
+    MSG91 pauses a webhook after any 4XX."""
+    given = token or request.headers.get("x-memo-token", "")
+    if not MSG91_INBOUND_SECRET or given != MSG91_INBOUND_SECRET:
         # Logged, so a missing or wrong secret shows up in the server log.
-        logger.warning("WhatsApp inbound refused: %s", "MSG91_INBOUND_SECRET is not set on the server" if not MSG91_INBOUND_SECRET else "wrong token in the webhook URL")
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+        logger.warning("WhatsApp inbound refused: %s", "MSG91_INBOUND_SECRET is not set on the server" if not MSG91_INBOUND_SECRET else "wrong token in the webhook URL or header")
+        return {"ok": False}
     raw = await request.body()
     try:
         payload = json.loads(raw or b"{}")

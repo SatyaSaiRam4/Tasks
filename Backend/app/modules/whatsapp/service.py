@@ -11,8 +11,8 @@ them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
   messages it again, and nobody can ask it again. Only its owner can turn
   reminders back on, by sending YES to Memo themselves.
 
-A number can be asked again only after 15 minutes and at most 3 times a day,
-so it can't be used to pester anyone.
+The owner has 1 minute to answer (👍/YES); after that the request expires
+and can be sent again, at most 3 times a day, so nobody can be pestered.
 """
 
 import json
@@ -31,11 +31,14 @@ from app.modules.auth.models import User
 
 from .models import ContactStatus, WhatsAppContact
 
-# A number can be asked again after this (and at most 3 times a day: see the router).
-ASK_AGAIN_AFTER = timedelta(minutes=15)
+# The owner has this long to tap 👍 (or reply YES) after being asked; after
+# that the request expires and the user asks again (3 times a day at most:
+# see the router). STOP always works.
+ANSWER_WINDOW = timedelta(minutes=1)
 STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
 YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "YES!", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE", "SURE"}
 YES_EMOJI = ("👍", "✅", "👌")
+NO_EMOJI = ("👎", "❌", "🚫")
 
 # The last incoming messages (masked), so the app and admins can see whether
 # replies reach the server at all. In memory: one API instance (see PROJECT.md).
@@ -70,12 +73,24 @@ def is_verified(db: Session, phone: str | None) -> bool:
     return bool(phone) and contact_status(db, phone) == ContactStatus.VERIFIED
 
 
+def _expired(contact: WhatsAppContact | None) -> bool:
+    """Asked, but the answer window has passed without a 👍/YES."""
+    return bool(
+        contact
+        and contact.status == ContactStatus.PENDING
+        and (contact.asked_at is None or utc_now() - contact.asked_at > ANSWER_WINDOW)
+    )
+
+
 def describe(db: Session, phone: str) -> dict:
     contact = db.get(WhatsAppContact, phone)
     reply = last_reply.get(phone)
+    status_ = "EXPIRED" if _expired(contact) else (contact.status.value if contact else "NONE")
     return {
         "phone": phone,
-        "status": contact.status.value if contact else "NONE",
+        # NONE, PENDING (asked, inside the answer window), EXPIRED (no answer in time), VERIFIED or STOPPED
+        "status": status_,
+        "expires_at": contact.asked_at + ANSWER_WINDOW if contact and contact.asked_at and status_ == "PENDING" else None,
         "asked_at": contact.asked_at if contact else None,
         "business_number": business_number(),
         # The last message that reached the server from this number (since the server started), if any.
@@ -85,14 +100,14 @@ def describe(db: Session, phone: str) -> dict:
 
 
 def ask_permission(db: Session, user: User, phone: str) -> dict:
-    """Sends the number the "reply YES to allow" message (again only after 15 minutes)."""
+    """Sends the number the "tap 👍 to allow" message (again once the 1-minute window has passed)."""
     contact = db.get(WhatsAppContact, phone)
     if contact and contact.status in (ContactStatus.VERIFIED, ContactStatus.STOPPED):
         # Verified: nothing to do. Stopped: only the owner can turn it back on.
         return describe(db, phone)
     now = utc_now()
-    if contact and contact.asked_at and now - contact.asked_at < ASK_AGAIN_AFTER:
-        return describe(db, phone)  # asked a few minutes ago: just keep waiting for the reply
+    if contact and not _expired(contact) and contact.status == ContactStatus.PENDING:
+        return describe(db, phone)  # still inside the answer window: keep waiting
     if not is_configured():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "WhatsApp isn't set up on the server yet.")
     if not send_whatsapp_reminder(phone, consent_variables(MSG91_WHATSAPP_TEMPLATE_STYLE, user.display_name)):
@@ -110,6 +125,8 @@ def ask_permission(db: Session, user: User, phone: str) -> dict:
 def classify(text: str | None) -> str | None:
     """'YES', 'STOP' or None, from a reply such as "Yes!", "stop please", "👍"."""
     raw = (text or "").strip()
+    if any(e in raw for e in NO_EMOJI):
+        return "STOP"
     if any(e in raw for e in YES_EMOJI):
         return "YES"
     words = [re.sub(r"[^A-Z]", "", w) for w in raw.upper().split()]
@@ -134,6 +151,12 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
         return "ignored: not YES or STOP"
     status_ = ContactStatus.STOPPED if kind == "STOP" else ContactStatus.VERIFIED
     contact = db.get(WhatsAppContact, phone)
+    # A 👍/YES counts only inside the 1-minute window after being asked, or
+    # when the owner turns a stopped number back on themselves.
+    if kind == "YES" and contact is not None and contact.status == ContactStatus.PENDING and _expired(contact):
+        return "ignored: answered after the 1-minute window"
+    if kind == "YES" and contact is not None and contact.status == ContactStatus.VERIFIED:
+        return "verified (already)"
     if contact is None:
         contact = WhatsAppContact(phone=phone, status=status_)
         db.add(contact)
