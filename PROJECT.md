@@ -233,13 +233,11 @@ the **light** theme.
   `npm run build:melo`): he arrives as a ball in his own robe red that rolls
   in from one side and flips open in a burst of gold, red and white stars
   with a ripple across the floor; he pops out and strolls off, turns his
-  face to you mid-walk, blushes (soft pink, steam puffs) and dashes in a
-  kick of dust to hide behind the tree on that side, Chopper-style with half
-  of him showing; he leans out from the trunk with a sweat drop to check
-  whether you're still watching (twice; a tap finds him) and comes back to
-  give his tip in a speech bubble. He lives in a little garden: a lawn with
-  tufts and flowers, a round apple tree on each side, and he leaves soft
-  footprints that fade as he walks. A tap at any time makes him blush, with
+  face to you mid-walk, blushes (soft pink, steam puffs) and dashes off the
+  screen in a kick of dust; then, Chopper-style, he leans back in from the
+  edge with half of him showing and a sweat drop to check whether you're
+  still watching (twice; a tap finds him) and comes back to give his tip in
+  a speech bubble. He leaves soft footprints that fade as he walks. A tap at any time makes him blush, with
   red hearts that pop out to his sides (below the speech bubble).
   Particles have darker edges so they show on the light and dark themes. He also reacts to the user's
   day (proud, worried, sleepy). Check it in a browser: serve `MyApp/assets`
