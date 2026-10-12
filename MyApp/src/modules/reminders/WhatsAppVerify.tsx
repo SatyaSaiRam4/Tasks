@@ -1,92 +1,97 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Share, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
-import { colors, font, radius, spacing, type as t, withAlpha } from '../../theme';
+import { colors, font, radius, spacing, withAlpha } from '../../theme';
 import { Button } from '../../components/Button';
-import { Icon } from '../../components/Icon';
-import { Sheet } from '../../components/Sheet';
+import { Icon, type IconName } from '../../components/Icon';
 import { getErrorMessage } from '../../utils/apiError';
-import { useStartWhatsappVerificationMutation, useWhatsappStatusQuery, type ContactStatus, type VerifyStart } from './whatsappApi';
+import { useAskWhatsappPermissionMutation, useWhatsappStatusQuery, type ContactStatus } from './whatsappApi';
 
 /**
- * The WhatsApp number's verification, under the number field. Memo only
- * messages a number whose owner has sent it a code from that number, so nobody
- * can use Memo to message someone else. For your own number, "Open WhatsApp"
- * sends it in one tap; for someone else's, share the code and they send it.
- * If the owner ever sends STOP, it has to be verified again.
+ * Permission for a WhatsApp number, under the number field. Memo only sends
+ * reminders to a number whose owner has replied YES to one short message
+ * ("…Reply YES to allow them, or STOP to never get them"), so nobody can use
+ * Memo to message someone else's number. Nothing secret is shown here: the
+ * owner simply replies on WhatsApp. After STOP, only the owner can allow
+ * reminders again, by sending YES to Memo themselves.
  */
 export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (status: ContactStatus) => void }) {
-  const [open, setOpen] = useState(false);
-  const [start, starting] = useStartWhatsappVerificationMutation();
-  const [pending, setPending] = useState<VerifyStart | null>(null);
-  // While the sheet is open, check every few seconds whether the code has arrived.
-  const query = useWhatsappStatusQuery(phone, { pollingInterval: open ? 3000 : 0 });
-  const status: ContactStatus = query.data?.phone === phone ? query.data.status : 'NONE';
-
-  useEffect(() => onStatus(status), [status, onStatus]);
+  const [ask, asking] = useAskWhatsappPermissionMutation();
+  const query = useWhatsappStatusQuery(phone);
+  const info = query.data?.phone === phone ? query.data : null;
+  const status: ContactStatus = info?.status ?? 'NONE';
+  // While waiting for the reply, look every few seconds.
+  const { refetch } = query;
   useEffect(() => {
-    if (open && status === 'VERIFIED') {
-      setOpen(false);
-      Toast.success('WhatsApp number verified.', 1.4);
-    }
-  }, [open, status]);
+    if (status !== 'PENDING') return;
+    const id = setInterval(() => refetch(), 4000);
+    return () => clearInterval(id);
+  }, [status, refetch]);
+  const [was, setWas] = useState<ContactStatus>(status);
+  useEffect(() => {
+    onStatus(status);
+    if (was === 'PENDING' && status === 'VERIFIED') Toast.success('They said YES. WhatsApp reminders are on.', 1.6);
+    setWas(status);
+  }, [status, onStatus, was]);
 
-  const begin = async () => {
+  const askNow = async () => {
     try {
-      const res = await start(phone).unwrap();
-      if (res.status === 'VERIFIED') {
-        query.refetch();
-        return;
-      }
-      setPending(res);
-      setOpen(true);
+      await ask(phone).unwrap();
+      refetch();
     } catch (err) {
-      Toast.fail(getErrorMessage(err, 'Could not start verification.'), 2);
+      Toast.fail(getErrorMessage(err, 'Could not send the WhatsApp message.'), 2);
     }
   };
 
-  const share = () =>
-    pending &&
-    Share.share({
-      message: `I'd like to send you reminders from the Memo app on WhatsApp. If that's OK, send this message to Memo on WhatsApp: ${pending.message}\n${pending.link}\n(Reply STOP to Memo any time to stop them.)`,
-    }).catch(() => undefined);
+  // After STOP: only the owner can turn it back on, by sending YES to Memo.
+  const yesLink = info?.business_number ? `https://wa.me/${info.business_number}?text=YES` : null;
+  const shareYes = () =>
+    yesLink &&
+    Share.share({ message: `If you'd like reminders from me through the Memo app on WhatsApp, send YES to Memo here: ${yesLink}` }).catch(() => undefined);
 
-  if (status === 'VERIFIED') {
+  if (status === 'VERIFIED') return <Note icon="check-circle" tone={colors.success} text="Allowed · this number replied YES to Memo" />;
+
+  if (status === 'PENDING') {
     return (
-      <View style={[styles.row, styles.ok]}>
-        <Icon name="check-circle" size={16} color={colors.success} />
-        <Text style={[styles.text, { color: colors.success }]}>Verified · this number agreed to Memo reminders</Text>
+      <View>
+        <View style={[styles.row, { backgroundColor: withAlpha(colors.gold, 0.12) }]}>
+          <ActivityIndicator size="small" color={colors.gold} />
+          <Text style={[styles.text, styles.flex]}>Asked on WhatsApp. Waiting for them to reply YES…</Text>
+        </View>
+        <Text style={styles.hint}>Memo sent this number one message: “Reply YES to allow, or STOP”. You can save now; reminders go out once they reply YES.</Text>
+      </View>
+    );
+  }
+
+  if (status === 'STOPPED') {
+    return (
+      <View>
+        <Note icon="x" tone={colors.danger} text="This number replied STOP. Memo won't message it." />
+        <Text style={styles.hint}>Only its owner can allow reminders again, by sending YES to Memo on WhatsApp.</Text>
+        {yesLink ? (
+          <View style={styles.buttons}>
+            <Button label="It's my number · Send YES" icon="message" variant="secondary" size="sm" onPress={() => Linking.openURL(yesLink).catch(() => undefined)} />
+            <Button label="Ask them" icon="users" variant="ghost" size="sm" onPress={shareYes} />
+          </View>
+        ) : null}
       </View>
     );
   }
 
   return (
     <View>
-      <View style={[styles.row, styles.todo]}>
-        <Icon name="shield" size={16} color={colors.warning} />
-        <Text style={[styles.text, styles.flex]}>
-          {status === 'STOPPED' ? 'This number replied STOP. Verify it again to send reminders.' : 'Not verified yet. Its owner sends Memo a code once.'}
-        </Text>
-      </View>
-      <Button label={status === 'STOPPED' ? 'Verify again' : 'Verify this number'} icon="message" variant="secondary" onPress={begin} loading={starting.isLoading} style={styles.verify} />
+      <Note icon="shield" tone={colors.warning} text="Its owner needs to allow Memo reminders first." />
+      <Text style={styles.hint}>Memo will send this number one WhatsApp message asking them to reply YES (or STOP). No codes.</Text>
+      <Button label="Ask for permission on WhatsApp" icon="message" variant="secondary" onPress={askNow} loading={asking.isLoading} style={styles.mtSm} />
+    </View>
+  );
+}
 
-      <Sheet visible={open} onClose={() => setOpen(false)} title="Verify on WhatsApp" subtitle={phone}>
-        <Text style={[t.body, styles.lead]}>From the WhatsApp of {phone}, send this message to Memo:</Text>
-        <View style={styles.codeBox}>
-          <Text style={styles.code} selectable>
-            {pending?.message}
-          </Text>
-        </View>
-        <Button label="It's my number · Open WhatsApp" icon="message" size="lg" onPress={() => pending?.link && Linking.openURL(pending.link).catch(() => undefined)} />
-        <Button label="Someone else's · Share the code" icon="users" variant="secondary" onPress={share} style={styles.mtSm} />
-        <View style={styles.waiting}>
-          <ActivityIndicator color={colors.gold} />
-          <Text style={t.caption}>Waiting for the message… The code works for 30 minutes.</Text>
-        </View>
-        <Text style={[t.caption, styles.note]}>
-          This keeps anyone from sending reminders to a number that isn't theirs. Reply STOP to Memo on WhatsApp any time to stop them.
-        </Text>
-      </Sheet>
+function Note({ icon, tone, text }: { icon: IconName; tone: string; text: string }) {
+  return (
+    <View style={[styles.row, { backgroundColor: withAlpha(tone, 0.12) }]}>
+      <Icon name={icon} size={16} color={tone} />
+      <Text style={[styles.text, styles.flex, { color: tone }]}>{text}</Text>
     </View>
   );
 }
@@ -104,49 +109,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginTop: spacing.sm,
   },
-  ok: {
-    backgroundColor: withAlpha(colors.success, 0.12),
-  },
-  todo: {
-    backgroundColor: withAlpha(colors.warning, 0.12),
-  },
   text: {
     ...font.semibold,
     fontSize: 13,
     color: colors.text,
   },
-  verify: {
-    marginTop: spacing.sm,
-  },
-  lead: {
+  hint: {
+    ...font.medium,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
-  codeBox: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: colors.goldSoft,
-    borderWidth: 1,
-    borderColor: colors.goldLine,
-  },
-  code: {
-    ...font.bold,
-    fontSize: 30,
-    letterSpacing: 3,
-    color: colors.text,
+  buttons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   mtSm: {
     marginTop: spacing.sm,
-  },
-  waiting: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  note: {
-    marginTop: spacing.md,
   },
 });

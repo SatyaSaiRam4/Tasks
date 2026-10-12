@@ -99,7 +99,14 @@ export function ReminderEditorScreen() {
     const phone = whatsapp ? normalizeWhatsapp(number) : '';
     if (whatsapp && !/^\+\d{8,15}$/.test(phone)) return setError('Enter a WhatsApp number, e.g. 9876543210.');
     const unchanged = editing && existing.data?.whatsapp_number === phone;
-    if (whatsapp && waStatus !== 'VERIFIED' && !unchanged) return setError('Verify this WhatsApp number first (tap "Verify this number").');
+    // Saved while waiting for their YES (nothing is sent until they reply).
+    if (whatsapp && waStatus !== 'VERIFIED' && waStatus !== 'PENDING' && !unchanged) {
+      return setError(
+        waStatus === 'STOPPED'
+            ? 'This number replied STOP, so Memo can’t message it.'
+            : 'Ask this number for permission first (“Ask for permission on WhatsApp”).',
+      );
+    }
 
     const payload = { title: title.trim(), note: note.trim() || null, remind_at: at.toISOString(), whatsapp_number: whatsapp ? phone : undefined, alarm_enabled: alarm };
     try {
