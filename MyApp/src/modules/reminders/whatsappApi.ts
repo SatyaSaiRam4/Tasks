@@ -1,30 +1,28 @@
 import { baseApi } from '../../api/baseApi';
 
+/** NONE: never asked · PENDING: asked, waiting for YES · VERIFIED: said YES · STOPPED: said STOP. */
 export type ContactStatus = 'NONE' | 'PENDING' | 'VERIFIED' | 'STOPPED';
 
-export interface VerifyStart {
+export interface ContactInfo {
   phone: string;
   status: ContactStatus;
-  /** The code and the ready-made message ("MEMO 123456"); null if already verified. */
-  code: string | null;
-  message: string | null;
-  /** wa.me link that opens WhatsApp with the message to Memo's number. */
-  link: string | null;
+  /** When the "reply YES to allow" message was sent (once a day at most). */
+  asked_at: string | null;
+  /** Memo's WhatsApp number, digits only. */
   business_number: string;
-  expires_at: string | null;
 }
 
-/** WhatsApp consent: a number gets reminders only once its owner has sent Memo the code from it. */
+/** WhatsApp consent: a number gets reminders only once its owner has replied YES. */
 export const whatsappApi = baseApi.injectEndpoints({
   endpoints: builder => ({
-    whatsappStatus: builder.query<{ phone: string; status: ContactStatus }, string>({
+    whatsappStatus: builder.query<ContactInfo, string>({
       query: phone => ({ url: '/whatsapp/status', params: { phone } }),
       keepUnusedDataFor: 0,
     }),
-    startWhatsappVerification: builder.mutation<VerifyStart, string>({
+    askWhatsappPermission: builder.mutation<ContactInfo, string>({
       query: phone => ({ url: '/whatsapp/verify', method: 'POST', body: { phone } }),
     }),
   }),
 });
 
-export const { useWhatsappStatusQuery, useStartWhatsappVerificationMutation } = whatsappApi;
+export const { useWhatsappStatusQuery, useAskWhatsappPermissionMutation } = whatsappApi;

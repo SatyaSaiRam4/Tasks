@@ -38,7 +38,7 @@ def _poll_due_reminders() -> None:
             from app.modules.whatsapp.service import is_verified
 
             for reminder in reminders_service.get_due_whatsapp_reminders(db):
-                # Never message a number whose owner hasn't verified it, or said STOP.
+                # Never message a number whose owner hasn't replied YES, or said STOP.
                 if not is_verified(db, reminder.whatsapp_number):
                     reminders_service.mark_whatsapp_result(db, reminder.id, False)
                     continue

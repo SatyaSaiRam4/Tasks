@@ -11,11 +11,12 @@ from .models import Reminder, ReminderStatus, WhatsAppStatus
 
 
 def _require_verified(db: Session, phone: str | None) -> None:
-    """WhatsApp reminders only go to a number whose owner has verified it."""
-    if phone and not whatsapp.is_verified(db, phone):
+    """A WhatsApp number must have been asked (and not said STOP) to be saved
+    on a reminder; the worker only sends once its owner has replied YES."""
+    if phone and whatsapp.contact_status(db, phone) not in (whatsapp.ContactStatus.VERIFIED, whatsapp.ContactStatus.PENDING):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Verify this WhatsApp number first: its owner sends the Memo code from it.",
+            "This number hasn't allowed Memo reminders yet: its owner replies YES to Memo's WhatsApp message.",
         )
 
 

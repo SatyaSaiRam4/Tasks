@@ -28,3 +28,12 @@ def whatsapp_variables(style: str, name: str, title: str, note: str | None, at: 
         return [first, title, when]
     one_line = f"⏰ {title} · {when}" + (f" · 📝 {extra}" if extra else "")
     return [one_line]
+
+
+def consent_variables(style: str, requester: str) -> list[str]:
+    """The one-time permission request sent through the same template: no code,
+    just asking the owner of the number to reply YES (or STOP)."""
+    who = (requester or "Someone").split()[0]
+    if style == "detailed":
+        return ["there", f"{who} wants to send you reminders from the Memo app here. Reply YES to allow them, or STOP to never get them", "Reply YES or STOP"]
+    return [f"👋 {who} wants to send you reminders from the Memo app on this WhatsApp. Reply YES to allow them, or STOP to never get them."]

@@ -1,36 +1,36 @@
-"""WhatsApp consent: a number gets reminders only after its owner verifies it.
+"""WhatsApp consent: a number gets reminders only after its owner says YES.
 
-Verification works the other way round from an SMS OTP, so it needs no extra
-WhatsApp template: Memo shows a code, and the owner of the number sends
-"MEMO <code>" from that number to Memo's WhatsApp number (the app opens
-WhatsApp with the message ready). MSG91 forwards incoming messages to
-POST /api/v1/whatsapp/inbound. "STOP" from a number stops all reminders to it;
-to receive them again the owner verifies again.
+No codes. When a user adds a WhatsApp number, Memo sends that number one
+message through the approved reminder template: "<name> wants to send you
+reminders from the Memo app… Reply YES to allow them, or STOP to never get
+them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
+
+- YES (or START / OK / ALLOW / HAAN) marks the number VERIFIED. A YES the
+  owner sends on their own (for example after STOP) counts too: it's theirs.
+- STOP (or UNSUBSCRIBE / CANCEL / END / QUIT) marks it STOPPED: Memo never
+  messages it again, and nobody can ask it again. Only its owner can turn
+  reminders back on, by sending YES to Memo themselves.
+
+A number can be asked at most once a day, so it can't be used to pester anyone.
 """
 
-import hashlib
-import hmac
 import re
-import secrets
 from datetime import timedelta
-from urllib.parse import quote
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.config import JWT_SECRET, MSG91_WHATSAPP_INTEGRATED_NUMBER
+from app.core.config import MSG91_WHATSAPP_INTEGRATED_NUMBER, MSG91_WHATSAPP_TEMPLATE_STYLE
 from app.core.timeutil import utc_now
+from app.integrations.messages import consent_variables
+from app.integrations.msg91 import is_configured, send_whatsapp_reminder
 from app.modules.auth.models import User
 
 from .models import ContactStatus, WhatsAppContact
 
-CODE_MINUTES = 30
-STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH"}
-CODE_PATTERN = re.compile(r"(?:MEMO\s*)?(\d{6})")
-
-
-def _hash(phone: str, code: str) -> str:
-    return hmac.new(JWT_SECRET.encode(), f"{phone}:{code}".encode(), hashlib.sha256).hexdigest()
+ASK_AGAIN_AFTER = timedelta(hours=24)
+STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
+YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE"}
 
 
 def normalize(phone: str | None) -> str | None:
@@ -56,34 +56,37 @@ def is_verified(db: Session, phone: str | None) -> bool:
     return bool(phone) and contact_status(db, phone) == ContactStatus.VERIFIED
 
 
-def start_verification(db: Session, user: User, phone: str) -> dict:
-    """A fresh code for `phone`, to be sent from that number. Already verified: nothing to do."""
+def describe(db: Session, phone: str) -> dict:
     contact = db.get(WhatsAppContact, phone)
-    if contact and contact.status == ContactStatus.VERIFIED:
-        return {"phone": phone, "status": contact.status.value, "code": None, "message": None, "link": None, "business_number": business_number(), "expires_at": None}
-    if not business_number():
+    return {
+        "phone": phone,
+        "status": contact.status.value if contact else "NONE",
+        "asked_at": contact.asked_at if contact else None,
+        "business_number": business_number(),
+    }
+
+
+def ask_permission(db: Session, user: User, phone: str) -> dict:
+    """Sends the number one "reply YES to allow" message (at most once a day)."""
+    contact = db.get(WhatsAppContact, phone)
+    if contact and contact.status in (ContactStatus.VERIFIED, ContactStatus.STOPPED):
+        # Verified: nothing to do. Stopped: only the owner can turn it back on.
+        return describe(db, phone)
+    now = utc_now()
+    if contact and contact.asked_at and now - contact.asked_at < ASK_AGAIN_AFTER:
+        return describe(db, phone)  # already asked today: just keep waiting for the reply
+    if not is_configured():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "WhatsApp isn't set up on the server yet.")
-    code = f"{secrets.randbelow(1_000_000):06d}"
-    expires = utc_now() + timedelta(minutes=CODE_MINUTES)
+    if not send_whatsapp_reminder(phone, consent_variables(MSG91_WHATSAPP_TEMPLATE_STYLE, user.display_name)):
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Couldn't send the WhatsApp message. Check the number and try again.")
     if contact is None:
         contact = WhatsAppContact(phone=phone, status=ContactStatus.PENDING)
         db.add(contact)
-    elif contact.status != ContactStatus.STOPPED:
-        contact.status = ContactStatus.PENDING
-    contact.code_hash = _hash(phone, code)
-    contact.code_expires_at = expires
+    contact.status = ContactStatus.PENDING
+    contact.asked_at = now
     contact.requested_by = user.id
     db.commit()
-    message = f"MEMO {code}"
-    return {
-        "phone": phone,
-        "status": contact.status.value,
-        "code": code,
-        "message": message,
-        "link": f"https://wa.me/{business_number()}?text={quote(message)}",
-        "business_number": business_number(),
-        "expires_at": expires,
-    }
+    return describe(db, phone)
 
 
 def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
@@ -91,32 +94,25 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
     phone = normalize(sender)
     if not phone:
         return "ignored: no sender"
-    words = (text or "").strip().upper()
+    first = re.sub(r"[^A-Z]", "", ((text or "").strip().upper().split() or [""])[0])
+    if first in STOP_WORDS:
+        status_ = ContactStatus.STOPPED
+    elif first in YES_WORDS:
+        status_ = ContactStatus.VERIFIED
+    else:
+        return "ignored: not YES or STOP"
     contact = db.get(WhatsAppContact, phone)
-    if words.split(" ")[0] in STOP_WORDS:
-        if contact is None:
-            contact = WhatsAppContact(phone=phone, status=ContactStatus.STOPPED)
-            db.add(contact)
-        contact.status = ContactStatus.STOPPED
+    if contact is None:
+        contact = WhatsAppContact(phone=phone, status=status_)
+        db.add(contact)
+    contact.status = status_
+    if status_ == ContactStatus.VERIFIED:
+        contact.verified_at = utc_now()
+        contact.stopped_at = None
+    else:
         contact.stopped_at = utc_now()
-        contact.code_hash = None
-        contact.code_expires_at = None
-        db.commit()
-        return "stopped"
-    match = CODE_PATTERN.search(words)
-    if not match or contact is None or not contact.code_hash:
-        return "ignored: no code waiting"
-    if contact.code_expires_at is None or contact.code_expires_at < utc_now():
-        return "ignored: code expired"
-    if not hmac.compare_digest(contact.code_hash, _hash(phone, match.group(1))):
-        return "ignored: wrong code"
-    contact.status = ContactStatus.VERIFIED
-    contact.verified_at = utc_now()
-    contact.stopped_at = None
-    contact.code_hash = None
-    contact.code_expires_at = None
     db.commit()
-    return "verified"
+    return "verified" if status_ == ContactStatus.VERIFIED else "stopped"
 
 
 def _find(payload, keys: tuple[str, ...]):

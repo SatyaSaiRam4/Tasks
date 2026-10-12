@@ -154,7 +154,7 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   |---|---|---|
   | Notification (free) | This phone, quietly | 🔔 **Call the electrician** · 6:30 PM · Bring the warranty card |
   | Alarm (free) | This phone, loud, until Stop | ⏰ **Call the electrician** · It's 6:30 PM… Press Stop when you're on it. |
-  | WhatsApp (premium) | Any **verified** number, even with the phone off | A personal message with the name, reminder, date and time |
+  | WhatsApp (premium) | Any number whose owner said **YES**, even with the phone off | A personal message with the name, reminder, date and time |
 
 - **"Ring like an alarm"** shows a full-screen, looping alarm with a Stop
   button that stops by itself after 10, 30 or 60 seconds. The sound
@@ -162,17 +162,18 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   Settings, which also has *Test alarm*.
 - Task notifications read ✅ **Walk 20 minutes** · Time for this task in
   "Fitness". The 8 PM streak warning reads 🔥 **2 tasks left today**.
-- **WhatsApp numbers must be verified by their owner** (so nobody can use
-  Memo to message someone else's number to tease them). Under the number
-  in the reminder editor, *Verify this number* shows a code such as
-  `MEMO 482913`; the owner sends it **from that number** to Memo's WhatsApp
-  number. For your own number, *Open WhatsApp* sends it in one tap; for a
-  friend's, *Share the code* and they send it. The app sees the result
-  within seconds. The code lasts 30 minutes. Replying **STOP** (or
-  UNSUBSCRIBE, CANCEL, END, QUIT) stops all reminders to that number; to get
-  them again it has to be verified again (START alone isn't enough). The
-  server refuses WhatsApp reminders for unverified numbers, and the worker
-  never sends to them (see [7.4](#74-whatsapp-number-verification)).
+- **A WhatsApp number must say YES first** (so nobody can use Memo to
+  message someone else's number to tease them). Under the number in the
+  reminder editor, *Ask for permission on WhatsApp* sends that number **one**
+  message through the reminder template: "👋 Satya wants to send you
+  reminders from the Memo app on this WhatsApp. Reply YES to allow them, or
+  STOP to never get them." No codes are shown or sent. The reminder can be
+  saved while waiting; WhatsApp messages go out only once the owner replies
+  **YES**, and the app shows it within seconds. A number is asked at most
+  once a day. **STOP** (or UNSUBSCRIBE, CANCEL, END, QUIT, NO) stops all
+  reminders to it, and nobody can ask it again; only its owner can turn them
+  back on, by sending YES to Memo's WhatsApp themselves (see
+  [7.4](#74-whatsapp-number-permission)).
 
 ### 2.6 Private Vault
 
@@ -340,7 +341,7 @@ of users. Admin screens never give access to anyone's Vault.
 | `reminders` | Reminders, snooze, complete, WhatsApp scheduling |
 | `vault` | PIN, sessions, encrypted notes, voice notes, photos, bin |
 | `wallet` | Milestones, balance, redemptions |
-| `whatsapp` | WhatsApp number consent: verification codes, the MSG91 inbound webhook, STOP |
+| `whatsapp` | WhatsApp number consent: the YES/STOP permission message and the MSG91 inbound webhook |
 | `dashboard` | One call with everything Home needs |
 | `admin` | Statistics and user management |
 | `maintenance` | The daily cleanup endpoint |
@@ -479,7 +480,7 @@ Main tables (PostgreSQL):
 | `vault_entries` | Encrypted notes (+ encrypted voice note) |
 | `vault_images` | Encrypted photos of Vault notes |
 | `wallet_redemptions` | Redemption requests |
-| `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (code waiting, stored as a hash), `VERIFIED`, `STOPPED` |
+| `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (asked, waiting for YES; `asked_at`), `VERIFIED` (said YES), `STOPPED` (said STOP) |
 
 **Migrations** (`Backend/alembic/versions/`, oldest first):
 
@@ -498,6 +499,7 @@ Main tables (PostgreSQL):
 | `b9e3f7a2c4d1` | Email verification at sign-up |
 | `e6c2d9a4f8b3` | Google sign-in (`users.google_sub`) |
 | `e5b2c8d14a71` | WhatsApp number consent (`whatsapp_contacts`) |
+| `f7a3d9b2c6e4` | Consent by YES reply: drops the code column, `asked_at` |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -526,7 +528,7 @@ refresh, forgot/reset password and the health checks needs
 | Vault notes | `GET/POST /vault/entries`, `GET/PATCH/DELETE /vault/entries/{id}`, `POST /vault/entries/{id}/{pin,unpin,favorite,unfavorite,archive,unarchive,trash,restore}`, `GET /vault/folders`, `POST /vault/trash/empty` |
 | Vault media | `PUT/GET/DELETE /vault/entries/{id}/audio`, `POST /vault/entries/{id}/images`, `GET/DELETE /vault/entries/{id}/images/{image_id}` |
 | Wallet | `GET /wallet`, `POST /wallet/redeem` |
-| WhatsApp consent | `POST /whatsapp/verify`, `GET /whatsapp/status?phone=…`; `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in) |
+| WhatsApp consent | `POST /whatsapp/verify` (sends the YES/STOP permission message), `GET /whatsapp/status?phone=…`; `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in) |
 | Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role` |
 | Maintenance | `POST /maintenance/cleanup` (header `X-Cron-Secret`) |
 
@@ -548,7 +550,7 @@ Interactive docs are at `/docs` on a running server.
 | `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM` | Email through Resend |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`, `SMTP_DEBUG` | Email through SMTP (Gmail needs an App Password; ports 587 and 465 both work). `SMTP_SERVER`/`SMTP_EMAIL` are accepted aliases |
 | `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_INTEGRATED_NUMBER`, `MSG91_WHATSAPP_TEMPLATE_NAME`, `MSG91_WHATSAPP_NAMESPACE`, `MSG91_WHATSAPP_TEMPLATE_STYLE` | WhatsApp reminders (optional) |
-| `MSG91_INBOUND_SECRET` | Secret in the URL MSG91 forwards incoming WhatsApp messages to (number verification and STOP). Without it the inbound endpoint is off |
+| `MSG91_INBOUND_SECRET` | Secret in the URL MSG91 forwards incoming WhatsApp messages to (YES and STOP replies). Without it the inbound endpoint is off |
 | `GOOGLE_CLIENT_IDS` | Comma-separated OAuth client IDs accepted for Google sign-in |
 | `REMINDER_POLL_SECONDS`, `STREAK_FINALIZE_MINUTES` | Worker timing |
 | `TRACK_BONUS_*` | Plan completion bonus rules |
@@ -599,29 +601,35 @@ cd Backend && python -m app.integrations.email you@example.com
   Footer `Sent by Memo.`. Get it approved in MSG91, then set
   `MSG91_WHATSAPP_TEMPLATE_NAME` and `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed`.
 
-### 7.4 WhatsApp number verification
+### 7.4 WhatsApp number permission
 
-Verification works the other way round from an SMS OTP, so it **needs no
-extra WhatsApp template**: the user's own message to Memo is what proves the
-number is theirs (`Backend/app/modules/whatsapp/`).
+A number gets reminders only after its owner replies **YES** to one
+permission message, sent through the **existing reminder template** (no
+authentication template and no codes needed: it's a request for consent,
+which is what WhatsApp expects). Code: `Backend/app/modules/whatsapp/`,
+`MyApp/src/modules/reminders/WhatsAppVerify.tsx`.
 
-1. The app calls `POST /whatsapp/verify` with the number. The server stores
-   a hashed 6-digit code (30 minutes) and returns the message
-   (`MEMO 482913`) and a `https://wa.me/<Memo's number>?text=MEMO%20482913`
-   link.
-2. The owner sends that message from the number to Memo's WhatsApp number.
-3. MSG91 forwards incoming messages to
-   `POST /api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`. A matching
-   code marks the number `VERIFIED`; STOP marks it `STOPPED`.
-4. The app polls `GET /whatsapp/status?phone=…` while the sheet is open.
+1. The app calls `POST /whatsapp/verify` with the number. If it's new (and
+   wasn't asked in the last 24 hours), the server sends it the permission
+   message (`consent_variables` in `app/integrations/messages.py`) and marks
+   it `PENDING`. Verified or stopped numbers aren't messaged.
+2. MSG91 forwards replies to
+   `POST /api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`. **YES**
+   (also Y, OK, ALLOW, START, HAAN) marks the number `VERIFIED`; **STOP**
+   (also UNSUBSCRIBE, CANCEL, END, QUIT, NO) marks it `STOPPED`. A YES the
+   owner sends on their own counts too, which is how a stopped number comes
+   back.
+3. The app polls `GET /whatsapp/status?phone=…` while waiting.
+4. Reminders can be saved with a `PENDING` or `VERIFIED` number; the worker
+   sends only to `VERIFIED` ones (others are marked *Failed*).
 
 **MSG91 setup:** in MSG91 → WhatsApp → Webhook, add the inbound URL above
 for *incoming messages*, with a long random `MSG91_INBOUND_SECRET` set on
-Render. MSG91's inbound payload field names differ between its old and new
+Render. MSG91's inbound field names differ between its old and new
 webhooks, so the server accepts several (`customer_number`/`customerNumber`/
 `from`/`sender` for the number; `content.text`/`text`/`body`/`message` for
-the text). The first time, send a test message and check the Render log
-line `WhatsApp inbound: [...]`: it should say `verified` or `stopped`.
+the text). The first time, reply YES from a test number and check the Render
+log line `WhatsApp inbound: [...]`: it should say `verified`.
 
 **Free alternatives**, if MSG91 inbound isn't available on the account:
 Meta's own WhatsApp Cloud API (free messages inside the 24-hour window after
@@ -797,8 +805,8 @@ block. On Render this isn't needed.
 | Reminders late on Android | Allow exact alarms; turn off battery optimisation for Memo |
 | Password-reset email doesn't arrive | Run the email check in [7.1](#71-backend-environment-backendenv-or-render-environment-variables); Gmail needs an App Password |
 | The Vault locked while choosing a photo | Fixed: pickers no longer lock it. Pull the latest code |
-| WhatsApp verification never completes | Check the MSG91 inbound webhook URL and `MSG91_INBOUND_SECRET`, then the Render log line `WhatsApp inbound: [...]` ([7.4](#74-whatsapp-number-verification)). `ignored: no code waiting` means the code was sent from a different number than the one being verified |
-| WhatsApp reminders show *Failed* | The number isn't verified, or its owner replied STOP: verify it again from the reminder |
+| A WhatsApp number stays *Waiting for YES* | Check the MSG91 inbound webhook URL and `MSG91_INBOUND_SECRET`, then the Render log line `WhatsApp inbound: [...]` ([7.4](#74-whatsapp-number-permission)). `ignored: not YES or STOP` means the reply wasn't YES |
+| WhatsApp reminders show *Failed* | The number hadn't replied YES by the reminder time, or its owner replied STOP (then only they can turn it back on, by sending YES to Memo) |
 | Android build: `Keystore file … memo-debug.keystore not found` | Debug builds are signed with your own `memo-debug.keystore` (its SHA-1 is registered for Google sign-in). Copy it into `MyApp/android/app/`; it isn't in git |
 
 ---
