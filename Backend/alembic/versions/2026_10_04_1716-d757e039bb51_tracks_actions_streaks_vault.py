@@ -22,18 +22,19 @@ Create Date: 2026-10-04 17:16:00
 import json
 import os
 import secrets
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from cryptography.fernet import Fernet, MultiFernet
 from dotenv import load_dotenv
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "d757e039bb51"
-down_revision: Union[str, Sequence[str], None] = "b33bd85d0492"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "b33bd85d0492"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Existing users all registered from India before timezones were tracked;
 # their "days" are computed in IST. New users get their device's zone.

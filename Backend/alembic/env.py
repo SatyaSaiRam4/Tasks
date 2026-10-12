@@ -4,7 +4,6 @@ from logging.config import fileConfig
 from sqlalchemy import create_engine, pool
 
 from alembic import context
-
 from app.core.config import DATABASE_URL
 from app.db.base import Base
 from app.db.registry import UNMAPPED_LEGACY_TABLES, import_all_models
@@ -23,9 +22,7 @@ DB_URL = os.getenv("ALEMBIC_DATABASE_URL") or DATABASE_URL
 
 
 def include_object(obj, name, type_, reflected, compare_to):
-    if type_ == "table" and name in UNMAPPED_LEGACY_TABLES:
-        return False
-    return True
+    return not (type_ == "table" and name in UNMAPPED_LEGACY_TABLES)
 
 
 def run_migrations_offline() -> None:

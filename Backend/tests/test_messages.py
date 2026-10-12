@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.integrations.messages import whatsapp_variables
 
-AT = datetime(2026, 10, 10, 13, 0, tzinfo=timezone.utc)  # 6:30 PM in India
+AT = datetime(2026, 10, 10, 13, 0, tzinfo=UTC)  # 6:30 PM in India
 
 
 def test_single_template_is_one_line():

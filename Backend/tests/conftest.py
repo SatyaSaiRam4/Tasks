@@ -10,7 +10,7 @@ behaviour can be tested deterministically.
 """
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,9 +21,9 @@ TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL", "postgresql+psycopg2://postgres:test@127.0.0.1:55432/rememberly_test"
 )
 
-from app.core import rate_limit, timeutil  # noqa: E402
-from app.db.session import get_db  # noqa: E402
-from app.main import app  # noqa: E402
+from app.core import rate_limit, timeutil
+from app.db.session import get_db
+from app.main import app
 
 engine = create_engine(TEST_DATABASE_URL)
 TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
@@ -63,7 +63,7 @@ app.dependency_overrides[get_db] = _override_get_db
 
 class Clock:
     def __init__(self):
-        self.now = datetime(2026, 10, 5, 6, 0, tzinfo=timezone.utc)  # a Monday
+        self.now = datetime(2026, 10, 5, 6, 0, tzinfo=UTC)  # a Monday
 
     def set(self, value: datetime) -> None:
         self.now = value
@@ -81,10 +81,10 @@ def clock(monkeypatch):
     monkeypatch.setattr(timeutil, "utc_now", c)
     # Modules that imported utc_now by name need patching too.
     import app.modules.actions.service as actions_service
+    import app.modules.auth.service as auth_service
     import app.modules.tracks.service as tracks_service
     import app.modules.users.service as users_service
     import app.modules.vault.service as vault_service
-    import app.modules.auth.service as auth_service
 
     for module in (actions_service, tracks_service, users_service, vault_service, auth_service):
         if hasattr(module, "utc_now"):
@@ -109,9 +109,9 @@ def last_code(email: str) -> str:
     """The most recent 6-digit code emailed to `email`."""
     import re
 
-    for to, _subject, text in reversed(OUTBOX):
+    for to, _subject, body in reversed(OUTBOX):
         if to == email.lower():
-            return re.search(r"\b(\d{6})\b", text).group(1)
+            return re.search(r"\b(\d{6})\b", body).group(1)
     raise AssertionError(f"no email sent to {email}")
 
 
@@ -151,5 +151,5 @@ def register(client, email="alex@example.com", name="Alex", tz="UTC"):
 
 @pytest.fixture
 def auth(client):
-    headers, user = register(client)
+    headers, _user = register(client)
     return headers

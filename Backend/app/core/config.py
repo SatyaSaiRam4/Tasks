@@ -1,5 +1,6 @@
 # config.py: Load environment variables using dotenv
 import os
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -24,7 +25,7 @@ def validate_env_vars() -> None:
         if not os.getenv(var):
             missing.append(var)
     if missing:
-        raise EnvironmentError(
+        raise OSError(
             f"Missing required environment variables: {', '.join(missing)}"
         )
 

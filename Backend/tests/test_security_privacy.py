@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from sqlalchemy import text
 
@@ -244,7 +244,7 @@ def test_reminder_track_must_belong_to_the_user(client, auth, clock):
 
 
 def test_reminders_move_to_done_once_their_time_passes(client, auth, clock, db):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.modules.reminders.service import auto_complete_due
 
@@ -256,7 +256,7 @@ def test_reminders_move_to_done_once_their_time_passes(client, auth, clock, db):
     marked = auto_complete_due(db, whatsapp_ready=False, now=clock.now + timedelta(hours=2))
     assert marked == 1
     done = client.get(f"{API}/reminders/{r1['id']}", headers=auth).json()
-    assert datetime.fromisoformat(done["completed_at"]) == datetime.fromisoformat(r1["remind_at"]).astimezone(timezone.utc)
+    assert datetime.fromisoformat(done["completed_at"]) == datetime.fromisoformat(r1["remind_at"]).astimezone(UTC)
     assert client.get(f"{API}/reminders/{r2['id']}", headers=auth).json()["completed_at"] is None
 
 

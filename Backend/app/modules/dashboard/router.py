@@ -1,6 +1,6 @@
 """One request that powers the whole Dashboard. Never includes Vault data."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ def summary(current_user: User = Depends(get_current_user), db: Session = Depend
         if not t.is_archived and t.start_date <= today and (t.end_date is None or t.end_date >= today)
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upcoming_filter = (
         Reminder.user_id == current_user.id,
         Reminder.status == ReminderStatus.ACTIVE,

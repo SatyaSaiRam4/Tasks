@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import (
     Boolean,
@@ -23,7 +23,7 @@ from app.db.base import Base
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ActionPriority(str, enum.Enum):
