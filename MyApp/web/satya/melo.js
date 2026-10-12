@@ -298,6 +298,82 @@ function makeBall(radius, red) {
   return g;
 }
 
+/** The lawn: green grass that fades out towards the back, with fine darker blades. */
+function grassTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext('2d');
+  const base = g.createLinearGradient(0, 0, 0, 256);
+  base.addColorStop(0, 'rgba(120, 190, 92, 0)');
+  base.addColorStop(0.25, 'rgba(120, 190, 92, 0.85)');
+  base.addColorStop(1, 'rgba(84, 156, 66, 1)');
+  g.fillStyle = base;
+  g.fillRect(0, 0, 512, 256);
+  // Blades and speckles for texture.
+  for (let i = 0; i < 1400; i++) {
+    const x = Math.random() * 512;
+    const y = 50 + Math.random() * 206;
+    const a = Math.min(1, (y - 50) / 80);
+    g.strokeStyle = Math.random() < 0.5 ? `rgba(58, 120, 46, ${0.55 * a})` : `rgba(160, 214, 120, ${0.5 * a})`;
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (Math.random() - 0.5) * 3, y - 4 - Math.random() * 5);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(3, 1);
+  return t;
+}
+
+/** A cute round tree: a little tapered trunk and a fluffy crown of green balls, with a few red apples. */
+function makeTree(H, seed) {
+  const g = new THREE.Group();
+  const bark = new THREE.MeshStandardMaterial({ color: 0x8b5a36, roughness: 0.9 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.15, H * 0.19, H * 0.85, 20), bark);
+  trunk.position.y = H * 0.425;
+  trunk.castShadow = true;
+  g.add(trunk);
+  // Two little roots at the foot.
+  for (const side of [-1, 1]) {
+    const root = new THREE.Mesh(new THREE.SphereGeometry(H * 0.07, 12, 8), bark);
+    root.scale.set(1.6, 0.5, 1);
+    root.position.set(side * H * 0.16, H * 0.02, 0);
+    g.add(root);
+  }
+  const greens = [0x5fae4e, 0x4e9a3e, 0x79c45e, 0x67b552];
+  const leaves = greens.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 }));
+  const puffs = [
+    [0, 1.12, 0, 0.42],
+    [-0.28, 0.98, 0.05, 0.3],
+    [0.28, 0.98, 0.04, 0.32],
+    [0, 1.42, -0.02, 0.3],
+    [-0.16, 1.3, 0.12, 0.24],
+    [0.18, 1.32, 0.1, 0.22],
+  ];
+  puffs.forEach(([x, y, z, r], i) => {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(H * r, 24, 18), leaves[(i + seed) % leaves.length]);
+    ball.position.set(H * x, H * y, H * z);
+    ball.castShadow = true;
+    g.add(ball);
+  });
+  const apple = new THREE.MeshStandardMaterial({ color: 0xe0384f, roughness: 0.4 });
+  [
+    [-0.2, 1.05, 0.33],
+    [0.25, 1.18, 0.3],
+    [0.05, 1.4, 0.27],
+  ].forEach(([x, y, z]) => {
+    const a = new THREE.Mesh(new THREE.SphereGeometry(H * 0.045, 12, 10), apple);
+    a.position.set(H * x, H * y, H * z);
+    g.add(a);
+  });
+  g.userData.trunkR = H * 0.11;
+  return g;
+}
+
 /** A soft round pool of warm light, for the floor under Melo. */
 function spotlightTexture() {
   const c = document.createElement('canvas');
@@ -469,6 +545,13 @@ function start() {
         for (let i = 0; i < n; i++) {
           setTimeout(() => {
             const h = headAt();
+            if (kind === 'heart') {
+              // Hearts pop out from his chest to both sides and float up only to
+              // shoulder height, so the speech bubble above his head never hides them.
+              const side = i % 2 ? 1 : -1;
+              floaters.emit('heart', h.x + side * W * (0.75 + Math.random() * 0.45), h.y - H * 0.62, h.z + 0.1, H * 0.24, side * W * 0.5);
+              return;
+            }
             floaters.emit(kind, h.x + (Math.random() - 0.5) * W * 0.6, h.y, h.z + 0.05, H * 0.22);
           }, i * spacing);
         }
@@ -495,6 +578,101 @@ function start() {
       canvas.style.transitionDuration = reduced ? '0ms' : longIntro ? '1100ms' : '450ms';
       requestAnimationFrame(() => canvas.classList.add('ready'));
       if (!reduced && !stroll) motion.play(params.get('gesture') || (longIntro ? 'wave' : 'nod'));
+      /** World x that appears at screen position `ndc` (-1 left edge, 1 right edge) at depth z. */
+      const xAtScreen = (ndc, z = 0) => {
+        const a = new THREE.Vector3(0, H * 0.5, z).project(camera).x;
+        const b = new THREE.Vector3(1, H * 0.5, z).project(camera).x;
+        return (ndc - a) / (b - a);
+      };
+
+      // ---- Melo's garden (Home): a lawn with tufts and flowers, a tree on each side.
+      const garden = stroll ? new THREE.Group() : null;
+      const trees = [];
+      const TREE_Z = H * 0.22;
+      if (garden) {
+        const lawn = new THREE.Mesh(new THREE.PlaneGeometry(14, H * 2.4), new THREE.MeshStandardMaterial({ map: grassTexture(), transparent: true, roughness: 1, depthWrite: false }));
+        lawn.rotation.x = -Math.PI / 2;
+        lawn.position.set(0, -0.002, -H * 0.2);
+        lawn.receiveShadow = true;
+        lawn.renderOrder = -1;
+        garden.add(lawn);
+        // Tufts of grass and little flowers dotted about.
+        const tuftMat = new THREE.MeshStandardMaterial({ color: 0x4f9a3f, roughness: 0.8 });
+        const petals = [0xffffff, 0xffd84a, 0xff8fb1];
+        for (let i = 0; i < 46; i++) {
+          const x = (Math.random() - 0.5) * 7;
+          const z = -H * 0.8 + Math.random() * H * 1.4;
+          const tuft = new THREE.Group();
+          for (let b = 0; b < 3; b++) {
+            const blade = new THREE.Mesh(new THREE.ConeGeometry(H * 0.018, H * (0.07 + Math.random() * 0.05), 5), tuftMat);
+            blade.position.set((b - 1) * H * 0.02, H * 0.04, 0);
+            blade.rotation.z = (b - 1) * 0.35;
+            tuft.add(blade);
+          }
+          tuft.position.set(x, 0, z);
+          garden.add(tuft);
+          if (i % 3 === 0) {
+            const flower = new THREE.Mesh(new THREE.SphereGeometry(H * 0.022, 10, 8), new THREE.MeshStandardMaterial({ color: petals[i % 3], roughness: 0.5 }));
+            flower.position.set(x + H * 0.05, H * 0.06, z);
+            garden.add(flower);
+          }
+        }
+        for (const side of [-1, 1]) {
+          const tree = makeTree(H, side > 0 ? 1 : 0);
+          tree.scale.setScalar(0.72);
+          tree.userData.side = side;
+          trees.push(tree);
+          garden.add(tree);
+        }
+        scene.add(garden);
+      }
+      const placeTrees = () => trees.forEach(t => t.position.set(xAtScreen(t.userData.side * 0.82, TREE_Z), 0, TREE_Z));
+      placeTrees();
+      window.addEventListener('resize', placeTrees);
+
+      // ---- Footprints: little soft prints left behind as he walks, fading away.
+      const prints = [];
+      const printMat = () => new THREE.MeshBasicMaterial({ color: 0x3d5a2a, transparent: true, opacity: 0, depthWrite: false });
+      for (let i = 0; i < 28; i++) {
+        const m = new THREE.Mesh(new THREE.CircleGeometry(H * 0.035, 16), printMat());
+        m.scale.set(0.7, 1.25, 1);
+        m.rotation.x = -Math.PI / 2;
+        m.visible = false;
+        scene.add(m);
+        prints.push({ m, born: 0 });
+      }
+      let printIndex = 0;
+      let lastPrint = null;
+      let printSide = 1;
+      /** Called each frame: drops a print every step while he walks on the ground, and fades old ones. */
+      function footprints(time, walking) {
+        const here = new THREE.Vector3(stroller.position.x, 0, stroller.position.z);
+        if (!stroll) return;
+        if (walking && stroller.visible) {
+          if (!lastPrint) lastPrint = here.clone();
+          const step = here.distanceTo(lastPrint);
+          if (step > H * 0.12) {
+            const dir = here.clone().sub(lastPrint).normalize();
+            const across = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(printSide * H * 0.05);
+            const pr = prints[printIndex++ % prints.length];
+            pr.m.position.set(here.x + across.x, 0.003, here.z + across.z);
+            pr.m.rotation.z = Math.atan2(dir.x, dir.z);
+            pr.m.visible = true;
+            pr.born = time;
+            printSide = -printSide;
+            lastPrint = here.clone();
+          }
+        } else {
+          lastPrint = null;
+        }
+        for (const pr of prints) {
+          if (!pr.m.visible) continue;
+          const age = (time - pr.born) / 4000;
+          pr.m.material.opacity = age < 0.1 ? 0.45 * (age / 0.1) : 0.45 * Math.max(0, 1 - (age - 0.1) / 0.9);
+          if (age >= 1) pr.m.visible = false;
+        }
+      }
+
       const walker = stroll ? createStroll() : null;
       if (stroll && reduced) setTimeout(() => announce(0), 600); // standing still: tip at once
 
@@ -549,12 +727,6 @@ function start() {
         wave.rotation.x = -Math.PI / 2;
         wave.position.y = 0.004;
         scene.add(wave);
-        /** World x that appears at screen position `ndc` (-1 left edge, 1 right edge) at depth z. */
-        const xAtScreen = (ndc, z = 0) => {
-          const a = new THREE.Vector3(0, H * 0.5, z).project(camera).x;
-          const b = new THREE.Vector3(1, H * 0.5, z).project(camera).x;
-          return (ndc - a) / (b - a);
-        };
         const T = { roll: 1700, open: 1100, stroll: 2300, notice: 700, blush: 1000, flee: 650, gone: 1300, peek: 2300, back: 0 };
         const setPhase = (time, phase) => {
           st.phase = phase;
@@ -678,7 +850,10 @@ function start() {
             if (k > T.blush) {
               st.steamed = false;
               st.x0 = st.x;
-              st.x1 = xAtScreen(st.walkSide * 1.35);
+              st.z0 = st.z;
+              st.tree = trees.find(t => t.userData.side === st.walkSide);
+              // Behind the trunk, on the inner side, so half of him still shows (Chopper!).
+              st.x1 = st.tree ? st.tree.position.x - st.walkSide * W * 0.5 : xAtScreen(st.walkSide * 1.35);
               setPhase(time, 'flee');
               motion.now('');
               // Anime dash: dust kicks back from his feet.
@@ -689,9 +864,10 @@ function start() {
             return true;
           }
           if (st.phase === 'flee') {
-            // And runs off the screen, fast.
+            // And dashes off to hide behind the tree.
             const f = Math.min(1, k / T.flee);
             st.x = run(st.x0, st.x1, f * f);
+            st.z = run(st.z0 || 0, st.tree ? -H * 0.12 : 0, ease(f));
             st.face = st.walkSide * 1.1;
             if (!motion.busy()) motion.play('walk');
             st.tremble = 0.4;
@@ -702,6 +878,10 @@ function start() {
             return true;
           }
           if (st.phase === 'gone') {
+            // Hiding behind the trunk (half of him in plain sight), trembling.
+            st.face = -st.walkSide * 0.25;
+            st.tremble = 0.5;
+            st.blush = 1.2;
             if (k > T.gone) setPhase(time, 'peek');
             return true;
           }
@@ -716,7 +896,9 @@ function start() {
               const h = headAt();
               floaters.emit('sweat', h.x - st.walkSide * W * 0.3, h.y + H * 0.05, h.z + 0.08, H * 0.2);
             }
-            st.x = run(xAtScreen(st.walkSide * 1.35), xAtScreen(st.walkSide * depth), lean);
+            const hidden = st.tree ? st.tree.position.x - st.walkSide * W * 0.5 : xAtScreen(st.walkSide * 1.35);
+            const peekOut = st.tree ? st.tree.position.x - st.walkSide * W * (st.peeks === 0 ? 0.8 : 0.92) : xAtScreen(st.walkSide * depth);
+            st.x = run(hidden, peekOut, lean);
             st.lean = -st.walkSide * lean;
             st.face = -st.walkSide * 0.35 * lean;
             st.blush = 1.4;
@@ -736,9 +918,9 @@ function start() {
             st.tremble = 0;
             st.plead = 0;
             st.blush = 0.4;
-            st.x = xAtScreen(st.walkSide * 1.2);
             st.stops = 0;
-            walkTo(time, xAtScreen(st.walkSide * 0.25));
+            // He steps out from behind the tree and comes to the middle.
+            walkTo(time, xAtScreen(st.walkSide * 0.2));
             return false;
           }
           return false;
@@ -786,7 +968,7 @@ function start() {
             stroller.position.z = st.z;
             spot.position.x = st.x;
             spot.position.z = st.z;
-            spot.visible = st.phase !== 'gone' && st.phase !== 'peek' && st.phase !== 'flee';
+            spot.visible = st.phase !== 'gone' && st.phase !== 'peek' && st.phase !== 'flee' && st.phase !== 'ball';
             return;
           }
           // Out of the entrance, any leftover blush fades (unless he was just tapped).
@@ -870,10 +1052,11 @@ function start() {
           }
           // Turn smoothly toward where he is going (or back to face you).
           stroller.rotation.y += (st.face - stroller.rotation.y) * Math.min(1, dt * 6);
+          st.z += (0 - st.z) * Math.min(1, dt * 3);
           stroller.position.x = st.x;
-          stroller.position.z = 0;
+          stroller.position.z = st.z;
           spot.position.x = st.x;
-          spot.position.z = 0;
+          spot.position.z = st.z;
           spot.visible = st.phase !== 'away' && st.phase !== 'peek';
         };
         update.state = st;
@@ -896,6 +1079,7 @@ function start() {
         }
         const time = frozenAt !== null ? frozenAt : frameTime + timeShift;
         if (walker && !reduced && frozenAt === null) walker(time);
+        if (walker && walker.state) footprints(time, ['walk', 'stroll', 'flee'].includes(walker.state.phase));
         const p = motion.pose(time);
         // The entrance adds a pop-in scale, a nervous tremble, blush and big eyes.
         const ex = walker && walker.state ? walker.state : null;
