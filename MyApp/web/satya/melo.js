@@ -8,7 +8,13 @@
  * Query: ?motion=reduced|full&intro=long|short&gesture=<name>&mode=stroll
  *
  * mode=stroll is Home's "Melo's corner": a wide stage where he lives. He
- * walks in, stops to wave and talk, wanders, sometimes strolls off one side
+ * arrives as a ball in his robe red that rolls in and flips open; he pops
+ * out, strolls off, turns to you, blushes bright red and runs off screen,
+ * peeks back in from the edge (half of him, bent sideways) twice, then comes
+ * back to talk; every other time he comes back on stage he arrives the same
+ * way. Debug: ?at=N fast-forwards N seconds; ?hold=<phase>&f=0.5 freezes
+ * halfway through a phase (ball, open, stroll, notice, blush, flee, peek&n=0|1).
+ * Then he stops to wave and talk, wanders, sometimes strolls off one side
  * and comes back from the other, with a soft gold spotlight following him.
  * When he stops to talk the page posts {"type":"stop","x","y"} (his head's
  * position as fractions of the stage) so the app can pin a speech bubble
@@ -232,6 +238,66 @@ function createMotion() {
 
 // ---- Stage --------------------------------------------------------------------------------
 
+/** A soft glow, for the halo around Melo's golden ball. */
+function glowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 236, 180, 0.9)');
+  grad.addColorStop(0.35, 'rgba(255, 214, 130, 0.45)');
+  grad.addColorStop(1, 'rgba(255, 214, 130, 0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/**
+ * The ball Melo arrives in, in his own robe red: two halves with a gold
+ * seam, a shine, and a warm glow inside that shows when the top flips open.
+ */
+function makeBall(radius, red) {
+  const g = new THREE.Group();
+  const shell = new THREE.MeshStandardMaterial({ color: red, metalness: 0.15, roughness: 0.32, emissive: red, emissiveIntensity: 0.08 });
+  const inner = new THREE.MeshBasicMaterial({ color: 0xfff1c8, side: THREE.BackSide, toneMapped: false });
+  const seam = new THREE.MeshStandardMaterial({ color: 0xe7c17a, metalness: 0.75, roughness: 0.25 });
+  // The roller spins as it rolls; the halves sit inside it.
+  const roller = new THREE.Group();
+  g.add(roller);
+  const half = top => {
+    const h = new THREE.Group();
+    const geo = new THREE.SphereGeometry(radius, 40, 20, 0, Math.PI * 2, top ? 0 : Math.PI / 2, Math.PI / 2);
+    const outside = new THREE.Mesh(geo, shell);
+    outside.castShadow = true;
+    h.add(outside, new THREE.Mesh(geo, inner));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.005, radius * 0.06, 10, 48).rotateX(Math.PI / 2), seam);
+    h.add(ring);
+    return h;
+  };
+  // The top half hinges at the back of the seam, so it flips up and back.
+  const hinge = new THREE.Group();
+  hinge.position.set(0, 0, -radius);
+  const top = half(true);
+  top.position.set(0, 0, radius);
+  hinge.add(top);
+  const bottom = half(false);
+  roller.add(hinge, bottom);
+  // A white shine, and a gold button on the seam.
+  const shine = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.14, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  shine.position.set(-radius * 0.45, radius * 0.6, radius * 0.6);
+  top.add(shine);
+  const button = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.2, radius * 0.2, radius * 0.08, 24).rotateX(Math.PI / 2), seam);
+  button.position.set(0, 0, radius * 1.02);
+  bottom.add(button);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: 0 }));
+  halo.scale.setScalar(radius * 4);
+  g.add(halo);
+  g.userData = { roller, hinge, halo, shell, radius };
+  return g;
+}
+
 /** A soft round pool of warm light, for the floor under Melo. */
 function spotlightTexture() {
   const c = document.createElement('canvas');
@@ -356,6 +422,8 @@ function start() {
   window.satya = { play: motion.play, now: motion.now };
   let paused = false;
   let poked = false;
+  // Set by ?hold (checking a pose in a browser): the moment to keep showing.
+  let frozenAt = null;
   window.melo = {
     setPaused: v => {
       paused = Boolean(v);
@@ -396,12 +464,19 @@ function start() {
       // Sparkly eyes and rosy cheeks, and the hearts / sparkles / z's that float up.
       const face = addFace(model);
       const floaters = createFloaters(scene);
-      const headAt = () => new THREE.Vector3(stroller.position.x, H * 1.12, 0);
+      const headAt = () => new THREE.Vector3(stroller.position.x, H * 1.12, stroller.position.z);
       const emit = (kind, n, spacing) => {
         for (let i = 0; i < n; i++) {
           setTimeout(() => {
             const h = headAt();
-            floaters.emit(kind, h.x + (Math.random() - 0.5) * W * 0.6, h.y, 0.05, H * 0.22);
+            if (kind === 'heart') {
+              // Hearts pop out from his chest to both sides and float up only to
+              // shoulder height, so the speech bubble above his head never hides them.
+              const side = i % 2 ? 1 : -1;
+              floaters.emit('heart', h.x + side * W * (0.75 + Math.random() * 0.45), h.y - H * 0.62, h.z + 0.1, H * 0.24, side * W * 0.5);
+              return;
+            }
+            floaters.emit(kind, h.x + (Math.random() - 0.5) * W * 0.6, h.y, h.z + 0.05, H * 0.22);
           }, i * spacing);
         }
       };
@@ -427,6 +502,57 @@ function start() {
       canvas.style.transitionDuration = reduced ? '0ms' : longIntro ? '1100ms' : '450ms';
       requestAnimationFrame(() => canvas.classList.add('ready'));
       if (!reduced && !stroll) motion.play(params.get('gesture') || (longIntro ? 'wave' : 'nod'));
+      /** World x that appears at screen position `ndc` (-1 left edge, 1 right edge) at depth z. */
+      const xAtScreen = (ndc, z = 0) => {
+        const a = new THREE.Vector3(0, H * 0.5, z).project(camera).x;
+        const b = new THREE.Vector3(1, H * 0.5, z).project(camera).x;
+        return (ndc - a) / (b - a);
+      };
+
+      // ---- Footprints: little soft prints left behind as he walks, fading away.
+      const prints = [];
+      // A soft warm grey that shows on the cream and the midnight Home alike.
+      const printMat = () => new THREE.MeshBasicMaterial({ color: 0x6b5a4a, transparent: true, opacity: 0, depthWrite: false });
+      for (let i = 0; i < 28; i++) {
+        const m = new THREE.Mesh(new THREE.CircleGeometry(H * 0.035, 16), printMat());
+        m.scale.set(0.7, 1.25, 1);
+        m.rotation.x = -Math.PI / 2;
+        m.visible = false;
+        scene.add(m);
+        prints.push({ m, born: 0 });
+      }
+      let printIndex = 0;
+      let lastPrint = null;
+      let printSide = 1;
+      /** Called each frame: drops a print every step while he walks on the ground, and fades old ones. */
+      function footprints(time, walking) {
+        const here = new THREE.Vector3(stroller.position.x, 0, stroller.position.z);
+        if (!stroll) return;
+        if (walking && stroller.visible) {
+          if (!lastPrint) lastPrint = here.clone();
+          const step = here.distanceTo(lastPrint);
+          if (step > H * 0.12) {
+            const dir = here.clone().sub(lastPrint).normalize();
+            const across = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(printSide * H * 0.05);
+            const pr = prints[printIndex++ % prints.length];
+            pr.m.position.set(here.x + across.x, 0.003, here.z + across.z);
+            pr.m.rotation.z = Math.atan2(dir.x, dir.z);
+            pr.m.visible = true;
+            pr.born = time;
+            printSide = -printSide;
+            lastPrint = here.clone();
+          }
+        } else {
+          lastPrint = null;
+        }
+        for (const pr of prints) {
+          if (!pr.m.visible) continue;
+          const age = (time - pr.born) / 4000;
+          pr.m.material.opacity = age < 0.1 ? 0.45 * (age / 0.1) : 0.45 * Math.max(0, 1 - (age - 0.1) / 0.9);
+          if (age >= 1) pr.m.visible = false;
+        }
+      }
+
       const walker = stroll ? createStroll() : null;
       if (stroll && reduced) setTimeout(() => announce(0), 600); // standing still: tip at once
 
@@ -459,8 +585,226 @@ function start() {
         };
         // Each walk is a segment from x0 to x1 starting at t0: his position comes
         // from the clock, so frame drops never slow him down.
-        const st = { x: edgeX + W, x0: edgeX + W, x1: edgeX * 0.35, t0: null, phase: 'walk', stops: 0, wait: 0, face: 0, last: null };
+        const st = { x: edgeX + W, x0: edgeX + W, x1: edgeX * 0.35, t0: null, phase: 'ball', stops: 0, wait: 0, face: 0, last: null, z: 0, pop: 1, blush: 0, plead: 0, tremble: 0, returns: 0 };
         stroller.position.x = st.x;
+
+        // ---- The entrance: a ball in his own red rolls in and opens, Melo pops
+        // out and strolls off casually; he turns, notices you watching, goes
+        // bright red and runs off the screen; then, like Chopper, he leans
+        // back in from the edge with half of him showing to check whether
+        // you're still looking, twice, and finally comes back to say his tip.
+        const ballR = H * 0.2;
+        const ball = makeBall(ballR, robe?.material?.color ? robe.material.color.clone() : new THREE.Color(0xb8405a));
+        ball.visible = false;
+        scene.add(ball);
+        const flash = new THREE.PointLight(0xffe2a8, 0, H * 6, 1.6);
+        scene.add(flash);
+        // A ring of light that ripples out across the floor as the ball opens.
+        const wave = new THREE.Mesh(
+          new THREE.RingGeometry(0.82, 1, 64),
+          new THREE.MeshBasicMaterial({ color: 0xe8a33a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+        );
+        wave.rotation.x = -Math.PI / 2;
+        wave.position.y = 0.004;
+        scene.add(wave);
+        const T = { roll: 1700, open: 1100, stroll: 2300, notice: 700, blush: 1000, flee: 650, gone: 1300, peek: 2300, back: 0 };
+        const setPhase = (time, phase) => {
+          st.phase = phase;
+          st.t0 = time;
+        };
+        const startBall = time => {
+          st.side = Math.random() < 0.5 ? -1 : 1;
+          setPhase(time, 'ball');
+          st.pop = 0;
+          st.blush = 0;
+          st.plead = 0;
+          st.tremble = 0;
+          st.lean = 0;
+          st.x = 0;
+          st.peeks = 0;
+          ball.visible = true;
+          ball.scale.setScalar(1);
+          ball.userData.hinge.rotation.x = 0;
+          ball.userData.halo.material.opacity = 0;
+          stroller.visible = false;
+          post(JSON.stringify({ type: 'move' }));
+        };
+        // ?hold=<phase> (for checking a pose in a browser): freeze halfway through that phase.
+        const hold = params.get('hold');
+        /** The entrance, phase by phase. Returns true while it's running. */
+        function entrance(time) {
+          const k = time - st.t0;
+          if (hold && st.phase === hold && k > (T[hold] || 0) * (Number(params.get('f')) || 0.5) && (hold !== 'peek' || st.peeks === Number(params.get('n') || 0))) frozenAt = time;
+          const run = (from, to, f) => from + (to - from) * f;
+          if (st.phase === 'ball') {
+            // Rolls in from the side, bouncing less and less.
+            const f = Math.min(1, k / T.roll);
+            const bx = xAtScreen(st.side * 1.2) * (1 - ease(f));
+            const bounce = Math.abs(Math.sin(f * Math.PI * 3)) * (1 - f) * H * 0.3;
+            ball.position.set(bx, ballR + bounce, 0);
+            ball.userData.roller.rotation.z = bx / ballR;
+            const squash = bounce < H * 0.015 && f < 0.95 ? 0.1 : 0;
+            ball.userData.roller.scale.set(1 + squash, 1 - squash, 1 + squash);
+            spot.position.x = bx;
+            if (f >= 1) setPhase(time, 'open');
+            return true;
+          }
+          if (st.phase === 'open') {
+            // A wiggle, then the top flips open with a warm light, and out he pops.
+            const roller = ball.userData.roller;
+            roller.rotation.z += (0 - roller.rotation.z) * 0.2;
+            const wiggle = k < 450 ? Math.sin(k * 0.05) * bump(k / 450) : 0;
+            roller.rotation.y = 0.25 * wiggle;
+            roller.scale.set(1 + 0.06 * wiggle, 1 - 0.06 * Math.abs(wiggle), 1 + 0.06 * wiggle);
+            const o = ease(Math.min(1, Math.max(0, (k - 450) / 300)));
+            ball.userData.hinge.rotation.x = -2.1 * o;
+            ball.userData.halo.material.opacity = 0.9 * o * (1 - Math.max(0, (k - 800) / 300));
+            flash.position.set(0, H * 0.6, H * 0.8);
+            flash.intensity = 7 * bump(Math.max(0, (k - 450) / 500));
+            if (k > 450 && !st.opened) {
+              st.opened = true;
+              stroller.visible = true;
+              // Ta-da: stars fly out in gold, red and white, sparkles and a soft poof.
+              floaters.burst(0, ballR * 1.3, 0.12, 18, H, [0xffc23a, 0xe0384f, 0xffffff, 0xff9a2e]);
+              emit('sparkle', 6, 60);
+              for (let i = 0; i < 5; i++) floaters.emit('puff', (i - 2) * ballR * 0.5, ballR * 1.2, 0.1, H * 0.25);
+              motion.now('hop');
+            }
+            // The ripple across the floor.
+            const r = Math.max(0, (k - 450) / 650);
+            wave.visible = r > 0 && r < 1;
+            wave.scale.setScalar(ballR * (1 + 6 * ease(Math.min(1, r))));
+            wave.material.opacity = 0.75 * (1 - Math.min(1, r));
+            // He springs up out of it with an overshoot.
+            const g = Math.max(0, (k - 450) / 550);
+            st.pop = g <= 0 ? 0 : g < 0.6 ? ease(g / 0.6) * 1.15 : 1.15 - 0.15 * Math.min(1, (g - 0.6) / 0.4);
+            // The empty ball shrinks away.
+            ball.scale.setScalar(Math.max(0.001, 1 - Math.max(0, (k - 800) / 300)));
+            if (k > T.open) {
+              st.opened = false;
+              st.pop = 1;
+              ball.visible = false;
+              wave.visible = false;
+              flash.intensity = 0;
+              // Off for a casual stroll to one side.
+              st.walkSide = Math.random() < 0.5 ? -1 : 1;
+              st.x0 = st.x;
+              st.x1 = xAtScreen(st.walkSide * 0.5);
+              setPhase(time, 'stroll');
+            }
+            return true;
+          }
+          if (st.phase === 'stroll') {
+            // Hands behind his back, la-la-la... (a slow, easy walk).
+            const f = Math.min(1, k / T.stroll);
+            st.x = run(st.x0, st.x1, f);
+            st.face = st.walkSide * 0.95;
+            if (!motion.busy()) motion.play('walk');
+            if (f >= 0.7) setPhase(time, 'notice');
+            return true;
+          }
+          if (st.phase === 'notice') {
+            // ...he turns his face to you. Oh! Someone's watching.
+            st.face = st.walkSide * 0.95 * (1 - ease(Math.min(1, k / 350)));
+            st.plead = Math.min(1, k / 300);
+            if (k > 120 && !st.noticed) {
+              st.noticed = true;
+              motion.now('');
+            }
+            if (k > T.notice) {
+              st.noticed = false;
+              setPhase(time, 'blush');
+              st.wiggleUntil = time + T.blush;
+            }
+            return true;
+          }
+          if (st.phase === 'blush') {
+            // Goes bright red, steam puffing off his head, a tiny shy wiggle.
+            st.face = 0;
+            st.blush = Math.min(1.6, (k / 400) * 1.6);
+            if (k > 250 && !st.steamed) {
+              st.steamed = true;
+              steam(3);
+              emit('heart', 2, 180);
+            }
+            if (k > T.blush) {
+              st.steamed = false;
+              st.x0 = st.x;
+              st.x1 = xAtScreen(st.walkSide * 1.35);
+              setPhase(time, 'flee');
+              motion.now('');
+              // Anime dash: dust kicks back from his feet.
+              for (let i = 0; i < 4; i++) {
+                setTimeout(() => floaters.emit('dust', st.x - st.walkSide * W * (0.2 + i * 0.12), H * 0.06, 0.05, H * 0.28, -st.walkSide * H * 0.5), i * 70);
+              }
+            }
+            return true;
+          }
+          if (st.phase === 'flee') {
+            // And runs off the screen, fast.
+            const f = Math.min(1, k / T.flee);
+            st.x = run(st.x0, st.x1, f * f);
+            st.face = st.walkSide * 1.1;
+            if (!motion.busy()) motion.play('walk');
+            st.tremble = 0.4;
+            if (f >= 1) {
+              st.tremble = 0;
+              setPhase(time, 'gone');
+            }
+            return true;
+          }
+          if (st.phase === 'gone') {
+            if (k > T.gone) setPhase(time, 'peek');
+            return true;
+          }
+          if (st.phase === 'peek') {
+            // Chopper-style: he leans back in from the edge, half of him
+            // showing, bent sideways, eyes on you... then ducks back out.
+            const f = Math.min(1, k / T.peek);
+            const lean = f < 0.2 ? ease(f / 0.2) : f < 0.78 ? 1 : 1 - ease((f - 0.78) / 0.22);
+            const depth = st.peeks === 0 ? 0.93 : 0.88; // the second time, a little braver
+            if (f > 0.25 && !st.sweated) {
+              st.sweated = true;
+              const h = headAt();
+              floaters.emit('sweat', h.x - st.walkSide * W * 0.3, h.y + H * 0.05, h.z + 0.08, H * 0.2);
+            }
+            st.x = run(xAtScreen(st.walkSide * 1.35), xAtScreen(st.walkSide * depth), lean);
+            st.lean = -st.walkSide * lean;
+            st.face = -st.walkSide * 0.35 * lean;
+            st.blush = 1.4;
+            st.plead = 1;
+            st.tremble = 0.35 * lean;
+            if (f >= 1) {
+              st.sweated = false;
+              st.peeks += 1;
+              setPhase(time, st.peeks >= 2 ? 'back' : 'gone');
+              if (st.peeks < 2) st.t0 = time - T.gone + 700; // a shorter wait before the second peek
+            }
+            return true;
+          }
+          if (st.phase === 'back') {
+            // Coast's clear: he comes back in to tell you his tip.
+            st.lean = 0;
+            st.tremble = 0;
+            st.plead = 0;
+            st.blush = 0.4;
+            st.stops = 0;
+            // He walks back in from the edge to tell you his tip.
+            st.x = xAtScreen(st.walkSide * 1.2);
+            walkTo(time, xAtScreen(st.walkSide * 0.25));
+            return false;
+          }
+          return false;
+        }
+        /** Little puffs of steam off his head: embarrassed! */
+        function steam(n) {
+          for (let i = 0; i < n; i++) {
+            setTimeout(() => {
+              const h = headAt();
+              floaters.emit('puff', h.x + (i % 2 ? 1 : -1) * W * 0.32, h.y + H * 0.05, h.z + 0.05, H * 0.16);
+            }, i * 160);
+          }
+        }
         const walkTo = (time, target) => {
           st.x0 = st.x;
           st.x1 = target;
@@ -473,10 +817,33 @@ function start() {
           if (Math.abs(t - st.x) < reach * 0.4) t = -Math.sign(st.x || 1) * reach * (0.4 + Math.random() * 0.5);
           return t;
         };
-        return function update(time) {
+        const update = function update(time) {
           const dt = st.last === null ? 0 : Math.min(0.25, (time - st.last) / 1000);
           st.last = time;
-          if (st.t0 === null) st.t0 = time - timeShift; // the first walk starts as the page opens
+          if (st.t0 === null) startBall(time); // the entrance starts as the page opens
+          if (poked && st.phase === 'peek') {
+            // Found him! He gives up and comes back, all shy.
+            poked = false;
+            st.peeks = 2;
+            st.t0 = time - T.peek;
+          }
+          // After a tap he stays bright red for a while, then calms down.
+          if (st.flushUntil && time > st.flushUntil) {
+            st.flushUntil = 0;
+            st.blush = 0;
+          }
+          if (entrance(time)) {
+            poked = false;
+            stroller.rotation.y += (st.face - stroller.rotation.y) * Math.min(1, dt * 6);
+            stroller.position.x = st.x;
+            stroller.position.z = st.z;
+            spot.position.x = st.x;
+            spot.position.z = st.z;
+            spot.visible = st.phase !== 'gone' && st.phase !== 'peek' && st.phase !== 'flee' && st.phase !== 'ball';
+            return;
+          }
+          // Out of the entrance, any leftover blush fades (unless he was just tapped).
+          if (!st.flushUntil) st.blush = Math.max(0, st.blush - dt * 0.6);
           if (poked) {
             poked = false;
             if (st.phase !== 'away') {
@@ -484,7 +851,13 @@ function start() {
               st.phase = 'stop';
               st.wait = time + 4200;
               st.face = 0;
-              motion.now('shy');
+              // Facing you, bright red to the ears, a shy wiggle, steam puffing, red hearts.
+              motion.now('hop');
+              st.face = 0;
+              st.wiggleUntil = time + 2600;
+              st.blush = 1.6;
+              st.flushUntil = time + 4200;
+              steam(4);
               emit('heart', 5, 220);
               post(JSON.stringify({ type: 'move' }));
               setTimeout(() => announce(st.x, 'shy'), 500);
@@ -520,6 +893,9 @@ function start() {
               // Every few stops he strolls off one side; otherwise he wanders.
               walkTo(time, st.stops % 4 === 0 ? Math.sign(st.x || 1) * (edgeX + W) : pickTarget());
             }
+          } else if (st.phase === 'away' && time > st.wait && st.returns++ % 2 === 0) {
+            // Every other time he comes back as the golden ball.
+            startBall(time);
           } else if (st.phase === 'away' && time > st.wait) {
             // Back from the other side: first he peeks in from the edge...
             const side = -Math.sign(st.x || 1);
@@ -547,22 +923,57 @@ function start() {
           }
           // Turn smoothly toward where he is going (or back to face you).
           stroller.rotation.y += (st.face - stroller.rotation.y) * Math.min(1, dt * 6);
+          st.z += (0 - st.z) * Math.min(1, dt * 3);
           stroller.position.x = st.x;
+          stroller.position.z = st.z;
           spot.position.x = st.x;
+          spot.position.z = st.z;
           spot.visible = st.phase !== 'away' && st.phase !== 'peek';
         };
+        update.state = st;
+        return update;
       }
 
+      // ?at=N (for checking a moment in a browser): play the first N seconds
+      // in fast-forward on the first frame, so every phase really happens.
+      let forwarded = timeShift <= 0;
       const tick = frameTime => {
         requestAnimationFrame(tick);
         if (paused) return;
-        const time = frameTime + timeShift;
-        if (walker && !reduced) walker(time);
+        if (!forwarded) {
+          forwarded = true;
+          for (let t = frameTime; t < frameTime + timeShift && frozenAt === null; t += 16) {
+            if (walker && !reduced) walker(t);
+            motion.pose(t);
+            floaters.update(t);
+          }
+        }
+        const time = frozenAt !== null ? frozenAt : frameTime + timeShift;
+        if (walker && !reduced && frozenAt === null) walker(time);
+        if (walker && walker.state) footprints(time, ['walk', 'stroll', 'flee'].includes(walker.state.phase));
         const p = motion.pose(time);
+        // The entrance adds a pop-in scale, a nervous tremble, blush and big eyes.
+        const ex = walker && walker.state ? walker.state : null;
+        const pop = ex ? ex.pop : 1;
+        if (ex) {
+          p.roll += ex.tremble * 3.5 * Math.sin(time * 0.07);
+          // A shy wiggle, facing you (so you can see him blush).
+          if (ex.wiggleUntil && time < ex.wiggleUntil) {
+            const w = Math.min(1, (ex.wiggleUntil - time) / 400);
+            p.roll += 9 * Math.sin(time * 0.022) * w;
+            p.y -= 2 * Math.abs(Math.sin(time * 0.022)) * w;
+            p.yaw *= 0.3;
+          }
+          // Peeking in from the edge: bent sideways at the waist, Chopper-style.
+          p.roll += 24 * (ex.lean || 0);
+          p.pitch += 4 * Math.abs(ex.lean || 0);
+          p.blush = Math.max(p.blush, ex.blush);
+          p.plead = Math.max(p.plead, ex.plead);
+        }
         // (The old page turned the camera by -yaw; turning him by +yaw looks the same.)
         puppet.rotation.set(p.pitch * 0.6 * D2R, p.yaw * D2R, -p.roll * D2R, 'YXZ');
         puppet.position.y = (-p.y / 100) * H * 1.12; // the moves were tuned with this scale
-        puppet.scale.set(p.sx, p.sy, p.sx);
+        puppet.scale.set(p.sx * pop, p.sy * pop, p.sx * pop);
         if (!reduced) {
           hatSpring(time, { roll: p.roll, yaw: p.yaw, lift: -p.y, air: p.air });
           mouth?.setOpen(p.open);
