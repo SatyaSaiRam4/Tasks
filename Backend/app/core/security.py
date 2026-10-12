@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import HTTPException, status
 
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, JWT_ALGORITHM, JWT_SECRET
@@ -17,14 +17,13 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     try:
         return _hasher.verify(password_hash, password)
-    except VerifyMismatchError:
-        return False
-    except Exception:
+    except (VerificationError, InvalidHashError, TypeError, ValueError):
+        # Wrong password, or no usable hash (e.g. a Google-only account).
         return False
 
 
 def create_access_token(subject: str, role: str) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": subject,
         "role": role,
@@ -37,7 +36,7 @@ def create_access_token(subject: str, role: str) -> str:
 
 def create_vault_token(user_id: str, minutes: int) -> tuple[str, datetime]:
     """A short-lived token proving the Vault PIN was entered, separate from the login token."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + timedelta(minutes=minutes)
     payload = {"sub": user_id, "type": "vault", "iat": now, "exp": expires}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), expires

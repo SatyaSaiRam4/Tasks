@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -47,7 +47,7 @@ def set_user_role(db: Session, user_id: UUID, role: UserRole) -> User:
 
 
 def get_dashboard_stats(db: Session) -> dict:
-    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    since = datetime.now(UTC) - timedelta(hours=24)
 
     def count(stmt) -> int:
         return db.scalar(stmt) or 0

@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy import Enum as SAEnum
@@ -11,7 +11,7 @@ from app.db.base import Base
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class UserRole(str, enum.Enum):

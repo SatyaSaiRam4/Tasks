@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -103,7 +103,7 @@ def cancel_reminder(db: Session, user_id: UUID, reminder_id: UUID) -> Reminder:
 
 def set_completed(db: Session, user_id: UUID, reminder_id: UUID, completed: bool) -> Reminder:
     reminder = _get_owned_reminder(db, user_id, reminder_id)
-    reminder.completed_at = datetime.now(timezone.utc) if completed else None
+    reminder.completed_at = datetime.now(UTC) if completed else None
     if completed and reminder.whatsapp_status == WhatsAppStatus.PENDING:
         reminder.whatsapp_status = WhatsAppStatus.NOT_REQUESTED
     db.commit()
@@ -117,7 +117,7 @@ def snooze(db: Session, user_id: UUID, reminder_id: UUID, minutes: int) -> Remin
     reminder = _get_owned_reminder(db, user_id, reminder_id)
     if reminder.status != ReminderStatus.ACTIVE:
         raise HTTPException(status.HTTP_409_CONFLICT, "Only active reminders can be snoozed.")
-    base = max(datetime.now(timezone.utc), reminder.remind_at)
+    base = max(datetime.now(UTC), reminder.remind_at)
     reminder.remind_at = base + timedelta(minutes=minutes)
     reminder.completed_at = None
     reminder.whatsapp_status = _whatsapp_status_for(reminder.whatsapp_number)
@@ -135,7 +135,7 @@ def delete_reminder(db: Session, user_id: UUID, reminder_id: UUID) -> None:
 def get_due_whatsapp_reminders(db: Session) -> list[Reminder]:
     """Used by the background worker: active reminders whose time has arrived
     and whose WhatsApp side-channel hasn't been sent yet."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = select(Reminder).where(
         Reminder.status == ReminderStatus.ACTIVE,
         Reminder.whatsapp_status == WhatsAppStatus.PENDING,
@@ -151,7 +151,7 @@ def auto_complete_due(db: Session, whatsapp_ready: bool, now: datetime | None = 
     cleanup deletes them 7 days later). One still waiting for its WhatsApp
     send is left until the send has been tried, unless WhatsApp isn't set up
     or 30 minutes have gone by. Returns how many were marked."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     due = Reminder.remind_at <= now - timedelta(minutes=1)
     stale = Reminder.remind_at <= now - timedelta(minutes=30)
     waiting = Reminder.whatsapp_status == WhatsAppStatus.PENDING

@@ -1,6 +1,6 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import timedelta
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.modules.streaks.engine import compute_bonus
 from tests.conftest import register
@@ -311,7 +311,7 @@ def test_category_grid_marks_each_task_per_day(client, auth, clock):
     today = clock.now.date()
     track = make_track(client, auth, start_date=str(today), end_date=str(today + timedelta(days=6)))
     walk = make_action(client, auth, track["id"], title="Walk")
-    read = make_action(client, auth, track["id"], title="Read")
+    make_action(client, auth, track["id"], title="Read")
     complete(client, auth, walk["id"])
 
     grid = client.get(f"{API}/tracks/{track['id']}/grid", headers=auth).json()

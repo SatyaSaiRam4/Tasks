@@ -18,8 +18,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
 
 from app.core.config import MSG91_WHATSAPP_TEMPLATE_STYLE, REMINDER_POLL_SECONDS, STREAK_FINALIZE_MINUTES
-from app.integrations.messages import whatsapp_variables
 from app.db.session import SessionLocal
+from app.integrations.messages import whatsapp_variables
 from app.integrations.msg91 import is_configured, send_whatsapp_reminder
 from app.modules.reminders import service as reminders_service
 

@@ -61,6 +61,6 @@ def test_connection() -> bool:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
-    except Exception as exc:
-        print("Database connection failed:", exc)
+    except exc.SQLAlchemyError as error:
+        print("Database connection failed:", error)
         return False

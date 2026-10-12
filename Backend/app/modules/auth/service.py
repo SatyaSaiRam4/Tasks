@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -321,7 +321,7 @@ def issue_tokens(db: Session, user: User, device_name: str | None = None) -> tup
         user_id=user.id,
         token_hash=_hash_token(refresh_token),
         device_name=device_name,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
     )
     db.add(session)
     db.commit()
@@ -334,11 +334,11 @@ def rotate_refresh_token(db: Session, refresh_token: str) -> tuple[str, str, Use
     if (
         not session
         or session.revoked_at is not None
-        or session.expires_at < datetime.now(timezone.utc)
+        or session.expires_at < datetime.now(UTC)
     ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired or invalid. Please log in again.")
 
-    session.revoked_at = datetime.now(timezone.utc)
+    session.revoked_at = datetime.now(UTC)
     user = db.get(User, session.user_id)
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account is unavailable.")
@@ -352,14 +352,14 @@ def revoke_refresh_token(db: Session, refresh_token: str) -> None:
     token_hash = _hash_token(refresh_token)
     session = db.scalar(select(RefreshSession).where(RefreshSession.token_hash == token_hash))
     if session and session.revoked_at is None:
-        session.revoked_at = datetime.now(timezone.utc)
+        session.revoked_at = datetime.now(UTC)
         db.commit()
 
 
 def revoke_all_sessions(db: Session, user_id: UUID) -> None:
     db.query(RefreshSession).filter(
         RefreshSession.user_id == user_id, RefreshSession.revoked_at.is_(None)
-    ).update({"revoked_at": datetime.now(timezone.utc)})
+    ).update({"revoked_at": datetime.now(UTC)})
     db.commit()
 
 
