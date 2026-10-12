@@ -628,8 +628,20 @@ for *incoming messages*, with a long random `MSG91_INBOUND_SECRET` set on
 Render. MSG91's inbound field names differ between its old and new
 webhooks, so the server accepts several (`customer_number`/`customerNumber`/
 `from`/`sender` for the number; `content.text`/`text`/`body`/`message` for
-the text). The first time, reply YES from a test number and check the Render
-log line `WhatsApp inbound: [...]`: it should say `verified`.
+the text, including JSON hidden in a string, Meta's `entry/changes/messages`
+shape, buttons and 👍). Only messages clearly marked outgoing are skipped.
+
+**Checking it works:**
+- Render log, every webhook call: `WhatsApp inbound: [{'from': '…3572',
+  'text': 'Yes', 'result': 'verified'}]`. A refused call logs `WhatsApp
+  inbound refused: MSG91_INBOUND_SECRET is not set on the server` or `wrong
+  token in the webhook URL`. **No line at all** means MSG91 isn't calling the
+  webhook: check the URL is saved for *incoming messages* on the right
+  WhatsApp number.
+- Admins: `GET /api/v1/whatsapp/inbound/recent` lists the last 50 webhook
+  calls (numbers masked) and whether the secret is set.
+- In the app, while waiting, the number shows the last reply that reached
+  Memo (if it wasn't YES), or after 2 minutes says no reply has reached Memo.
 
 **Free alternatives**, if MSG91 inbound isn't available on the account:
 Meta's own WhatsApp Cloud API (free messages inside the 24-hour window after
@@ -805,7 +817,7 @@ block. On Render this isn't needed.
 | Reminders late on Android | Allow exact alarms; turn off battery optimisation for Memo |
 | Password-reset email doesn't arrive | Run the email check in [7.1](#71-backend-environment-backendenv-or-render-environment-variables); Gmail needs an App Password |
 | The Vault locked while choosing a photo | Fixed: pickers no longer lock it. Pull the latest code |
-| A WhatsApp number stays *Waiting for YES* | Check the MSG91 inbound webhook URL and `MSG91_INBOUND_SECRET`, then the Render log line `WhatsApp inbound: [...]` ([7.4](#74-whatsapp-number-permission)). `ignored: not YES or STOP` means the reply wasn't YES |
+| A WhatsApp number stays *Waiting for YES* | Look in the Render log ([7.4](#74-whatsapp-number-permission)): no `WhatsApp inbound` line means MSG91 isn't forwarding replies (set the incoming-message webhook); `refused` means the secret is missing or the token in the URL is wrong; `ignored: not YES or STOP` means the reply wasn't YES |
 | WhatsApp reminders show *Failed* | The number hadn't replied YES by the reminder time, or its owner replied STOP (then only they can turn it back on, by sending YES to Memo) |
 | Android build: `Keystore file … memo-debug.keystore not found` | Debug builds are signed with your own `memo-debug.keystore` (its SHA-1 is registered for Google sign-in). Copy it into `MyApp/android/app/`; it isn't in git |
 

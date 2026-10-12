@@ -14,7 +14,9 @@ them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
 A number can be asked at most once a day, so it can't be used to pester anyone.
 """
 
+import json
 import re
+from collections import deque
 from datetime import timedelta
 
 from fastapi import HTTPException, status
@@ -30,7 +32,17 @@ from .models import ContactStatus, WhatsAppContact
 
 ASK_AGAIN_AFTER = timedelta(hours=24)
 STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
-YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE"}
+YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "YES!", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE", "SURE"}
+YES_EMOJI = ("👍", "✅", "👌")
+
+# The last incoming messages (masked), so the app and admins can see whether
+# replies reach the server at all. In memory: one API instance (see PROJECT.md).
+recent: deque = deque(maxlen=50)
+last_reply: dict[str, dict] = {}
+
+
+def mask(phone: str | None) -> str:
+    return f"…{phone[-4:]}" if phone and len(phone) > 4 else "?"
 
 
 def normalize(phone: str | None) -> str | None:
@@ -58,11 +70,15 @@ def is_verified(db: Session, phone: str | None) -> bool:
 
 def describe(db: Session, phone: str) -> dict:
     contact = db.get(WhatsAppContact, phone)
+    reply = last_reply.get(phone)
     return {
         "phone": phone,
         "status": contact.status.value if contact else "NONE",
         "asked_at": contact.asked_at if contact else None,
         "business_number": business_number(),
+        # The last message that reached the server from this number (since the server started), if any.
+        "last_reply": reply["text"] if reply else None,
+        "last_reply_at": reply["at"] if reply else None,
     }
 
 
@@ -89,18 +105,32 @@ def ask_permission(db: Session, user: User, phone: str) -> dict:
     return describe(db, phone)
 
 
+def classify(text: str | None) -> str | None:
+    """'YES', 'STOP' or None, from a reply such as "Yes!", "stop please", "👍"."""
+    raw = (text or "").strip()
+    if any(e in raw for e in YES_EMOJI):
+        return "YES"
+    words = [re.sub(r"[^A-Z]", "", w) for w in raw.upper().split()]
+    words = [w for w in words if w]
+    if not words:
+        return None
+    if words[0] in STOP_WORDS:
+        return "STOP"
+    if words[0] in YES_WORDS:
+        return "YES"
+    return None
+
+
 def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
     """One incoming WhatsApp message. Returns what happened (for the log)."""
     phone = normalize(sender)
     if not phone:
         return "ignored: no sender"
-    first = re.sub(r"[^A-Z]", "", ((text or "").strip().upper().split() or [""])[0])
-    if first in STOP_WORDS:
-        status_ = ContactStatus.STOPPED
-    elif first in YES_WORDS:
-        status_ = ContactStatus.VERIFIED
-    else:
+    last_reply[phone] = {"text": (text or "")[:60], "at": utc_now()}
+    kind = classify(text)
+    if kind is None:
         return "ignored: not YES or STOP"
+    status_ = ContactStatus.STOPPED if kind == "STOP" else ContactStatus.VERIFIED
     contact = db.get(WhatsAppContact, phone)
     if contact is None:
         contact = WhatsAppContact(phone=phone, status=status_)
@@ -115,12 +145,30 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
     return "verified" if status_ == ContactStatus.VERIFIED else "stopped"
 
 
+def _unpack(value):
+    """Parses JSON hidden inside strings (MSG91 sometimes sends `content` as a JSON string)."""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped[:1] in ("{", "["):
+            try:
+                return _unpack(json.loads(stripped))
+            except ValueError:
+                return value
+        return value
+    if isinstance(value, dict):
+        return {k: _unpack(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_unpack(v) for v in value]
+    return value
+
+
 def _find(payload, keys: tuple[str, ...]):
-    """The first value under any of `keys`, searching nested dicts and lists."""
+    """The first text value under any of `keys`, searching nested dicts and lists."""
     if isinstance(payload, dict):
         for key in keys:
-            if key in payload and isinstance(payload[key], (str, int)):
-                return str(payload[key])
+            value = payload.get(key)
+            if isinstance(value, (str, int)) and str(value).strip():
+                return str(value)
         for value in payload.values():
             found = _find(value, keys)
             if found:
@@ -133,22 +181,34 @@ def _find(payload, keys: tuple[str, ...]):
     return None
 
 
+SENDER_KEYS = ("customer_number", "customerNumber", "customer_mobile", "sender", "from", "mobile", "wa_id", "source", "phone")
+TEXT_KEYS = ("text", "body", "message", "caption", "title", "payload", "content")
+
+
 def messages_from(payload) -> list[tuple[str | None, str | None]]:
-    """(sender, text) pairs from an MSG91 inbound webhook body. MSG91's field
-    names differ between its old and new webhooks, so several are accepted."""
+    """(sender, text) pairs from an MSG91 inbound webhook body. MSG91's formats
+    differ between its old webhook, its new one and Meta's own shape, so this
+    reads them all: JSON hidden in strings, Meta's entry/changes/messages,
+    button and quick-reply answers. Only messages clearly marked outgoing (our
+    own sends' delivery reports) are skipped."""
+    payload = _unpack(payload)
     items = payload if isinstance(payload, list) else [payload]
-    out = []
+    # Meta's shape: entry[].changes[].value.messages[]
+    expanded = []
     for item in items:
-        if isinstance(item, dict) and str(item.get("direction", "inbound")).lower() not in ("inbound", "incoming", "0", ""):
-            continue
-        sender = _find(item, ("customer_number", "customerNumber", "sender", "from", "mobile", "wa_id", "source"))
-        text = None
+        msgs = []
         if isinstance(item, dict):
-            content = item.get("content") or item.get("text") or item.get("message")
-            if isinstance(content, dict):
-                text = _find(content, ("text", "body", "message"))
-            elif isinstance(content, str):
-                text = content
-        text = text or _find(item, ("text", "body", "message", "content"))
+            for entry in item.get("entry") or []:
+                for change in (entry or {}).get("changes") or []:
+                    msgs.extend(((change or {}).get("value") or {}).get("messages") or [])
+            if isinstance(item.get("messages"), list):
+                msgs.extend(item["messages"])
+        expanded.extend(msgs or [item])
+    out = []
+    for item in expanded:
+        if isinstance(item, dict) and "out" in str(item.get("direction", "")).lower():
+            continue
+        sender = _find(item, SENDER_KEYS)
+        text = _find(item, TEXT_KEYS) if isinstance(item, dict) else None
         out.append((sender, text))
     return out

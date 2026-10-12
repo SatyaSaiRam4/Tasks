@@ -10,6 +10,9 @@ export interface ContactInfo {
   asked_at: string | null;
   /** Memo's WhatsApp number, digits only. */
   business_number: string;
+  /** The last message from this number that reached the server, if any. */
+  last_reply: string | null;
+  last_reply_at: string | null;
 }
 
 /** WhatsApp consent: a number gets reminders only once its owner has replied YES. */
