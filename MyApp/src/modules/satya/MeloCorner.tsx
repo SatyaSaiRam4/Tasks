@@ -20,11 +20,12 @@ type StageEvent = { type: 'stop'; kind?: 'tip' | 'shy'; x: number; y: number } |
 
 /**
  * Melo's corner, at the bottom of Home: Melo lives here. He arrives as a
- * golden ball that rolls in from one side and pops into Melo in the middle;
- * he looks around to see if anyone's watching, spots you ("!"), and dashes
- * to hide behind a little column that rises from the floor — only half
- * hidden, trembling and blushing, peeking out now and then — before coming
- * out shyly (tap him while he hides and he gives up). Then he walks, stops
+ * ball in his own robe red that rolls in from one side and flips open; he
+ * pops out and strolls off casually, turns his face to you mid-walk, goes
+ * bright red (steam puffing) and runs off the screen; then, Chopper-style,
+ * he leans back in from the edge with half of him showing to check whether
+ * you're still looking, twice (tap him then and he's found), and comes back
+ * to tell you his tip. Tapping him any time makes him blush bright red. He walks, stops
  * to wave and tell you your tip of the moment (a speech bubble above his
  * head), wanders, now and then strolls off one side and comes back from the
  * other (peeking in first), with a soft gold spotlight following him

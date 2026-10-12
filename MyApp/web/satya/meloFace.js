@@ -23,6 +23,27 @@ function blushTexture() {
   return t;
 }
 
+/** Anime blush lines: three short diagonal strokes, for when he's bright red. */
+function blushLinesTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 80;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(176, 18, 44, 1)';
+  g.lineWidth = 11;
+  g.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const x = 30 + i * 30;
+    g.beginPath();
+    g.moveTo(x + 10, 18);
+    g.lineTo(x - 8, 62);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** The centre of each eye (world space), from the eye mesh's vertices left and right of its middle. */
 function eyeCentres(eyes) {
   const pos = eyes.geometry.attributes.position;
@@ -85,27 +106,44 @@ export function addFace(model) {
   const span = centres.length > 1 ? centres[1].getCenter(new THREE.Vector3()).x - centres[0].getCenter(new THREE.Vector3()).x : 0.05;
   const rosy = new THREE.MeshBasicMaterial({ map: blushTexture(), transparent: true, depthWrite: false, opacity: 0.36, toneMapped: false });
   const cheeks = [];
+  const lines = new THREE.MeshBasicMaterial({ map: blushLinesTexture(), transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
+  const deep = new THREE.Color(0xff1030);
+  const soft = new THREE.Color(0xffffff);
   for (const b of centres) {
     const c = b.getCenter(new THREE.Vector3());
     const out = Math.sign(c.x - (centres[0].getCenter(new THREE.Vector3()).x + span / 2)) || 1;
     const cheek = new THREE.Mesh(new THREE.PlaneGeometry(span * 0.62, span * 0.4), rosy);
     if (stick(cheek, face, c.x + out * span * 0.22, b.min.y - span * 0.18, b.max.z, span * 0.03, face.parent)) {
       cheek.renderOrder = 2;
+      cheek.userData.base = cheek.scale.x;
+      // The blush lines sit on top of the cheek.
+      const stroke = new THREE.Mesh(new THREE.PlaneGeometry(span * 0.5, span * 0.32), lines);
+      stroke.position.z = span * 0.01;
+      stroke.renderOrder = 3;
+      cheek.add(stroke);
       cheeks.push(cheek);
     }
   }
 
   return {
-    /** blush: 0 a hint of rose, 1 bright pink. plead: 0 normal, 1 big shiny puppy eyes. */
+    /**
+     * blush: 0 a hint of rose, 1 bright pink, 2 bright red to the ears (bigger
+     * cheeks, deeper red, anime blush lines). plead: 0 normal, 1 big shiny puppy eyes.
+     */
     set({ blush = 0, plead = 0 } = {}) {
-      rosy.opacity = 0.36 + 0.56 * Math.max(0, Math.min(1, blush));
+      const b = Math.max(0, Math.min(2, blush));
+      const red = Math.max(0, b - 1);
+      rosy.opacity = Math.min(1, 0.36 + 0.56 * Math.min(1, b) + 0.1 * red);
+      rosy.color.copy(soft).lerp(deep, red);
+      lines.opacity = red;
+      cheeks.forEach(c => c.scale.set(c.userData.base * (1 + 0.9 * red), c.userData.base * (1 + 0.6 * red), 1));
       const grow = 1 + 0.9 * Math.max(0, Math.min(1, plead));
       sparkles.forEach(s => s.scale.setScalar(s.userData.base * grow));
     },
   };
 }
 
-/** Little things that float up from Melo: hearts, sparkles, a sleepy "z", a startled "!" or a puff of smoke. */
+/** Little things that float up from Melo: red hearts, sparkles, a sleepy "z" or a puff (steam, or the ball opening). */
 export function createFloaters(scene) {
   const draw = kind => {
     const c = document.createElement('canvas');
@@ -113,7 +151,7 @@ export function createFloaters(scene) {
     const g = c.getContext('2d');
     g.translate(32, 32);
     if (kind === 'heart') {
-      g.fillStyle = '#ff6f8f';
+      g.fillStyle = '#e8213c';
       g.beginPath();
       g.moveTo(0, 20);
       g.bezierCurveTo(-30, 0, -22, -26, 0, -10);
@@ -138,22 +176,6 @@ export function createFloaters(scene) {
       g.quadraticCurveTo(-3, 3, -28, 0);
       g.quadraticCurveTo(-3, -3, 0, -28);
       g.fill();
-    } else if (kind === 'bang') {
-      // A comic "!": a gold burst with a bold mark, for "someone's watching!"
-      g.fillStyle = '#fff4d6';
-      g.beginPath();
-      for (let i = 0; i < 16; i++) {
-        const r = i % 2 ? 18 : 30;
-        const a = (i / 16) * Math.PI * 2;
-        g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      g.closePath();
-      g.fill();
-      g.fillStyle = '#e0a12a';
-      g.font = '900 40px sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText('!', 0, 2);
     } else if (kind === 'puff') {
       // A soft round cloud, for the poof when the ball becomes Melo.
       const cloud = g.createRadialGradient(0, 0, 0, 0, 0, 30);
@@ -175,7 +197,7 @@ export function createFloaters(scene) {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   };
-  const textures = { heart: draw('heart'), sparkle: draw('sparkle'), z: draw('z'), bang: draw('bang'), puff: draw('puff') };
+  const textures = { heart: draw('heart'), sparkle: draw('sparkle'), z: draw('z'), puff: draw('puff') };
   const live = [];
   return {
     /** Sends one up from (x, y, z), `size` across. */
@@ -185,7 +207,7 @@ export function createFloaters(scene) {
       sprite.scale.setScalar(size * 0.3);
       sprite.renderOrder = 5;
       scene.add(sprite);
-      const life = kind === 'z' ? 2600 : kind === 'bang' ? 1300 : kind === 'puff' ? 900 : 1700;
+      const life = kind === 'z' ? 2600 : kind === 'puff' ? 900 : 1700;
       live.push({ sprite, born: null, size, drift: (Math.random() - 0.5) * size * (kind === 'puff' ? 3 : 1.2), life, x, y, kind });
     },
     update(time) {
@@ -201,14 +223,6 @@ export function createFloaters(scene) {
         }
         // Pops in, drifts up with a gentle sway, fades away.
         const pop = Math.min(1, p / 0.15);
-        if (f.kind === 'bang') {
-          // Pops in big with a wobble and stays put above his head.
-          const wob = 1 + 0.25 * Math.sin(Math.min(1, p / 0.35) * Math.PI * 3) * (1 - Math.min(1, p / 0.35));
-          f.sprite.scale.setScalar(f.size * pop * wob * 1.1);
-          f.sprite.position.y = f.y + Math.min(1, p / 0.2) * f.size * 0.4;
-          f.sprite.material.opacity = p < 0.8 ? 1 : 1 - (p - 0.8) / 0.2;
-          continue;
-        }
         if (f.kind === 'puff') {
           // Billows out and fades.
           f.sprite.scale.setScalar(f.size * (0.5 + 1.6 * p));
