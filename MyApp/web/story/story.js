@@ -21,6 +21,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { findRobe, robeName } from '../satya/meloName.js';
+import { createHatSpring, dressMelo } from '../satya/meloHat.js';
+import { addMouth } from '../satya/meloMouth.js';
 
 const params = new URLSearchParams(location.search);
 const reduced = params.get('motion') === 'reduced';
@@ -1325,6 +1327,9 @@ let part = 1;
 const showCalendar = on => (B.calendar.visible = on);
 
 // Melo, loaded from the app's own GLB and scaled to stand about 1.1 tall.
+/** Each Melo's hat spring, fed by how his group moves (see meloHat.js). */
+const hatSprings = [];
+
 (function loadMelo() {
   const get = url =>
     new Promise((resolve, reject) => {
@@ -1357,6 +1362,11 @@ const showCalendar = on => (B.calendar.visible = on);
           // No font, no name; Melo carries on.
         }
       }
+      // His straw hat, as on the guide page.
+      const hat = dressMelo(model);
+      if (hat) hat.name = 'meloHat';
+      // His smile (the story shows it closed; he talks in speech bubbles).
+      addMouth(model);
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
@@ -1371,6 +1381,11 @@ const showCalendar = on => (B.calendar.visible = on);
       });
       M.melo.add(model);
       F.melo.add(model.clone(true));
+      // The hat bobs and wobbles with each Melo as he drops in and celebrates.
+      for (const group of [M.melo, F.melo]) {
+        const pivot = group.getObjectByName('meloHat');
+        if (pivot) hatSprings.push({ group, update: createHatSpring(pivot) });
+      }
     });
   });
 })();
@@ -1936,6 +1951,16 @@ function frame(now) {
   const t = (now - startedAt) / 1000 / SLOW;
   const s = SCENES[current];
   PEOPLE.forEach((p, i) => rest(p, now / 1000 + i * 0.7));
+  if (!reduced) {
+    for (const { group, update } of hatSprings) {
+      update(now, {
+        roll: -THREE.MathUtils.radToDeg(group.rotation.z),
+        yaw: THREE.MathUtils.radToDeg(group.rotation.y),
+        lift: group.position.y * 60,
+        air: Math.min(1, Math.max(0, group.position.y * 4)),
+      });
+    }
+  }
   // Each panel's background sets the clear color; reset it, so the space
   // around the panels stays see-through.
   renderer.setClearColor(0x000000, 0);

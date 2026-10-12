@@ -10,10 +10,10 @@ jest.mock('../src/notifications', () => ({
 }));
 
 jest.mock('react-native-webview', () => {
-  const React = require('react');
+  const ReactLib = require('react');
   const { View } = require('react-native');
   return {
-    WebView: (props: any) => React.createElement(View, props, props.children),
+    WebView: (props: any) => ReactLib.createElement(View, props, props.children),
   };
 });
 

@@ -37,7 +37,7 @@ export function Gradient({ colors, direction = 'diagonal', opacity = [1, 1], sty
     setSize(prev => (prev.width === width && prev.height === height ? prev : { width, height }));
   };
   return (
-    <View style={[{ borderRadius, overflow: 'hidden' }, style]} onLayout={onLayout}>
+    <View style={[styles.clip, { borderRadius }, style]} onLayout={onLayout}>
       {size.width > 0 && size.height > 0 ? (
         <Svg
           key={`${size.width}x${size.height}`}
@@ -90,6 +90,9 @@ export function Sheen({ color, inset = '16%', style }: { color?: [string, string
 }
 
 const styles = StyleSheet.create({
+  clip: {
+    overflow: 'hidden',
+  },
   fill: {
     position: 'absolute',
     top: 0,

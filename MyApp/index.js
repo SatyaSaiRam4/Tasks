@@ -6,7 +6,7 @@
  * read from storage.
  */
 import React, { useEffect, useState } from 'react';
-import { AppRegistry, View } from 'react-native';
+import { AppRegistry, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { name as appName } from './app.json';
 import { applyAccent, applyTheme, colors } from './src/theme';
@@ -38,7 +38,13 @@ function Bootstrap() {
       });
   }, []);
 
-  return App ? <App /> : <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  return App ? <App /> : <View style={[styles.boot, { backgroundColor: colors.background }]} />;
 }
+
+const styles = StyleSheet.create({
+  boot: {
+    flex: 1,
+  },
+});
 
 AppRegistry.registerComponent(appName, () => Bootstrap);

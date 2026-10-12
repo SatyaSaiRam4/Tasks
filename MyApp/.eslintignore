@@ -1,2 +1,6 @@
-# Built or vendored files: the story bundle (from web/story) and model-viewer.
+# Built or vendored files: the 3D page bundles (built from web/), and native
+# build output (which holds copies of those bundles).
 assets/web/**/*.js
+android/**/build/
+ios/build/
+ios/Pods/

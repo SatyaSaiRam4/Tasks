@@ -39,7 +39,7 @@ export function AchievementBadge({ icon, earned = true, size = 52 }: { icon: str
     );
   }
   return (
-    <Gradient colors={gradients.gold} borderRadius={size / 2} style={{ width: size, height: size, padding: 1.5 }}>
+    <Gradient colors={gradients.gold} borderRadius={size / 2} style={[styles.badgeRing, { width: size, height: size }]}>
       <View style={[styles.badgeInner, { borderRadius: size / 2 }]}>
         <Icon name={achievementIcon(icon)} size={size * 0.4} color={brand.champagneLight} strokeWidth={1.6} />
       </View>
@@ -96,6 +96,9 @@ export function AchievementsScreen() {
 }
 
 const styles = StyleSheet.create({
+  badgeRing: {
+    padding: 1.5,
+  },
   flex: {
     flex: 1,
   },
