@@ -61,6 +61,12 @@ const STORY_PAGE = 'file:///android_asset/web/story/index.html';
 const CAPTION_SPACE = 150;
 const HINT_SPACE = 64;
 const LOAD_TIMEOUT_MS = 9000;
+/**
+ * The closing slide's "Let's begin" sits where people tap to move on, so it
+ * waits this long (fading in) before it accepts a tap: a "next" tap that
+ * lands on it must not close the story before the slide is even seen.
+ */
+const FINISH_GUARD_MS = 1200;
 type Mode = 'loading' | '3d' | 'flat';
 
 export function WelcomeStory({ onDone }: { onDone: () => void }) {
@@ -77,6 +83,20 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
   const fade = useRef(new Animated.Value(1)).current;
   const scene = SCENES[index];
   const last = step === order.length - 1;
+  // The scene on screen, for re-syncing the 3D page after a reload.
+  const shown = useRef({ index, more });
+  shown.current = { index, more };
+  // The closing slide's button: fades in, then becomes tappable.
+  const [canFinish, setCanFinish] = useState(false);
+  const finishIn = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    setCanFinish(false);
+    finishIn.setValue(0);
+    if (!last || mode === 'loading') return;
+    Animated.timing(finishIn, { toValue: 1, duration: reduced ? 0 : 500, delay: reduced ? 0 : FINISH_GUARD_MS - 500, useNativeDriver: true }).start();
+    const timer = setTimeout(() => setCanFinish(true), FINISH_GUARD_MS);
+    return () => clearTimeout(timer);
+  }, [last, more, mode, reduced, finishIn]);
 
   // Give the 3D stage a few seconds to start; otherwise play the flat story.
   useEffect(() => {
@@ -149,8 +169,12 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
           setSupportMultipleWindows={false}
           onShouldStartLoadWithRequest={req => req.url.startsWith('file:///android_asset/')}
           onMessage={e => {
-            if (e.nativeEvent.data === 'loaded') setMode(m => (m === 'loading' ? '3d' : m));
-            else setMode('flat');
+            if (e.nativeEvent.data === 'loaded') {
+              setMode(m => (m === 'loading' ? '3d' : m));
+              // If the page reloaded mid-story it starts at scene 0: put it back on ours.
+              const { index: i, more: m2 } = shown.current;
+              web.current?.injectJavaScript(`window.story && window.story.show(${i}, ${m2 ? 2 : 1}); true;`);
+            } else setMode('flat');
           }}
           onError={() => setMode('flat')}
           onRenderProcessGone={() => setMode('flat')}
@@ -215,7 +239,9 @@ export function WelcomeStory({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
         {last ? (
-          <Button label="Let’s begin" size="lg" onPress={onDone} />
+          <Animated.View style={{ opacity: finishIn }} pointerEvents={canFinish ? 'auto' : 'none'}>
+            <Button label="Let’s begin" size="lg" onPress={onDone} />
+          </Animated.View>
         ) : (
           <Text style={styles.hint}>{mode === 'loading' ? 'Getting the story ready…' : 'Tap to continue'}</Text>
         )}

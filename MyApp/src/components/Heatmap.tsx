@@ -64,7 +64,7 @@ export function Heatmap({
   return (
     <View accessibilityLabel={`Consistency calendar: ${success} successful days, ${failed} missed days`}>
       <View style={styles.row}>
-        <View style={{ marginRight: gap, marginTop: 18 }}>
+        <View style={[styles.weekdays, { marginRight: gap }]}>
           {WEEKDAYS.map((d, i) => (
             <Text key={i} style={[styles.weekday, { height: cell, marginBottom: gap, lineHeight: cell }]}>
               {d}
@@ -90,8 +90,8 @@ export function Heatmap({
                       height: cell,
                       marginBottom: gap,
                       borderRadius: cell * 0.32,
-                      backgroundColor: day ? cellColor(day.status) : 'transparent',
-                      opacity: day && day.status === 'FUTURE' ? 0.35 : 1,
+                      backgroundColor: fillFor(day),
+                      opacity: dimFor(day),
                     }}
                   />
                 ))}
@@ -151,7 +151,15 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
+/** A day's colour, or nothing for padding cells outside the range. */
+const fillFor = (day: HeatmapDay | null | undefined) => (day ? cellColor(day.status) : 'transparent');
+/** Days still to come are faint. */
+const dimFor = (day: HeatmapDay | null | undefined) => (day && day.status === 'FUTURE' ? 0.35 : 1);
+
 const styles = StyleSheet.create({
+  weekdays: {
+    marginTop: 18,
+  },
   flex: {
     flex: 1,
   },

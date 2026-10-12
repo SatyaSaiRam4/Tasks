@@ -15,7 +15,7 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
 }
 
 /** Labeled input with a champagne focus edge, inline error, optional icon and show/hide for secrets. */
-export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFieldProps>(function TextField(
+export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFieldProps>(function TextFieldImpl(
   { label, error, hint, icon, secureToggle, secureTextEntry, multiline, minHeight, onFocus, onBlur, ...rest },
   ref,
 ) {
@@ -23,6 +23,7 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
   const [hidden, setHidden] = useState(Boolean(secureTextEntry));
   // Inside a bottom sheet, typing moves the sheet up out of the keyboard's way.
   const sheet = useSheetInput();
+  const multilineHeight = minHeight ?? 120;
 
   return (
     <View style={styles.wrap}>
@@ -30,7 +31,7 @@ export const TextField = forwardRef<React.ComponentRef<typeof TextInput>, TextFi
       <View
         style={[
           styles.field,
-          multiline && { alignItems: 'flex-start', paddingVertical: spacing.md, minHeight: minHeight ?? 120 },
+          multiline && [styles.fieldMultiline, { minHeight: multilineHeight }],
           focused && styles.focused,
           Boolean(error) && styles.errored,
         ]}
@@ -101,6 +102,10 @@ export const fieldStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  fieldMultiline: {
+    alignItems: 'flex-start',
+    paddingVertical: spacing.md,
+  },
   wrap: {
     marginBottom: spacing.lg,
   },

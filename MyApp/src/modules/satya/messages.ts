@@ -28,3 +28,27 @@ export function greeting(d: Dashboard): string {
   const first = d.display_name.split(' ')[0] || d.display_name;
   return `${greetingFor(d.local_hour)}, ${first}`;
 }
+
+/** How Melo feels, from the user's day: it changes how he moves on Home. */
+export type MeloMood = 'calm' | 'happy' | 'worried' | 'sleepy';
+
+export function meloMood(d: Dashboard): MeloMood {
+  const { streak, local_hour: hour } = d;
+  if (streak.today.secured) return 'happy';
+  if (hour >= 23 || hour < 6) return 'sleepy';
+  if (streak.at_risk) return 'worried';
+  return 'calm';
+}
+
+/** What Melo says when he's tapped: bashful, and secretly delighted. Cycles in order. */
+const SHY_LINES = [
+  'H-hey! Tapping me won’t make me happy, you know! ♪',
+  'S-stop it… I’m not blushing!',
+  'Hehe… okay, one more.',
+  'You’re making my hat fall off!',
+  'I like you too. Now go finish a task!',
+];
+
+export function shyLine(taps: number): string {
+  return SHY_LINES[taps % SHY_LINES.length];
+}

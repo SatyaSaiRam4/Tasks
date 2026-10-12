@@ -129,6 +129,8 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
     outputRange: [isTablet ? 40 : placement === 'top' ? -460 : 460, 0],
   });
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [isTablet ? 0.96 : 1, 1] });
+  // Tablets fade the dialog in; phones slide the sheet up at full opacity.
+  const sheetOpacity = isTablet ? progress : 1;
   const content = (
     <SheetInputContext.Provider value={inputApi}>
     <View style={[styles.flex, isTablet && styles.center]}>
@@ -148,7 +150,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, dismissable
               : atTop
                 ? [styles.sheetTop, { top: insets.top + spacing.sm, paddingBottom: spacing.lg }]
                 : { paddingBottom: insets.bottom + spacing.xl },
-            { opacity: isTablet ? progress : 1, transform: [{ translateY }, { scale }] },
+            { opacity: sheetOpacity, transform: [{ translateY }, { scale }] },
           ]}
           accessibilityViewIsModal
         >

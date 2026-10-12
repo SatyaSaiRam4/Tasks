@@ -24,6 +24,9 @@ import { useListTracksQuery } from '../../routines/routinesApi';
 import { categoryColor } from '../../routines/components';
 import { BadgeStrip, useBadges } from '../../streaks/Tiers';
 import { hasQueuedForHome, subscribeHomeQueue, takeQueuedForHome } from '../../streaks/homeQueue';
+import { MeloCorner } from '../../satya/MeloCorner';
+import { meloMood, satyaMessage } from '../../satya/messages';
+import { useAppSelector } from '../../../app/hooks';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -35,7 +38,7 @@ const SEEN_COMPLETIONS_KEY = '@rememberly/seen_track_completions';
 /**
  * Home, as simple as it gets: the streak in the middle, then two cards —
  * the user's plans (tap one to open it) and the next reminder. Each card's
- * arrow opens its full tab.
+ * arrow opens its full tab. Melo lives in his corner at the bottom.
  */
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
@@ -44,6 +47,7 @@ export function DashboardScreen() {
   const tracks = useListTracksQuery();
   const { celebrate } = useCelebration();
   const best = data?.streak.best_streak;
+  const meloOnHome = useAppSelector(s => s.preferences.satyaEnabled);
 
   // A new badge is revealed here, the first time Home is on screen after it
   // was earned: the locked badge comes to life in the streak card, then its
@@ -193,6 +197,13 @@ export function DashboardScreen() {
           </Pressable>
         </HomeCard>
       </FadeIn>
+
+      {/* Melo's corner: he lives at the bottom of Home (off in Settings → Melo on Home). */}
+      {meloOnHome ? (
+        <FadeIn index={3}>
+          <MeloCorner tip={satyaMessage(data)} mood={meloMood(data)} />
+        </FadeIn>
+      ) : null}
     </Screen>
   );
 }

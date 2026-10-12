@@ -91,21 +91,26 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
           const tx = burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(p.angle) * p.dist] });
           const ty = burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(p.angle) * p.dist + 60] });
           const opacity = burst.interpolate({ inputRange: [0, 0.1, 0.8, 1], outputRange: [0, 1, 1, 0] });
+          // Stars are little diamonds; the rest are round.
+          const corner = p.star ? 1 : p.size / 2;
+          const turn = p.star ? '45deg' : '0deg';
           return (
             <Animated.View
               key={i}
               pointerEvents="none"
-              style={{
-                position: 'absolute',
-                left: W / 2,
-                top: H / 2 - 120,
-                width: p.size,
-                height: p.size,
-                borderRadius: p.star ? 1 : p.size / 2,
-                backgroundColor: p.color,
-                opacity,
-                transform: [{ translateX: tx }, { translateY: ty }, { rotate: p.star ? '45deg' : '0deg' }],
-              }}
+              style={[
+                styles.particle,
+                {
+                  left: W / 2,
+                  top: H / 2 - 120,
+                  width: p.size,
+                  height: p.size,
+                  borderRadius: corner,
+                  backgroundColor: p.color,
+                  opacity,
+                  transform: [{ translateX: tx }, { translateY: ty }, { rotate: turn }],
+                },
+              ]}
             />
           );
         })}
@@ -154,6 +159,9 @@ function CelebrationOverlay({ spec, onDone }: { spec: CelebrationSpec; onDone: (
 }
 
 const styles = StyleSheet.create({
+  particle: {
+    position: 'absolute',
+  },
   backdrop: {
     flex: 1,
     backgroundColor: colors.scrim,
