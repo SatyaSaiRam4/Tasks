@@ -19,7 +19,8 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
   const [ask, asking] = useAskWhatsappPermissionMutation();
   const query = useWhatsappStatusQuery(phone);
   const info = query.data?.phone === phone ? query.data : null;
-  const status: ContactStatus = info?.status ?? 'NONE';
+  // Waiting but never actually asked (left over from an older version): ask again.
+  const status: ContactStatus = info?.status === 'PENDING' && !info.asked_at ? 'NONE' : info?.status ?? 'NONE';
   // While waiting for the reply, look every few seconds.
   const { refetch } = query;
   useEffect(() => {
@@ -36,7 +37,8 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
 
   const askNow = async () => {
     try {
-      await ask(phone).unwrap();
+      const res = await ask(phone).unwrap();
+      if (res.status === 'PENDING') Toast.success('Sent. Ask them to reply YES on WhatsApp.', 1.6);
       refetch();
     } catch (err) {
       Toast.fail(getErrorMessage(err, 'Could not send the WhatsApp message.'), 2);
@@ -60,6 +62,7 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
         </View>
         <Text style={styles.hint}>Memo sent this number one message: “Reply YES to allow, or STOP”. You can save now; reminders go out once they reply YES.</Text>
         <Diagnosis info={info} />
+        <AskAgain askedAt={info?.asked_at ?? null} onPress={askNow} loading={asking.isLoading} />
       </View>
     );
   }
@@ -105,6 +108,18 @@ function Diagnosis({ info }: { info: { asked_at: string | null; last_reply: stri
       No reply has reached Memo from this number yet. If they've already replied YES, Memo's WhatsApp isn't passing replies on to the app; the admin needs to check the MSG91 incoming-message webhook.
     </Text>
   );
+}
+
+/** "Send the message again", available 15 minutes after the last one. */
+function AskAgain({ askedAt, onPress, loading }: { askedAt: string | null; onPress: () => void; loading: boolean }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const wait = askedAt ? Math.ceil((new Date(askedAt).getTime() + 15 * 60_000 - now) / 60_000) : 0;
+  if (wait > 0) return <Text style={styles.hint}>Didn't get it? You can send it again in {wait} min.</Text>;
+  return <Button label="Send the message again" icon="refresh" variant="ghost" size="sm" onPress={onPress} loading={loading} style={styles.mtSm} />;
 }
 
 function Note({ icon, tone, text }: { icon: IconName; tone: string; text: string }) {
