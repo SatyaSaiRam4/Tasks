@@ -35,6 +35,8 @@ class StatusOut(BaseModel):
     status: str  # NONE, PENDING (asked, inside the 1-minute window), EXPIRED, VERIFIED or STOPPED
     asked_at: datetime | None = None
     expires_at: datetime | None = None
+    refusals_today: int = 0
+    try_again_at: datetime | None = None
     business_number: str = ""
     last_reply: str | None = None
     last_reply_at: datetime | None = None
@@ -44,7 +46,7 @@ class StatusOut(BaseModel):
 def verify(payload: VerifyIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Sends the number the "reply YES to allow Memo reminders" message (3 times a day at most)."""
     rate_limit.hit(f"wa-verify:{current_user.id}", limit=10, window_seconds=3600)
-    rate_limit.hit(f"wa-verify-phone:{payload.phone}", limit=3, window_seconds=24 * 3600)
+    rate_limit.hit(f"wa-verify-phone:{payload.phone}", limit=6, window_seconds=24 * 3600)
     return service.ask_permission(db, current_user, payload.phone)
 
 

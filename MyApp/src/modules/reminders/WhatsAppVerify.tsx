@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { colors, font, radius, spacing, withAlpha } from '../../theme';
 import { Button } from '../../components/Button';
@@ -12,12 +12,13 @@ import { useAskWhatsappPermissionMutation, useWhatsappStatusQuery, type ContactS
  * reminders to a number whose owner tapped 👍 (or replied YES) on one short
  * message within 1 minute, so nobody can use Memo to message someone else's
  * number. Nothing secret is shown here. A live countdown runs while they
- * decide; after it, "Send again". After 👎 / STOP, only the owner can allow
- * reminders again, by sending YES to Memo themselves.
+ * decide; after it, "Send again". After 👎 / STOP, "Verify again" asks once
+ * more; after 3 refusals in a day it says to try again tomorrow.
  */
 export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (status: ContactStatus) => void }) {
   const [ask, asking] = useAskWhatsappPermissionMutation();
-  const query = useWhatsappStatusQuery(phone);
+  // Always fresh from the server when the editor opens (never an old answer).
+  const query = useWhatsappStatusQuery(phone, { refetchOnMountOrArgChange: true, refetchOnFocus: true });
   const info = query.data?.phone === phone ? query.data : null;
   // Waiting but never actually asked (left over from an older version): ask again.
   const status: ContactStatus = info?.status === 'PENDING' && !info.asked_at ? 'NONE' : info?.status ?? 'NONE';
@@ -25,8 +26,10 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
   // While they have the minute to answer, check every 2 seconds so the screen
   // changes as soon as they tap.
   useEffect(() => {
-    if (status !== 'PENDING') return;
-    const id = setInterval(() => refetch(), 2000);
+    if (status === 'VERIFIED') return;
+    // Fast while they have the minute to answer; slower otherwise, so a 👍 sent
+    // later still shows up without reopening the reminder.
+    const id = setInterval(() => refetch(), status === 'PENDING' ? 2000 : 5000);
     return () => clearInterval(id);
   }, [status, refetch]);
   // The countdown.
@@ -59,12 +62,6 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
     }
   };
 
-  // After STOP: only the owner can turn it back on, by sending YES to Memo.
-  const yesLink = info?.business_number ? `https://wa.me/${info.business_number}?text=YES` : null;
-  const shareYes = () =>
-    yesLink &&
-    Share.share({ message: `If you'd like reminders from me through the Memo app on WhatsApp, send YES to Memo here: ${yesLink}` }).catch(() => undefined);
-
   if (status === 'VERIFIED') return <Note icon="check-circle" tone={colors.success} text="Allowed · this number tapped 👍 for Memo" />;
 
   if (status === 'PENDING') {
@@ -82,16 +79,24 @@ export function WhatsAppVerify({ phone, onStatus }: { phone: string; onStatus: (
   }
 
   if (status === 'STOPPED') {
+    const blockedUntil = info?.try_again_at ? new Date(info.try_again_at) : null;
+    if (blockedUntil && blockedUntil.getTime() > Date.now()) {
+      return (
+        <View>
+          <Note icon="alert" tone={colors.danger} text="This number refused 3 times today. Try again tomorrow." />
+          <Text style={styles.hint}>
+            Memo won't message it before {blockedUntil.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}.
+          </Text>
+        </View>
+      );
+    }
     return (
       <View>
-        <Note icon="x" tone={colors.danger} text="This number refused (👎 / STOP). Memo won't message it." />
-        <Text style={styles.hint}>Only its owner can allow reminders again, by sending YES to Memo on WhatsApp.</Text>
-        {yesLink ? (
-          <View style={styles.buttons}>
-            <Button label="It's my number · Send YES" icon="message" variant="secondary" size="sm" onPress={() => Linking.openURL(yesLink).catch(() => undefined)} />
-            <Button label="Ask them" icon="users" variant="ghost" size="sm" onPress={shareYes} />
-          </View>
-        ) : null}
+        <Note icon="x" tone={colors.danger} text="This number refused (👎). Memo won't message it." />
+        <Text style={styles.hint}>
+          Ask again if it was a mistake: they get the 👍 / 👎 message once more.{info?.refusals_today ? ` Refused ${info.refusals_today} of 3 times today.` : ''}
+        </Text>
+        <Button label="Verify again" icon="message" variant="secondary" onPress={askNow} loading={asking.isLoading} style={styles.mtSm} />
       </View>
     );
   }
@@ -173,12 +178,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.textSecondary,
     marginTop: spacing.xs,
-  },
-  buttons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   mtSm: {
     marginTop: spacing.sm,
