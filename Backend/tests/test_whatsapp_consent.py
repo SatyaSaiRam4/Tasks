@@ -85,15 +85,21 @@ def test_inbound_reads_every_msg91_shape():
     assert wa.classify("STOP") == "STOP" and wa.classify("who is this") is None
 
 
-def test_a_yes_after_the_one_minute_window_does_not_count(client, auth, monkeypatch, clock):
+def test_a_late_thumbs_up_counts_for_10_minutes_then_not(client, auth, monkeypatch, clock):
     monkeypatch.setattr(wa, "is_configured", lambda: True)
     monkeypatch.setattr(wa, "send_whatsapp_reminder", lambda phone, variables: True)
     monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
     monkeypatch.setattr(wa, "utc_now", clock)
     client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
     clock.advance(seconds=90)
+    # The app's 1-minute countdown is over, but a 👍 MSG91 delivers late still counts.
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "EXPIRED"
-    assert _inbound(client, "919876543210", "👍") == ["ignored: answered after the 1-minute window"]
+    assert _inbound(client, "919876543210", "👍") == ["verified"]
+    # Much later (another ask, then 11 minutes): no longer.
+    client.post(f"{API}/whatsapp/inbound?token=s3cret", json={"customerNumber": "919876543210", "text": "STOP"})
+    client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
+    clock.advance(minutes=11)
+    assert _inbound(client, "919876543210", "👍") == ["ignored: answered more than 10 minutes after the ask"]
     # Asking again opens a new window; a 👎 refuses (STOP).
     assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
     assert _inbound(client, "919876543210", "👎") == ["stopped"]
@@ -115,3 +121,15 @@ def test_three_refusals_in_a_day_block_asking_until_tomorrow(client, auth, monke
     # The next day it can be asked again.
     clock.advance(hours=25)
     assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
+
+
+def test_every_webhook_call_is_kept_in_the_inbound_log(client, monkeypatch, db):
+    from sqlalchemy import text
+
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    client.post(f"{API}/whatsapp/inbound?token=wrong", json={"customerNumber": "919876543210", "text": "YES"})
+    client.post(f"{API}/whatsapp/inbound?token=s3cret", json={"customerNumber": "919876543210", "text": "hello"})
+    rows = db.execute(text("SELECT token_ok, summary, payload FROM whatsapp_inbound_log ORDER BY received_at")).all()
+    assert [r.token_ok for r in rows] == [False, True]
+    assert "wrong token" in rows[0].summary and "not YES or STOP" in rows[1].summary
+    assert "9876543210" not in rows[1].payload and "3210" in rows[1].payload  # numbers masked
