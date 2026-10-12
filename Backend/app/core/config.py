@@ -112,6 +112,8 @@ REDIS_URL = os.getenv("REDIS_URL", "")  # e.g. redis://default:password@host:por
 # ---------------------------------------------------------------------------
 MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY", "").strip()
 MSG91_WHATSAPP_INTEGRATED_NUMBER = os.getenv("MSG91_WHATSAPP_INTEGRATED_NUMBER", "").strip()
+# Shared secret in the URL MSG91 forwards incoming WhatsApp messages to (number verification and STOP).
+MSG91_INBOUND_SECRET = os.getenv("MSG91_INBOUND_SECRET", "").strip()
 MSG91_WHATSAPP_TEMPLATE_NAME = os.getenv("MSG91_WHATSAPP_TEMPLATE_NAME", "").strip()
 MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
 # Which approved template the reminder uses (see PROJECT.md, "Messages"):

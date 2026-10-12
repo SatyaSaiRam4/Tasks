@@ -207,7 +207,10 @@ def test_wrong_current_password_is_forbidden_not_unauthenticated(client, auth):
 # ---- Reminders ----------------------------------------------------------------
 
 
-def test_reminder_snooze_and_complete(client, auth, clock):
+def test_reminder_snooze_and_complete(client, auth, clock, db):
+    # WhatsApp reminders need a number its owner has verified.
+    db.execute(text("INSERT INTO whatsapp_contacts (phone, status, created_at, updated_at) VALUES ('+919876543210', 'VERIFIED', now(), now())"))
+    db.commit()
     at = (clock.now + timedelta(hours=1)).isoformat()
     r = client.post(f"{API}/reminders", json={"title": "Call John", "remind_at": at, "whatsapp_number": "+919876543210", "priority": "HIGH"}, headers=auth).json()
     assert r["priority"] == "HIGH" and r["whatsapp_status"] == "PENDING"
