@@ -169,8 +169,8 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   reminders from the Memo app on this WhatsApp. Reply YES to allow them, or
   STOP to never get them." No codes are shown or sent. The reminder can be
   saved while waiting; WhatsApp messages go out only once the owner replies
-  **YES**, and the app shows it within seconds. A number is asked at most
-  once a day. **STOP** (or UNSUBSCRIBE, CANCEL, END, QUIT, NO) stops all
+  **YES**, and the app shows it within seconds. A number can be asked again
+  after 15 minutes (*Send the message again*), at most 3 times a day. **STOP** (or UNSUBSCRIBE, CANCEL, END, QUIT, NO) stops all
   reminders to it, and nobody can ask it again; only its owner can turn them
   back on, by sending YES to Memo's WhatsApp themselves (see
   [7.4](#74-whatsapp-number-permission)).
@@ -500,6 +500,7 @@ Main tables (PostgreSQL):
 | `e6c2d9a4f8b3` | Google sign-in (`users.google_sub`) |
 | `e5b2c8d14a71` | WhatsApp number consent (`whatsapp_contacts`) |
 | `f7a3d9b2c6e4` | Consent by YES reply: drops the code column, `asked_at` |
+| `a8d4e1f6b2c9` | Clears stale "asked" times left from the code version (those numbers looked asked but never got the message) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -610,7 +611,7 @@ which is what WhatsApp expects). Code: `Backend/app/modules/whatsapp/`,
 `MyApp/src/modules/reminders/WhatsAppVerify.tsx`.
 
 1. The app calls `POST /whatsapp/verify` with the number. If it's new (and
-   wasn't asked in the last 24 hours), the server sends it the permission
+   wasn't asked in the last 15 minutes; 3 times a day at most), the server sends it the permission
    message (`consent_variables` in `app/integrations/messages.py`) and marks
    it `PENDING`. Verified or stopped numbers aren't messaged.
 2. MSG91 forwards replies to

@@ -32,7 +32,7 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     # Saved while waiting, but nothing goes out until they reply YES.
     assert _reminder(client, auth).status_code == 201
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
-    # Asking again the same day doesn't message them again.
+    # Asking again within a few minutes doesn't message them again.
     client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
     assert len(sent) == 1
 

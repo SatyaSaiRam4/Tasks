@@ -41,8 +41,9 @@ class StatusOut(BaseModel):
 
 @router.post("/verify", response_model=StatusOut)
 def verify(payload: VerifyIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Sends the number one "reply YES to allow Memo reminders" message (at most once a day)."""
-    rate_limit.hit(f"wa-verify:{current_user.id}", limit=5, window_seconds=3600)
+    """Sends the number the "reply YES to allow Memo reminders" message (3 times a day at most)."""
+    rate_limit.hit(f"wa-verify:{current_user.id}", limit=10, window_seconds=3600)
+    rate_limit.hit(f"wa-verify-phone:{payload.phone}", limit=3, window_seconds=24 * 3600)
     return service.ask_permission(db, current_user, payload.phone)
 
 

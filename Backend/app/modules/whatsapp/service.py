@@ -11,7 +11,8 @@ them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
   messages it again, and nobody can ask it again. Only its owner can turn
   reminders back on, by sending YES to Memo themselves.
 
-A number can be asked at most once a day, so it can't be used to pester anyone.
+A number can be asked again only after 15 minutes and at most 3 times a day,
+so it can't be used to pester anyone.
 """
 
 import json
@@ -30,7 +31,8 @@ from app.modules.auth.models import User
 
 from .models import ContactStatus, WhatsAppContact
 
-ASK_AGAIN_AFTER = timedelta(hours=24)
+# A number can be asked again after this (and at most 3 times a day: see the router).
+ASK_AGAIN_AFTER = timedelta(minutes=15)
 STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
 YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "YES!", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE", "SURE"}
 YES_EMOJI = ("👍", "✅", "👌")
@@ -83,14 +85,14 @@ def describe(db: Session, phone: str) -> dict:
 
 
 def ask_permission(db: Session, user: User, phone: str) -> dict:
-    """Sends the number one "reply YES to allow" message (at most once a day)."""
+    """Sends the number the "reply YES to allow" message (again only after 15 minutes)."""
     contact = db.get(WhatsAppContact, phone)
     if contact and contact.status in (ContactStatus.VERIFIED, ContactStatus.STOPPED):
         # Verified: nothing to do. Stopped: only the owner can turn it back on.
         return describe(db, phone)
     now = utc_now()
     if contact and contact.asked_at and now - contact.asked_at < ASK_AGAIN_AFTER:
-        return describe(db, phone)  # already asked today: just keep waiting for the reply
+        return describe(db, phone)  # asked a few minutes ago: just keep waiting for the reply
     if not is_configured():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "WhatsApp isn't set up on the server yet.")
     if not send_whatsapp_reminder(phone, consent_variables(MSG91_WHATSAPP_TEMPLATE_STYLE, user.display_name)):
