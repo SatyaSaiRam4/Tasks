@@ -7,9 +7,9 @@ them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
 
 - YES (or START / OK / ALLOW / HAAN) marks the number VERIFIED. A YES the
   owner sends on their own (for example after STOP) counts too: it's theirs.
-- STOP (or UNSUBSCRIBE / CANCEL / END / QUIT) marks it STOPPED: Memo never
-  messages it again, and nobody can ask it again. Only its owner can turn
-  reminders back on, by sending YES to Memo themselves.
+- 👎 / STOP (or UNSUBSCRIBE / CANCEL / END / QUIT / NO) marks it STOPPED: no
+  reminders go there. It can be asked again ("Verify again"), but after 3
+  refusals within a day only once that day is over.
 
 The owner has 1 minute to answer (👍/YES); after that the request expires
 and can be sent again, at most 3 times a day, so nobody can be pestered.
@@ -35,6 +35,9 @@ from .models import ContactStatus, WhatsAppContact
 # that the request expires and the user asks again (3 times a day at most:
 # see the router). STOP always works.
 ANSWER_WINDOW = timedelta(minutes=1)
+# After this many refusals within a day, the number can't be asked again until the day is over.
+MAX_REFUSALS = 3
+REFUSAL_PERIOD = timedelta(hours=24)
 STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
 YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "YES!", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE", "SURE"}
 YES_EMOJI = ("👍", "✅", "👌")
@@ -82,6 +85,19 @@ def _expired(contact: WhatsAppContact | None) -> bool:
     )
 
 
+def _refusals_now(contact: WhatsAppContact | None) -> int:
+    if not contact or not contact.refusals_since or utc_now() - contact.refusals_since > REFUSAL_PERIOD:
+        return 0
+    return contact.refusals
+
+
+def try_again_at(contact: WhatsAppContact | None):
+    """When a number that refused 3 times today can be asked again (None if it can be now)."""
+    if _refusals_now(contact) >= MAX_REFUSALS:
+        return contact.refusals_since + REFUSAL_PERIOD
+    return None
+
+
 def describe(db: Session, phone: str) -> dict:
     contact = db.get(WhatsAppContact, phone)
     reply = last_reply.get(phone)
@@ -91,6 +107,8 @@ def describe(db: Session, phone: str) -> dict:
         # NONE, PENDING (asked, inside the answer window), EXPIRED (no answer in time), VERIFIED or STOPPED
         "status": status_,
         "expires_at": contact.asked_at + ANSWER_WINDOW if contact and contact.asked_at and status_ == "PENDING" else None,
+        "refusals_today": _refusals_now(contact),
+        "try_again_at": try_again_at(contact),
         "asked_at": contact.asked_at if contact else None,
         "business_number": business_number(),
         # The last message that reached the server from this number (since the server started), if any.
@@ -102,9 +120,10 @@ def describe(db: Session, phone: str) -> dict:
 def ask_permission(db: Session, user: User, phone: str) -> dict:
     """Sends the number the "tap 👍 to allow" message (again once the 1-minute window has passed)."""
     contact = db.get(WhatsAppContact, phone)
-    if contact and contact.status in (ContactStatus.VERIFIED, ContactStatus.STOPPED):
-        # Verified: nothing to do. Stopped: only the owner can turn it back on.
+    if contact and contact.status == ContactStatus.VERIFIED:
         return describe(db, phone)
+    if try_again_at(contact):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "This number refused 3 times today. Try again tomorrow.")
     now = utc_now()
     if contact and not _expired(contact) and contact.status == ContactStatus.PENDING:
         return describe(db, phone)  # still inside the answer window: keep waiting
@@ -166,6 +185,11 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
         contact.stopped_at = None
     else:
         contact.stopped_at = utc_now()
+        # Count the refusal (a new 24-hour stretch starts after the last one ended).
+        if not contact.refusals_since or utc_now() - contact.refusals_since > REFUSAL_PERIOD:
+            contact.refusals = 0
+            contact.refusals_since = utc_now()
+        contact.refusals += 1
     db.commit()
     return "verified" if status_ == ContactStatus.VERIFIED else "stopped"
 

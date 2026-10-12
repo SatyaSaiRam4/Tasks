@@ -13,6 +13,9 @@ export interface ContactInfo {
   asked_at: string | null;
   /** When the 1-minute answer window closes (while PENDING). */
   expires_at: string | null;
+  /** Refusals (👎 / STOP) today; after 3 it can be asked again only at `try_again_at`. */
+  refusals_today: number;
+  try_again_at: string | null;
   /** Memo's WhatsApp number, digits only. */
   business_number: string;
   /** The last message from this number that reached the server, if any. */

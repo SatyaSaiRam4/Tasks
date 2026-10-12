@@ -173,9 +173,11 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   after the minute doesn't count: *Send again* (3 times a day at most). The
   reminder can be saved while waiting; WhatsApp messages go out only to
   numbers that tapped 👍. 👎 / STOP (or UNSUBSCRIBE, CANCEL, END, QUIT, NO)
-  stops all reminders to it, and nobody can ask it again; only its owner can
-  turn them back on, by sending YES to Memo's WhatsApp themselves (see
-  [7.4](#74-whatsapp-number-permission)).
+  stops all reminders to it. The editor then shows **Verify again**, which
+  sends the 👍 / 👎 message once more; after **3 refusals within a day** it
+  says *This number refused 3 times today. Try again tomorrow.* (see
+  [7.4](#74-whatsapp-number-permission)). The status always comes fresh from
+  the server and keeps refreshing, so a later 👍 shows without reopening.
 
 ### 2.6 Private Vault
 
@@ -503,6 +505,7 @@ Main tables (PostgreSQL):
 | `e5b2c8d14a71` | WhatsApp number consent (`whatsapp_contacts`) |
 | `f7a3d9b2c6e4` | Consent by YES reply: drops the code column, `asked_at` |
 | `a8d4e1f6b2c9` | Clears stale "asked" times left from the code version (those numbers looked asked but never got the message) |
+| `b3f6c2a9d8e1` | WhatsApp refusals count (3 a day, then try tomorrow) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -619,8 +622,10 @@ for consent). Code: `Backend/app/modules/whatsapp/`,
 2. MSG91 forwards the reply or button tap to `POST /api/v1/whatsapp/inbound`.
    👍 / YES (also Y, OK, ALLOW, START, HAAN) within the minute marks it
    `VERIFIED`; 👎 / STOP (also NO, UNSUBSCRIBE, CANCEL, END, QUIT) marks it
-   `STOPPED` at any time. A YES the owner sends on their own turns a stopped
-   number back on.
+   `STOPPED` at any time and counts a refusal (`refusals`, `refusals_since`).
+   A stopped number can be asked again; after 3 refusals in 24 hours
+   `POST /whatsapp/verify` answers 429 until `try_again_at`. A YES the owner
+   sends on their own also turns a stopped number back on.
 3. `GET /whatsapp/status?phone=…` reports `NONE`, `PENDING` (with
    `expires_at`), `EXPIRED`, `VERIFIED` or `STOPPED`; the app polls it every
    2 seconds while `PENDING`.

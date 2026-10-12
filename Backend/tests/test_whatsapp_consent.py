@@ -47,14 +47,12 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "VERIFIED"
     assert _reminder(client, auth).status_code == 201
 
-    # STOP ends it, and nobody can ask that number again.
+    # STOP ends it; it can be asked again ("Verify again"), and a 👍 allows it again.
     assert _inbound(client, "919876543210", "STOP") == ["stopped"]
     assert _reminder(client, auth).status_code == 409
     again = client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()
-    assert again["status"] == "STOPPED" and len(sent) == 1
-
-    # Only the owner can turn it back on, by sending YES themselves.
-    assert _inbound(client, "+91 98765 43210", "yes") == ["verified"]
+    assert again["status"] == "PENDING" and len(sent) == 2
+    assert _inbound(client, "+91 98765 43210", "👍") == ["verified"]
     assert _reminder(client, auth).status_code == 201
 
 
@@ -99,3 +97,21 @@ def test_a_yes_after_the_one_minute_window_does_not_count(client, auth, monkeypa
     # Asking again opens a new window; a 👎 refuses (STOP).
     assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
     assert _inbound(client, "919876543210", "👎") == ["stopped"]
+
+
+def test_three_refusals_in_a_day_block_asking_until_tomorrow(client, auth, monkeypatch, clock):
+    monkeypatch.setattr(wa, "is_configured", lambda: True)
+    monkeypatch.setattr(wa, "send_whatsapp_reminder", lambda phone, variables: True)
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    monkeypatch.setattr(wa, "utc_now", clock)
+    for n in range(1, 4):
+        assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
+        assert _inbound(client, "919876543210", "👎") == ["stopped"]
+        state = client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()
+        assert state["status"] == "STOPPED" and state["refusals_today"] == n
+    assert state["try_again_at"] is not None
+    blocked = client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
+    assert blocked.status_code == 429 and "tomorrow" in blocked.json()["error"]["message"]
+    # The next day it can be asked again.
+    clock.advance(hours=25)
+    assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
