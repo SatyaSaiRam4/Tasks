@@ -28,20 +28,22 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     # Asking sends one permission message (no code), through the template.
     asked = client.post(f"{API}/whatsapp/verify", json={"phone": "91 98765 43210"}, headers=auth).json()
     assert asked["phone"] == PHONE and asked["status"] == "PENDING"
-    assert len(sent) == 1 and sent[0][0] == PHONE and "Reply YES" in sent[0][1][0]
+    assert len(sent) == 1 and sent[0][0] == PHONE and "tap 👍 to allow" in sent[0][1][0]
     # Saved while waiting, but nothing goes out until they reply YES.
     assert _reminder(client, auth).status_code == 201
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
-    # Asking again within a few minutes doesn't message them again.
+    # Asking again inside the 1-minute window doesn't message them again.
     client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
     assert len(sent) == 1
 
-    # The webhook needs the secret; other replies change nothing.
-    assert client.post(f"{API}/whatsapp/inbound?token=nope", json={}).status_code == 404
+    # The webhook needs the secret (but never answers 4XX: MSG91 would pause it); other replies change nothing.
+    refused = client.post(f"{API}/whatsapp/inbound?token=nope", json={})
+    assert refused.status_code == 200 and refused.json() == {"ok": False}
     assert _inbound(client, "919876543210", "who is this?") == ["ignored: not YES or STOP"]
 
-    # The owner replies YES: verified.
-    assert _inbound(client, "919876543210", "Yes!") == ["verified"]
+    # The owner taps 👍 (MSG91 sends the button as JSON in a string): verified.
+    tapped = client.post(f"{API}/whatsapp/inbound", headers={"x-memo-token": "s3cret"}, json={"customerNumber": "919876543210", "text": "", "button": '{"payload":"👍","text":"👍"}', "direction": "0"}).json()
+    assert tapped["results"] == ["verified"]
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "VERIFIED"
     assert _reminder(client, auth).status_code == 201
 
@@ -70,6 +72,9 @@ def test_inbound_reads_every_msg91_shape():
         # A quick-reply button, and a thumbs up.
         {"customer_number": "919876543210", "content": {"button": {"text": "Yes", "payload": "Yes"}}},
         {"customer_number": "919876543210", "content": {"text": "👍"}},
+        # MSG91 Webhook (New), trimmed payload: a reaction (long-press 👍) and a button tap, empty text.
+        {"uuid": "u1", "customerNumber": "919876543210", "contentType": "reaction", "text": "", "button": "", "reaction": '{"emoji":"👍","message_id":"wamid.x"}'},
+        {"uuid": "u2", "customerNumber": "919876543210", "contentType": "button", "text": "", "button": '{"payload":"👍","text":"👍"}', "interactive": ""},
     ]
     for shape in shapes:
         messages = wa.messages_from(shape)
@@ -80,3 +85,17 @@ def test_inbound_reads_every_msg91_shape():
     # Our own outgoing delivery reports are skipped.
     assert wa.messages_from({"customer_number": "919876543210", "direction": "outbound", "content": {"text": "Reply YES"}}) == []
     assert wa.classify("STOP") == "STOP" and wa.classify("who is this") is None
+
+
+def test_a_yes_after_the_one_minute_window_does_not_count(client, auth, monkeypatch, clock):
+    monkeypatch.setattr(wa, "is_configured", lambda: True)
+    monkeypatch.setattr(wa, "send_whatsapp_reminder", lambda phone, variables: True)
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    monkeypatch.setattr(wa, "utc_now", clock)
+    client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
+    clock.advance(seconds=90)
+    assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "EXPIRED"
+    assert _inbound(client, "919876543210", "👍") == ["ignored: answered after the 1-minute window"]
+    # Asking again opens a new window; a 👎 refuses (STOP).
+    assert client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
+    assert _inbound(client, "919876543210", "👎") == ["stopped"]

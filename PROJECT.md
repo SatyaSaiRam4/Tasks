@@ -154,7 +154,7 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   |---|---|---|
   | Notification (free) | This phone, quietly | 🔔 **Call the electrician** · 6:30 PM · Bring the warranty card |
   | Alarm (free) | This phone, loud, until Stop | ⏰ **Call the electrician** · It's 6:30 PM… Press Stop when you're on it. |
-  | WhatsApp (premium) | Any number whose owner said **YES**, even with the phone off | A personal message with the name, reminder, date and time |
+  | WhatsApp (premium) | Any number whose owner tapped **👍**, even with the phone off | A personal message with the name, reminder, date and time |
 
 - **"Ring like an alarm"** shows a full-screen, looping alarm with a Stop
   button that stops by itself after 10, 30 or 60 seconds. The sound
@@ -162,17 +162,19 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   Settings, which also has *Test alarm*.
 - Task notifications read ✅ **Walk 20 minutes** · Time for this task in
   "Fitness". The 8 PM streak warning reads 🔥 **2 tasks left today**.
-- **A WhatsApp number must say YES first** (so nobody can use Memo to
+- **A WhatsApp number must tap 👍 first** (so nobody can use Memo to
   message someone else's number to tease them). Under the number in the
   reminder editor, *Ask for permission on WhatsApp* sends that number **one**
-  message through the reminder template: "👋 Satya wants to send you
-  reminders from the Memo app on this WhatsApp. Reply YES to allow them, or
-  STOP to never get them." No codes are shown or sent. The reminder can be
-  saved while waiting; WhatsApp messages go out only once the owner replies
-  **YES**, and the app shows it within seconds. A number can be asked again
-  after 15 minutes (*Send the message again*), at most 3 times a day. **STOP** (or UNSUBSCRIBE, CANCEL, END, QUIT, NO) stops all
-  reminders to it, and nobody can ask it again; only its owner can turn them
-  back on, by sending YES to Memo's WhatsApp themselves (see
+  message through the reminder template (which has 👍 / 👎 buttons): "👋
+  Satya wants to send you reminders from the Memo app on this WhatsApp.
+  Within 1 minute, tap 👍 to allow or 👎 to refuse (or reply YES / STOP)."
+  No codes. The app shows a live 1-minute countdown and checks every 2
+  seconds, so it turns to *Allowed* (or *Refused*) as soon as they tap. A 👍
+  after the minute doesn't count: *Send again* (3 times a day at most). The
+  reminder can be saved while waiting; WhatsApp messages go out only to
+  numbers that tapped 👍. 👎 / STOP (or UNSUBSCRIBE, CANCEL, END, QUIT, NO)
+  stops all reminders to it, and nobody can ask it again; only its owner can
+  turn them back on, by sending YES to Memo's WhatsApp themselves (see
   [7.4](#74-whatsapp-number-permission)).
 
 ### 2.6 Private Vault
@@ -529,7 +531,7 @@ refresh, forgot/reset password and the health checks needs
 | Vault notes | `GET/POST /vault/entries`, `GET/PATCH/DELETE /vault/entries/{id}`, `POST /vault/entries/{id}/{pin,unpin,favorite,unfavorite,archive,unarchive,trash,restore}`, `GET /vault/folders`, `POST /vault/trash/empty` |
 | Vault media | `PUT/GET/DELETE /vault/entries/{id}/audio`, `POST /vault/entries/{id}/images`, `GET/DELETE /vault/entries/{id}/images/{image_id}` |
 | Wallet | `GET /wallet`, `POST /wallet/redeem` |
-| WhatsApp consent | `POST /whatsapp/verify` (sends the YES/STOP permission message), `GET /whatsapp/status?phone=…`; `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in) |
+| WhatsApp consent | `POST /whatsapp/verify` (sends the 👍/👎 permission message), `GET /whatsapp/status?phone=…`, `GET /whatsapp/inbound/recent` (admins); `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in, always 200) |
 | Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role` |
 | Maintenance | `POST /maintenance/cleanup` (header `X-Cron-Secret`) |
 
@@ -604,45 +606,52 @@ cd Backend && python -m app.integrations.email you@example.com
 
 ### 7.4 WhatsApp number permission
 
-A number gets reminders only after its owner replies **YES** to one
-permission message, sent through the **existing reminder template** (no
-authentication template and no codes needed: it's a request for consent,
-which is what WhatsApp expects). Code: `Backend/app/modules/whatsapp/`,
+A number gets reminders only after its owner taps **👍** (or replies YES)
+within **1 minute** of one permission message, sent through the **existing
+reminder template** (no authentication template, no codes: it's a request
+for consent). Code: `Backend/app/modules/whatsapp/`,
 `MyApp/src/modules/reminders/WhatsAppVerify.tsx`.
 
-1. The app calls `POST /whatsapp/verify` with the number. If it's new (and
-   wasn't asked in the last 15 minutes; 3 times a day at most), the server sends it the permission
-   message (`consent_variables` in `app/integrations/messages.py`) and marks
-   it `PENDING`. Verified or stopped numbers aren't messaged.
-2. MSG91 forwards replies to
-   `POST /api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`. **YES**
-   (also Y, OK, ALLOW, START, HAAN) marks the number `VERIFIED`; **STOP**
-   (also UNSUBSCRIBE, CANCEL, END, QUIT, NO) marks it `STOPPED`. A YES the
-   owner sends on their own counts too, which is how a stopped number comes
-   back.
-3. The app polls `GET /whatsapp/status?phone=…` while waiting.
+1. The app calls `POST /whatsapp/verify` with the number. Unless it's
+   already allowed, stopped, or inside an open 1-minute window, the server
+   sends the permission message (`consent_variables` in
+   `app/integrations/messages.py`) and marks it `PENDING` (`asked_at`).
+2. MSG91 forwards the reply or button tap to `POST /api/v1/whatsapp/inbound`.
+   👍 / YES (also Y, OK, ALLOW, START, HAAN) within the minute marks it
+   `VERIFIED`; 👎 / STOP (also NO, UNSUBSCRIBE, CANCEL, END, QUIT) marks it
+   `STOPPED` at any time. A YES the owner sends on their own turns a stopped
+   number back on.
+3. `GET /whatsapp/status?phone=…` reports `NONE`, `PENDING` (with
+   `expires_at`), `EXPIRED`, `VERIFIED` or `STOPPED`; the app polls it every
+   2 seconds while `PENDING`.
 4. Reminders can be saved with a `PENDING` or `VERIFIED` number; the worker
    sends only to `VERIFIED` ones (others are marked *Failed*).
 
-**MSG91 setup:** in MSG91 → WhatsApp → Webhook, add the inbound URL above
-for *incoming messages*, with a long random `MSG91_INBOUND_SECRET` set on
-Render. MSG91's inbound field names differ between its old and new
-webhooks, so the server accepts several (`customer_number`/`customerNumber`/
-`from`/`sender` for the number; `content.text`/`text`/`body`/`message` for
-the text, including JSON hidden in a string, Meta's `entry/changes/messages`
-shape, buttons and 👍). Only messages clearly marked outgoing are skipped.
+**MSG91 setup (required; without it no reply reaches the server):**
+1. MSG91 → **WhatsApp → Webhook (New) → Create Webhook**.
+2. Service **WhatsApp**, event **On Inbound Report Received**.
+3. URL `https://tasks-singapore.onrender.com/api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`
+   (or the URL without `?token=` plus a custom header `x-memo-token:
+   <MSG91_INBOUND_SECRET>`). Content type JSON. Create.
+4. On Render, set `MSG91_INBOUND_SECRET` to the same long random value.
+5. If MSG91 shows the webhook as paused, resume it. The server always
+   answers 200 so MSG91 never pauses it again (a wrong token is only logged).
+
+MSG91's inbound body has `customerNumber`, `text`, and for button taps
+`button` as a JSON string (`{"payload":"👍","text":"👍"}`); the server also
+reads the old webhook's `customer_number`/`content` and Meta's
+`entry/changes/messages` shape.
 
 **Checking it works:**
-- Render log, every webhook call: `WhatsApp inbound: [{'from': '…3572',
-  'text': 'Yes', 'result': 'verified'}]`. A refused call logs `WhatsApp
+- Render log, every webhook call: `WhatsApp inbound: [{'from': '…3323',
+  'text': '👍', 'result': 'verified'}]`. A refused call logs `WhatsApp
   inbound refused: MSG91_INBOUND_SECRET is not set on the server` or `wrong
-  token in the webhook URL`. **No line at all** means MSG91 isn't calling the
-  webhook: check the URL is saved for *incoming messages* on the right
-  WhatsApp number.
+  token`. **No `POST /api/v1/whatsapp/inbound` line at all** means MSG91 isn't
+  calling the webhook (step 1–3 above).
 - Admins: `GET /api/v1/whatsapp/inbound/recent` lists the last 50 webhook
   calls (numbers masked) and whether the secret is set.
 - In the app, while waiting, the number shows the last reply that reached
-  Memo (if it wasn't YES), or after 2 minutes says no reply has reached Memo.
+  Memo (if it wasn't 👍/YES), or after 40 seconds says nothing has arrived.
 
 **Free alternatives**, if MSG91 inbound isn't available on the account:
 Meta's own WhatsApp Cloud API (free messages inside the 24-hour window after
@@ -818,7 +827,7 @@ block. On Render this isn't needed.
 | Reminders late on Android | Allow exact alarms; turn off battery optimisation for Memo |
 | Password-reset email doesn't arrive | Run the email check in [7.1](#71-backend-environment-backendenv-or-render-environment-variables); Gmail needs an App Password |
 | The Vault locked while choosing a photo | Fixed: pickers no longer lock it. Pull the latest code |
-| A WhatsApp number stays *Waiting for YES* | Look in the Render log ([7.4](#74-whatsapp-number-permission)): no `WhatsApp inbound` line means MSG91 isn't forwarding replies (set the incoming-message webhook); `refused` means the secret is missing or the token in the URL is wrong; `ignored: not YES or STOP` means the reply wasn't YES |
+| A WhatsApp number stays *Waiting for 👍* | MSG91 must forward replies: create the Webhook (New) for *On Inbound Report Received* ([7.4](#74-whatsapp-number-permission)). Then look in the Render log ([7.4](#74-whatsapp-number-permission)): no `WhatsApp inbound` line means MSG91 isn't forwarding replies (set the incoming-message webhook); `refused` means the secret is missing or the token in the URL is wrong; `ignored: not YES or STOP` means the reply wasn't YES |
 | WhatsApp reminders show *Failed* | The number hadn't replied YES by the reminder time, or its owner replied STOP (then only they can turn it back on, by sending YES to Memo) |
 | Android build: `Keystore file … memo-debug.keystore not found` | Debug builds are signed with your own `memo-debug.keystore` (its SHA-1 is registered for Google sign-in). Copy it into `MyApp/android/app/`; it isn't in git |
 

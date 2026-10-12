@@ -1,13 +1,18 @@
 import { baseApi } from '../../api/baseApi';
 
-/** NONE: never asked · PENDING: asked, waiting for YES · VERIFIED: said YES · STOPPED: said STOP. */
-export type ContactStatus = 'NONE' | 'PENDING' | 'VERIFIED' | 'STOPPED';
+/**
+ * NONE: never asked · PENDING: asked, inside the 1-minute answer window ·
+ * EXPIRED: no answer in time · VERIFIED: tapped 👍 / said YES · STOPPED: tapped 👎 / said STOP.
+ */
+export type ContactStatus = 'NONE' | 'PENDING' | 'EXPIRED' | 'VERIFIED' | 'STOPPED';
 
 export interface ContactInfo {
   phone: string;
   status: ContactStatus;
   /** When the "reply YES to allow" message was sent (once a day at most). */
   asked_at: string | null;
+  /** When the 1-minute answer window closes (while PENDING). */
+  expires_at: string | null;
   /** Memo's WhatsApp number, digits only. */
   business_number: string;
   /** The last message from this number that reached the server, if any. */
