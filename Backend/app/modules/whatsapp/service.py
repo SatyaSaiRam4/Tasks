@@ -207,7 +207,7 @@ def _find(payload, keys: tuple[str, ...]):
 
 
 SENDER_KEYS = ("customer_number", "customerNumber", "customer_mobile", "sender", "from", "mobile", "wa_id", "source", "phone")
-TEXT_KEYS = ("text", "body", "message", "caption", "title", "payload", "content")
+TEXT_KEYS = ("text", "body", "message", "caption", "title", "payload", "emoji", "content")
 
 
 def messages_from(payload) -> list[tuple[str | None, str | None]]:

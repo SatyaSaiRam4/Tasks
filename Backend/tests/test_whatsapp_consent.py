@@ -72,6 +72,9 @@ def test_inbound_reads_every_msg91_shape():
         # A quick-reply button, and a thumbs up.
         {"customer_number": "919876543210", "content": {"button": {"text": "Yes", "payload": "Yes"}}},
         {"customer_number": "919876543210", "content": {"text": "👍"}},
+        # MSG91 Webhook (New), trimmed payload: a reaction (long-press 👍) and a button tap, empty text.
+        {"uuid": "u1", "customerNumber": "919876543210", "contentType": "reaction", "text": "", "button": "", "reaction": '{"emoji":"👍","message_id":"wamid.x"}'},
+        {"uuid": "u2", "customerNumber": "919876543210", "contentType": "button", "text": "", "button": '{"payload":"👍","text":"👍"}', "interactive": ""},
     ]
     for shape in shapes:
         messages = wa.messages_from(shape)
