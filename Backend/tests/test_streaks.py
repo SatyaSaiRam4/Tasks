@@ -394,3 +394,45 @@ def test_cleanup_removes_ended_plans_tasks_and_done_reminders_but_keeps_streaks(
     assert client.get(f"{API}/reminders/{reminder['id']}", headers=auth).status_code == 404
     s = streak(client, auth)
     assert s["best_streak"] == 2 and s["total_success_days"] == 1
+
+
+def test_finalizing_from_many_requests_at_once_never_duplicates_a_day(client, auth, db):
+    """Home loads several screens at once; right after midnight each finalizes
+    the same day. They must take turns instead of failing on a duplicate."""
+    import threading
+
+    from app.modules.auth.models import User
+    from app.modules.streaks import engine
+    from tests.conftest import TestingSession
+
+    track = make_track(client, auth)
+    make_action(client, auth, track["id"])
+    streak(client, auth)  # creates the streak state
+    # Pretend the last three days haven't been finalized yet.
+    db.execute(text("UPDATE streak_states SET last_finalized_date = last_finalized_date - 3"))
+    db.execute(text("DELETE FROM daily_records"))
+    db.commit()
+    user_id = db.execute(text("SELECT user_id FROM streak_states LIMIT 1")).scalar()
+
+    errors = []
+    gate = threading.Barrier(4)
+
+    def finalize():
+        session = TestingSession()
+        try:
+            user = session.get(User, user_id)
+            gate.wait()
+            engine.finalize_user(session, user)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            session.close()
+
+    threads = [threading.Thread(target=finalize) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    days = db.execute(text("SELECT record_date, count(*) FROM daily_records GROUP BY record_date HAVING count(*) > 1")).all()
+    assert days == []

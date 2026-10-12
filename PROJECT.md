@@ -821,6 +821,7 @@ block. On Render this isn't needed.
 |---|---|
 | Render deploy crashes: `column … does not exist` | The database is behind the code. Make sure the start command begins with `alembic upgrade head &&`, or run the migration by hand ([10.2](#102-database)) |
 | Red screen: `Unable to resolve module react-native-…` | A new package wasn't installed: `npm install`, rebuild (`./gradlew clean`, `run-android`), then `npx react-native start --reset-cache` |
+| 500 errors right after midnight: `duplicate key … uq_daily_records_user_date` | Fixed: several requests at once each tried to close the same day. Closing days now locks the user's streak row (`_lock_state` in `streaks/engine.py`), so they take turns |
 | Red screen: "set the key `shadowColor` … frozen" | Fixed: the theme is applied once per session and never edits styles in use. Pull the latest code |
 | `git pull` refuses: local changes to `package-lock.json` | Not real work (npm rewrote it): `git checkout -- MyApp/package-lock.json`, then pull |
 | `git push` 403 "denied to <other user>" | The computer has another GitHub login saved. Push with the owner's account and a personal access token |
