@@ -74,7 +74,12 @@ def register_user(db: Session, email: str, password: str, display_name: str, tim
 def authenticate_user(db: Session, email: str, password: str, timezone_name: str | None = None) -> User:
     user = get_user_by_email(db, email)
     if not user or not security.verify_password(password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password.")
+        # Same words for every failure, so it never reveals whether an account
+        # exists; the hint helps people whose account came from Google sign-in.
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Incorrect email or password. Signed up with Google? Use Continue with Google, or reset your password.",
+        )
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been disabled.")
     if not user.email_verified_at:

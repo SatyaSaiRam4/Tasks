@@ -60,6 +60,11 @@ SMTP_PASSWORD = "".join(os.getenv("SMTP_PASSWORD", "").split())
 SMTP_FROM = (os.getenv("SMTP_FROM") or SMTP_USER or "no-reply@rememberly.app").strip()
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Memo")
 
+# Brevo (brevo.com) sends over HTTPS, so it works where SMTP ports are blocked
+# (e.g. Render's free plan). The sender must be a sender verified in Brevo.
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+EMAIL_FROM = (os.getenv("EMAIL_FROM") or SMTP_FROM).strip()
+
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 RESEND_FROM = (os.getenv("RESEND_FROM") or "Memo <onboarding@resend.dev>").strip()
 

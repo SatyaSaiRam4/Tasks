@@ -1,7 +1,9 @@
-"""Transactional email (password reset codes).
+"""Transactional email (sign-up verification and password reset codes).
 
-Provider order: Resend (RESEND_API_KEY) -> SMTP (SMTP_USER/SMTP_PASSWORD) ->
-console. The console fallback exists only for local development and is used
+Provider order: Brevo (BREVO_API_KEY) -> Resend (RESEND_API_KEY) -> SMTP
+(SMTP_USER/SMTP_PASSWORD) -> console. Brevo and Resend send over HTTPS, so
+they work on hosts that block SMTP ports (Render's free plan blocks 25, 465
+and 587). The console fallback exists only for local development and is used
 only when SMTP_DEBUG is true; otherwise an unconfigured send is a hard failure.
 """
 
@@ -12,6 +14,8 @@ from email.message import EmailMessage
 import httpx
 
 from app.core.config import (
+    BREVO_API_KEY,
+    EMAIL_FROM,
     EMAIL_PROVIDER,
     RESEND_API_KEY,
     RESEND_FROM,
@@ -35,6 +39,32 @@ class EmailSendFailed(RuntimeError):
     pass
 
 
+def _raise_for(response: httpx.Response, provider: str) -> None:
+    """Turns an API error into one with the provider's own reason (never the key)."""
+    if response.is_success:
+        return
+    try:
+        reason = response.json().get("message") or response.text
+    except ValueError:
+        reason = response.text
+    raise httpx.HTTPStatusError(f"{provider} {response.status_code}: {reason[:300]}", request=response.request, response=response)
+
+
+def _send_brevo(to: str, subject: str, text: str) -> None:
+    response = httpx.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": BREVO_API_KEY, "accept": "application/json"},
+        json={
+            "sender": {"name": SMTP_FROM_NAME, "email": EMAIL_FROM},
+            "to": [{"email": to}],
+            "subject": subject,
+            "textContent": text,
+        },
+        timeout=15.0,
+    )
+    _raise_for(response, "Brevo")
+
+
 def _send_resend(to: str, subject: str, text: str) -> None:
     response = httpx.post(
         "https://api.resend.com/emails",
@@ -42,7 +72,7 @@ def _send_resend(to: str, subject: str, text: str) -> None:
         json={"from": RESEND_FROM, "to": [to], "subject": subject, "text": text},
         timeout=10.0,
     )
-    response.raise_for_status()
+    _raise_for(response, "Resend")
 
 
 def _login(smtp: smtplib.SMTP) -> None:
@@ -77,6 +107,8 @@ def _send_smtp(to: str, subject: str, text: str) -> None:
 def send_email(to: str, subject: str, text: str) -> None:
     provider = EMAIL_PROVIDER
     try:
+        if provider in ("auto", "brevo") and BREVO_API_KEY:
+            return _send_brevo(to, subject, text)
         if provider in ("auto", "resend") and RESEND_API_KEY:
             return _send_resend(to, subject, text)
         if provider in ("auto", "smtp") and SMTP_USER and SMTP_PASSWORD:
@@ -99,12 +131,14 @@ if __name__ == "__main__":
 
     if len(sys.argv) != 2:
         raise SystemExit("Usage: python -m app.integrations.email you@example.com")
-    if RESEND_API_KEY and EMAIL_PROVIDER in ("auto", "resend"):
+    if BREVO_API_KEY and EMAIL_PROVIDER in ("auto", "brevo"):
+        print(f"Provider: Brevo, from {EMAIL_FROM}")
+    elif RESEND_API_KEY and EMAIL_PROVIDER in ("auto", "resend"):
         print("Provider: Resend")
     elif SMTP_USER and SMTP_PASSWORD and EMAIL_PROVIDER in ("auto", "smtp"):
         print(f"Provider: SMTP {SMTP_HOST}:{SMTP_PORT} as {SMTP_USER}")
     else:
-        raise SystemExit("No provider configured: set SMTP_USER (or SMTP_EMAIL) and SMTP_PASSWORD in Backend/.env.")
+        raise SystemExit("No provider configured: set BREVO_API_KEY (+ EMAIL_FROM), or SMTP_USER and SMTP_PASSWORD, in Backend/.env.")
     try:
         send_email(sys.argv[1], "Memo test email", "If you can read this, Memo can send password-reset codes.")
     except EmailSendFailed as exc:
