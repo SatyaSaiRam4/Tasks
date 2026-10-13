@@ -28,6 +28,13 @@ interface AuthState {
   refreshToken: string | null;
   /** True once we've attempted to rehydrate the session from disk on app boot. */
   isBootstrapped: boolean;
+  /**
+   * The user record came from the server in this session (sign-in, token
+   * refresh or /users/me), not only from the copy on the phone. Anything
+   * that acts on onboarding_completed (the first tour, Home's quiet mode)
+   * waits for this, so an old copy never starts the tour again.
+   */
+  userConfirmed: boolean;
 }
 
 const initialState: AuthState = {
@@ -35,6 +42,7 @@ const initialState: AuthState = {
   accessToken: null,
   refreshToken: null,
   isBootstrapped: false,
+  userConfirmed: false,
 };
 
 /** Reads a persisted session (if any) from AsyncStorage on app launch. */
@@ -50,11 +58,14 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
+      state.userConfirmed = true;
     },
     userUpdated(state, action: PayloadAction<AuthUser>) {
       state.user = action.payload;
+      state.userConfirmed = true;
     },
     loggedOut(state) {
+      state.userConfirmed = false;
       state.user = null;
       state.accessToken = null;
       state.refreshToken = null;
@@ -92,3 +103,6 @@ export const selectRefreshToken = (state: AuthRootState): string | null => state
 export const selectIsAuthenticated = (state: AuthRootState): boolean => Boolean(state.auth.accessToken && state.auth.user);
 export const selectIsAdmin = (state: AuthRootState): boolean => state.auth.user?.role === 'ADMIN';
 export const selectIsBootstrapped = (state: AuthRootState): boolean => state.auth.isBootstrapped;
+/** A new user who hasn't finished (or skipped) Melo's tour, as the server says this session. */
+export const selectIsNewUser = (state: AuthRootState): boolean =>
+  Boolean(state.auth.accessToken && state.auth.user && state.auth.userConfirmed && !state.auth.user.onboarding_completed);

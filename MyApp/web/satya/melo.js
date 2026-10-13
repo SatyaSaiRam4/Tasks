@@ -26,6 +26,10 @@
  * 'happy' (all done: sparkles, cheers), 'worried' (streak at risk: big
  * pleading eyes), 'sleepy' (late: slow, yawns, dozes with floating z's) or
  * 'calm'. When he comes back on stage he peeks in from the edge first.
+ * window.melo.setWeather(kind, isDay) shows the real weather faintly behind
+ * him (meloWeather.js): 'clear', 'cloudy', 'fog', 'rain', 'storm', 'snow' or
+ * 'none'. Melo himself doesn't change; the app's speech bubble talks about
+ * it. Debug: ?weather=<kind>&night=1.
  * The app makes Melo move with window.satya.play(name) or now(list) (a comma
  * list plays in order): talk, wave, hop, nod, spin, lookLeft, lookRight,
  * cheer, walk, think, shy, yawn, doze. It hears back 'loaded', 'nowebgl' or 'error'.
@@ -40,6 +44,7 @@ import { findRobe, robeName } from './meloName.js';
 import { createHatSpring, dressMelo } from './meloHat.js';
 import { addMouth } from './meloMouth.js';
 import { addFace, createFloaters } from './meloFace.js';
+import { createWeather } from './meloWeather.js';
 
 const params = new URLSearchParams(location.search);
 const reduced = params.get('motion') === 'reduced';
@@ -424,10 +429,18 @@ function start() {
   let poked = false;
   // Set by ?hold (checking a pose in a browser): the moment to keep showing.
   let frozenAt = null;
+  // The weather where the user is, faintly behind him.
+  // Hearts, sparkles and the like on demand (used to render the widget's frames).
+  let burst = () => {};
+  const weather = createWeather({ reduced });
+  const setWeather = (kind, isDay = true) => weather.set(kind, Boolean(isDay));
   window.melo = {
     setPaused: v => {
       paused = Boolean(v);
+      weather.setPaused(paused);
     },
+    setWeather,
+    burst: (kind, n = 3, spacing = 200) => burst(kind, n, spacing),
     poke: () => {
       poked = true;
     },
@@ -436,6 +449,7 @@ function start() {
     },
   };
   if (MOODS.includes(params.get('mood'))) mood = params.get('mood');
+  if (params.get('weather')) setWeather(params.get('weather'), params.get('night') !== '1');
 
   Promise.all([load('../../models/model.glb'), load('../../fonts/CormorantGaramond-Bold.ttf').catch(() => null)])
     .then(([glb, ttf]) => new Promise((resolve, reject) => new GLTFLoader().parse(glb, '', gltf => resolve([gltf, ttf]), reject)))
@@ -477,6 +491,16 @@ function start() {
               return;
             }
             floaters.emit(kind, h.x + (Math.random() - 0.5) * W * 0.6, h.y, h.z + 0.05, H * 0.22);
+          }, i * spacing);
+        }
+      };
+      // Close around him, so they fit a small frame (the widget's).
+      burst = (kind, n, spacing) => {
+        for (let i = 0; i < n; i++) {
+          setTimeout(() => {
+            const h = headAt();
+            const side = i % 2 ? 1 : -1;
+            floaters.emit(kind, h.x + side * W * (0.3 + Math.random() * 0.12), h.y - H * 0.45, h.z + 0.1, H * 0.2, side * W * 0.12);
           }, i * spacing);
         }
       };
@@ -554,7 +578,13 @@ function start() {
       }
 
       const walker = stroll ? createStroll() : null;
-      if (stroll && reduced) setTimeout(() => announce(0), 600); // standing still: tip at once
+      if (stroll && reduced) {
+        // Reduced motion: no entrance or walking (the stroll placed him off
+        // stage, ready to roll in). He stands in the middle and talks at once.
+        stroller.position.x = 0;
+        stroller.visible = true;
+        setTimeout(() => announce(0), 600);
+      }
 
       /** Tells the app where his head is (fractions of the stage) when he stops to talk. */
       function announce(x, kind = 'tip') {
@@ -666,7 +696,15 @@ function start() {
               stroller.visible = true;
               // Ta-da: stars fly out in gold, red and white, sparkles and a soft poof.
               floaters.burst(0, ballR * 1.3, 0.12, 18, H, [0xffc23a, 0xe0384f, 0xffffff, 0xff9a2e]);
-              emit('sparkle', 6, 60);
+              // Sparkles scattered in an arc around the ball (not in a bunch above
+              // his head), each drifting outward, low enough to stay on screen.
+              for (let i = 0; i < 6; i++) {
+                const side = i % 2 ? 1 : -1;
+                const a = (0.15 + 0.7 * (Math.floor(i / 2) / 2)) * Math.PI * 0.5;
+                setTimeout(() => {
+                  floaters.emit('sparkle', stroller.position.x + side * (ballR * 1.4 + Math.cos(a) * H * 0.35), ballR * 0.8 + Math.sin(a) * H * 0.45, 0.12, H * (0.13 + 0.05 * Math.random()), side * H * 0.25);
+                }, i * 70);
+              }
               for (let i = 0; i < 5; i++) floaters.emit('puff', (i - 2) * ballR * 0.5, ballR * 1.2, 0.1, H * 0.25);
               motion.now('hop');
             }

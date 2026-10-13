@@ -27,6 +27,7 @@ import { hasQueuedForHome, subscribeHomeQueue, takeQueuedForHome } from '../../s
 import { MeloCorner } from '../../satya/MeloCorner';
 import { meloMood, satyaMessage } from '../../satya/messages';
 import { useAppSelector } from '../../../app/hooks';
+import { selectIsNewUser } from '../../auth/authSlice';
 import type { MainTabParamList, RootStackParamList } from '../../../navigation/RootNavigator';
 
 type Nav = CompositeNavigationProp<
@@ -48,10 +49,17 @@ export function DashboardScreen() {
   const { celebrate } = useCelebration();
   const best = data?.streak.best_streak;
   const meloOnHome = useAppSelector(s => s.preferences.satyaEnabled);
+  // A new user's first welcome story and tour run over Home: Melo's corner
+  // (his animation and the weather) waits until they're done, then he
+  // arrives. A tour replayed from Settings leaves him playing.
+  const isNewUser = useAppSelector(selectIsNewUser);
+  const tourReplay = useAppSelector(s => s.preferences.tourReplay);
+  const firstTour = isNewUser && !tourReplay;
 
   // A new badge is revealed here, the first time Home is on screen after it
-  // was earned: the locked badge comes to life in the streak card, then its
-  // congratulations card opens. Until then it looks locked everywhere.
+  // was earned: in its place in the streak card the locked (stone) badge
+  // shakes, cracks and breaks open, chips flying, into the gold medal; then
+  // its congratulations card opens. Until then it looks locked everywhere.
   const badges = useBadges(best ?? 0);
   const focused = useIsFocused();
   // Never behind another card (e.g. "+1 streak" right after a tick on Home).
@@ -199,7 +207,7 @@ export function DashboardScreen() {
       </FadeIn>
 
       {/* Melo's corner: he lives at the bottom of Home (off in Settings → Melo on Home). */}
-      {meloOnHome ? (
+      {meloOnHome && !firstTour ? (
         <FadeIn index={3}>
           <MeloCorner tip={satyaMessage(data)} mood={meloMood(data)} />
         </FadeIn>

@@ -22,6 +22,12 @@ export async function saveSession(session: StoredSession): Promise<void> {
   });
 }
 
+/** Keeps the saved user up to date (name, photo, tour finished…) without touching the tokens. */
+export async function saveUser(user: AuthUser): Promise<void> {
+  if ((await AsyncStorage.getItem(KEYS.ACCESS_TOKEN)) === null) return; // signed out meanwhile
+  await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
+}
+
 /** Reads the persisted session, if any. Returns null if incomplete/missing/corrupt. */
 export async function loadSession(): Promise<StoredSession | null> {
   const values = await AsyncStorage.getMany([KEYS.ACCESS_TOKEN, KEYS.REFRESH_TOKEN, KEYS.USER]);

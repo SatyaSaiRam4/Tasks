@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Rough location (city level) for the weather in Melo's corner on Home. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
       android:name=".MainApplication"
@@ -30,7 +32,7 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
-      <!-- Memo's home-screen widget (MemoWidgetProvider). -->
+      <!-- Memo's home-screen widgets (MemoWidgetProvider.kt): the full one (4×2) -->
       <receiver
         android:name=".MemoWidgetProvider"
         android:label="Memo"
@@ -41,6 +43,30 @@
         <meta-data
           android:name="android.appwidget.provider"
           android:resource="@xml/memo_widget_info" />
+      </receiver>
+      <!-- Melo with the streak and weather (2×2) -->
+      <receiver
+        android:name=".MemoSmallWidgetProvider"
+        android:label="Memo · Melo"
+        android:exported="false">
+        <intent-filter>
+          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/memo_widget_small_info" />
+      </receiver>
+      <!-- One slim row (4×1) -->
+      <receiver
+        android:name=".MemoWideWidgetProvider"
+        android:label="Memo · Today"
+        android:exported="false">
+        <intent-filter>
+          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/memo_widget_wide_info" />
       </receiver>
     </application>
 </manifest>

@@ -37,8 +37,8 @@ function google(): Lib | null {
 }
 
 /**
- * Opens Google's account picker. Resolves with an ID token, or null if the
- * user backed out. Throws a readable Error for real failures.
+ * Opens Google's account picker, every time. Resolves with an ID token, or
+ * null if the user backed out. Throws a readable Error for real failures.
  */
 export async function getGoogleIdToken(): Promise<string | null> {
   const g = google();
@@ -46,6 +46,11 @@ export async function getGoogleIdToken(): Promise<string | null> {
   const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = g;
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    // Forget the Google account used last time first: otherwise signIn() picks
+    // it again silently (e.g. after the session ended without "Sign out", or
+    // that account was removed), and someone with two Google accounts never
+    // gets to choose.
+    await GoogleSignin.signOut().catch(() => undefined);
     const response = await GoogleSignin.signIn();
     if (!isSuccessResponse(response)) return null; // cancelled
     if (!response.data.idToken) throw new Error('Google didn’t return a sign-in token. Please try again.');

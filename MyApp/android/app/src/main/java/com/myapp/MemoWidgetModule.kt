@@ -22,4 +22,17 @@ class MemoWidgetModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       .apply()
     MemoWidgetProvider.refreshAll(context)
   }
+
+  /** The weather line from Home (e.g. "☀️ 31° · Hyderabad"); empty hides it. */
+  @ReactMethod
+  fun setWeather(text: String) {
+    val context = reactApplicationContext.applicationContext
+    context
+      .getSharedPreferences(MemoWidgetProvider.PREFS, Context.MODE_PRIVATE)
+      .edit()
+      .putString("weather", text)
+      .putLong("weatherAt", System.currentTimeMillis())
+      .apply()
+    MemoWidgetProvider.refreshAll(context)
+  }
 }

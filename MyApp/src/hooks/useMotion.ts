@@ -14,7 +14,7 @@ AccessibilityInfo.isReduceMotionEnabled()
  * Reduce Motion setting and the user's own Animations / Reduced motion
  * settings (mirrored into the preferences slice from /users/me).
  */
-export function useMotion(): { reduced: boolean } {
+export function useMotion(): { reduced: boolean; system: boolean } {
   const prefs = useAppSelector(s => s.preferences);
   const [system, setSystem] = useState(systemReduceMotion);
 
@@ -26,5 +26,7 @@ export function useMotion(): { reduced: boolean } {
     return () => sub.remove();
   }, []);
 
-  return { reduced: system || prefs.reducedMotion || !prefs.animationsEnabled };
+  // `system`: the phone's own Remove animations / Reduce motion, for the few
+  // moments that play even when Memo's own animations are turned down.
+  return { reduced: system || prefs.reducedMotion || !prefs.animationsEnabled, system };
 }
