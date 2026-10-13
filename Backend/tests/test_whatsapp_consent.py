@@ -28,7 +28,7 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     # Asking sends one permission message (no code), through the template.
     asked = client.post(f"{API}/whatsapp/verify", json={"phone": "91 98765 43210"}, headers=auth).json()
     assert asked["phone"] == PHONE and asked["status"] == "PENDING"
-    assert len(sent) == 1 and sent[0][0] == PHONE and "Reply YES to allow or STOP to refuse" in sent[0][1][0] and "👍" not in sent[0][1][0]
+    assert len(sent) == 1 and sent[0][0] == PHONE and "Reply *YES* to allow or *STOP* to refuse" in sent[0][1][0] and "👍" not in sent[0][1][0]
     # Saved while waiting, but nothing goes out until they reply YES.
     assert _reminder(client, auth).status_code == 201
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
@@ -129,7 +129,7 @@ def test_every_webhook_call_is_kept_in_the_inbound_log(client, monkeypatch, db):
     monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
     client.post(f"{API}/whatsapp/inbound?token=wrong", json={"customerNumber": "919876543210", "text": "YES"})
     client.post(f"{API}/whatsapp/inbound?token=s3cret", json={"customerNumber": "919876543210", "text": "hello"})
-    rows = db.execute(text("SELECT token_ok, summary, payload FROM whatsapp_inbound_log ORDER BY received_at")).all()
+    rows = db.execute(text("SELECT token_ok, summary, payload FROM whatsapp_inbound_log WHERE summary NOT LIKE 'auto-reply%' ORDER BY received_at")).all()
     assert [r.token_ok for r in rows] == [False, True]
     assert "wrong token" in rows[0].summary and "not YES or STOP" in rows[1].summary
     assert "9876543210" not in rows[1].payload and "3210" in rows[1].payload  # numbers masked
@@ -179,27 +179,26 @@ def test_stop_then_yes_again_still_gets_the_due_reminder(client, auth, monkeypat
     assert db.execute(text("SELECT whatsapp_status FROM reminders WHERE id = :id"), {"id": rid}).scalar() == "FAILED"
 
 
-def test_other_messages_get_one_automatic_answer_a_day(client, monkeypatch, clock):
+def test_every_other_message_gets_an_automatic_answer_at_once(client, monkeypatch, db):
     """WhatsApp can't stop people writing to Memo's number, so anything that
-    isn't YES or STOP gets "Messages here aren't read" once a day, never a chat."""
+    isn't YES or STOP gets a short answer straight away, every time; what
+    MSG91 said is kept in the inbound log."""
+    from sqlalchemy import text
+
     texts = []
     monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
-    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, text: texts.append((phone, text)) or True)
-    monkeypatch.setattr(wa, "utc_now", clock)
+    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, t: texts.append((phone, t)) or (True, "HTTP 200 {}"))
 
     assert _inbound(client, "919876543210", "hi, who is this?") == ["ignored: not YES or STOP"]
-    assert texts == [(PHONE, wa.AUTO_REPLY)] and "aren't read" in wa.AUTO_REPLY and "STOP" in wa.AUTO_REPLY
-    # More messages the same day: no more answers.
     _inbound(client, "919876543210", "hello??")
-    clock.advance(hours=23)
-    _inbound(client, "919876543210", "reply pls")
-    assert len(texts) == 1
+    assert texts == [(PHONE, wa.AUTO_REPLY)] * 2
+    assert "*YES*" in wa.AUTO_REPLY and "*STOP*" in wa.AUTO_REPLY and len(wa.AUTO_REPLY) < 100
     # YES and STOP are handled as usual, never answered with it.
     _inbound(client, "919876543210", "STOP")
     _inbound(client, "919876543210", "YES")
-    assert len(texts) == 1
-    # A day later, one more answer; another number gets its own.
-    clock.advance(hours=2)
-    _inbound(client, "919876543210", "still there?")
+    assert len(texts) == 2
+    # Another number gets its own answer; each answer is in the log.
     _inbound(client, "919811112222", "hey")
-    assert texts[1:] == [(PHONE, wa.AUTO_REPLY), ("+919811112222", wa.AUTO_REPLY)]
+    assert texts[-1] == ("+919811112222", wa.AUTO_REPLY)
+    logged = [r[0] for r in db.execute(text("SELECT summary FROM whatsapp_inbound_log WHERE summary LIKE 'auto-reply%'"))]
+    assert len(logged) == 3 and all("sent" in s for s in logged)

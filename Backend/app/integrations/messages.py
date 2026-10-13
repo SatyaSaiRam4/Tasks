@@ -35,5 +35,5 @@ def consent_variables(style: str, requester: str) -> list[str]:
     just asking the owner of the number to reply YES (or STOP)."""
     who = (requester or "Someone").split()[0]
     if style == "detailed":
-        return ["there", f"{who} wants to send you Memo reminders here. Reply YES to allow or STOP to refuse", "Reply now"]
-    return [f"{who} wants to send you Memo reminders here. Reply YES to allow or STOP to refuse."]
+        return ["there", f"{who} wants to send you Memo reminders. Reply *YES* to allow or *STOP* to refuse", "Reply now"]
+    return [f"{who} wants to send you Memo reminders. Reply *YES* to allow or *STOP* to refuse."]

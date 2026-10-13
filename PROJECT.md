@@ -169,7 +169,7 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   message someone else's number to tease them). Under the number in the
   reminder editor, *Ask on WhatsApp* sends that number **one** short
   message through the reminder template: "Satya wants to send you Memo
-  reminders here. Reply YES to allow or STOP to refuse." No codes, no
+  reminders. Reply *YES* to allow or *STOP* to refuse." No codes, no
   emoji buttons (a 👍 / 👎 reply is still understood). The app shows a
   1-minute countdown and checks every 1.5 seconds, so it turns green
   (*Accepted · they replied YES*) as soon as they reply. It keeps checking
@@ -576,7 +576,7 @@ Main tables (PostgreSQL):
 | `vault_images` | Encrypted photos of Vault notes |
 | `wallet_redemptions` | Redemption requests |
 | `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (asked, waiting for YES; `asked_at`), `VERIFIED` (said YES), `STOPPED` (said STOP) |
-| `whatsapp_auto_replies` | One row per number that wrote something other than YES or STOP: when Memo last sent it the automatic "messages here aren't read" answer |
+| `whatsapp_auto_replies` | One row per number that wrote something other than YES or STOP: when Memo last sent it the automatic answer |
 
 **Migrations** (`Backend/alembic/versions/`, oldest first):
 
@@ -599,7 +599,7 @@ Main tables (PostgreSQL):
 | `a8d4e1f6b2c9` | Clears stale "asked" times left from the code version (those numbers looked asked but never got the message) |
 | `b3f6c2a9d8e1` | WhatsApp refusals count (3 a day, then try tomorrow) |
 | `c9e1a4d7f3b6` | `whatsapp_inbound_log`: every webhook call, numbers masked (kept 7 days) |
-| `d4a7e2b9c1f5` | `whatsapp_auto_replies`: when Memo last answered a number's non-YES/STOP message (once a day) |
+| `d4a7e2b9c1f5` | `whatsapp_auto_replies`: when Memo last answered a number's non-YES/STOP message |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -712,7 +712,7 @@ authentication template, no codes: it's a request for consent). Code:
    already allowed or inside an open 1-minute window, the server sends the
    permission message (`consent_variables` in
    `app/integrations/messages.py`): "Satya wants to send you Memo
-   reminders here. Reply YES to allow or STOP to refuse." It marks the
+   reminders. Reply *YES* to allow or *STOP* to refuse." It marks the
    number `PENDING` (`asked_at`).
 2. MSG91 forwards the reply to `POST /api/v1/whatsapp/inbound`. YES (also
    Y, OK, ALLOW, START, HAAN, or a 👍) marks it `VERIFIED` (a YES MSG91
@@ -736,14 +736,19 @@ authentication template, no codes: it's a request for consent). Code:
 
 **Other messages (no chatting):** WhatsApp has no way to stop people
 writing to a business number, and replies only ever reach Memo's number
-(never the Memo user or anyone else). Anything that isn't YES or STOP is
-ignored, and the number gets **one automatic answer a day**: "This number
-only sends Memo reminders. Messages here aren't read. Reply STOP to stop
-getting reminders." It's free text, which WhatsApp allows for 24 hours
-after the person writes (no template), sent with `send_whatsapp_text` in
-`app/integrations/msg91.py` after the webhook has answered. When it was
-last sent is kept per number in `whatsapp_auto_replies`, so restarts or a
-webhook MSG91 sends twice never cause a second answer.
+(never the Memo user or anyone else). **Every** message that isn't YES or
+STOP gets an immediate short answer: "Only Memo reminders come from this
+number. Reply ***YES*** to allow or ***STOP*** to stop." (`AUTO_REPLY`; WhatsApp
+shows `*…*` in bold). It's free text, which WhatsApp allows for 24 hours
+after the person writes (no template), sent by `send_whatsapp_text` in
+`app/integrations/msg91.py` right after the webhook has answered: a `POST`
+to `control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/` with the
+fields in the query string as MSG91 documents (then once more as a JSON
+body if refused). MSG91 can answer 200 with an error inside, so the body is
+checked too. **What MSG91 answered is logged** in `whatsapp_inbound_log` as
+`auto-reply to …1234: sent · HTTP 200 …` or `NOT SENT · …`, so a reply that
+didn't arrive is easy to explain. `whatsapp_auto_replies` keeps when each
+number was last answered.
 
 **MSG91 setup (required; without it no reply reaches the server):**
 1. MSG91 → **WhatsApp → Webhook (New) → Create Webhook**.
