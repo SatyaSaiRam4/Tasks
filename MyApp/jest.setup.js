@@ -36,3 +36,9 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   isErrorWithCode: error => Boolean(error && error.code),
   statusCodes: { SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED', IN_PROGRESS: 'IN_PROGRESS', PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE' },
 }));
+
+// Razorpay's checkout is native; tests never reach Razorpay or charge anything.
+jest.mock('react-native-razorpay', () => ({
+  __esModule: true,
+  default: { open: jest.fn(() => Promise.reject({ code: 0, description: 'Payment cancelled' })) },
+}));

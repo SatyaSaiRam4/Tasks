@@ -126,6 +126,18 @@ MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "sing
 # How often the reminder worker polls for due WhatsApp sends.
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
 
+# ---------------------------------------------------------------------------
+# Razorpay (payments for the WhatsApp plan). Leave the keys blank and payments
+# are simply off: the app says the plan can't be bought yet. RAZORPAY_MODE is
+# "test" (keys start rzp_test_) or "live" (keys start rzp_live_); keys that
+# don't match the mode are refused, so test keys never go live by accident and
+# live keys never run in test. Never commit real values.
+# ---------------------------------------------------------------------------
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "").strip()
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "").strip()
+RAZORPAY_MODE = os.getenv("RAZORPAY_MODE", "test").strip().lower()
+
 
 # ---------------------------------------------------------------------------
 # Vault encryption. Comma-separated Fernet keys: the first encrypts, all of

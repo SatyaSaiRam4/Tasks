@@ -67,7 +67,9 @@ import { WhyMemoScreen } from '../modules/settings/screens/WhyMemoScreen';
 import { ChangePasswordScreen } from '../modules/settings/screens/ChangePasswordScreen';
 import { AdminDashboardScreen } from '../modules/admin/screens/AdminDashboardScreen';
 import { AdminUsersScreen } from '../modules/admin/screens/AdminUsersScreen';
+import { AdminMoneyScreen } from '../modules/admin/screens/AdminMoneyScreen';
 import { WalletScreen } from '../modules/wallet/screens/WalletScreen';
+import { WhatsAppPlanScreen } from '../modules/subscriptions/screens/WhatsAppPlanScreen';
 
 // --- Param lists ----------------------------------------------------------------
 
@@ -99,7 +101,9 @@ export type RootStackParamList = {
   ChangePassword: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
+  AdminMoney: undefined;
   Wallet: undefined;
+  WhatsAppPlan: undefined;
 };
 
 // --- Tab bar ----------------------------------------------------------------------
@@ -405,7 +409,9 @@ export function RootNavigator() {
           <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
           <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="AdminMoney" component={AdminMoneyScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="Wallet" component={WalletScreen} options={{ animation: 'slide_from_right' }} />
+          <RootStack.Screen name="WhatsAppPlan" component={WhatsAppPlanScreen} options={{ animation: 'slide_from_right' }} />
         </RootStack.Group>
       )}
     </RootStack.Navigator>

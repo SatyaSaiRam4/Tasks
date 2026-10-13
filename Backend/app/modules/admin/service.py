@@ -81,3 +81,79 @@ def get_dashboard_stats(db: Session) -> dict:
         "whatsapp_failed": whatsapp.get(WhatsAppStatus.FAILED, 0),
         "whatsapp_pending": whatsapp.get(WhatsAppStatus.PENDING, 0),
     }
+
+
+
+# ---- Money
+
+
+def _emails(db: Session, ids) -> dict:
+    from app.modules.auth.models import User as _User
+
+    ids = {i for i in ids if i}
+    if not ids:
+        return {}
+    return dict(db.execute(select(_User.id, _User.email).where(_User.id.in_(ids))).all())
+
+
+def redemptions(db: Session, status_filter: str | None) -> list[dict]:
+    from app.modules.wallet import service as wallet
+
+    rows = wallet.list_for_admin(db, status_filter.upper() if status_filter else None)
+    emails = _emails(db, [r.user_id for r in rows] + [r.decided_by for r in rows])
+    return [_redemption_out(r, emails) for r in rows]
+
+
+def _redemption_out(r, emails: dict) -> dict:
+    return {
+        "id": r.id, "user_email": emails.get(r.user_id), "amount": r.amount, "points": r.points, "phone": r.phone,
+        "status": r.status, "payout_reference": r.payout_reference, "note": r.note,
+        "decided_by_email": emails.get(r.decided_by), "decided_at": r.decided_at, "created_at": r.created_at,
+    }
+
+
+def decide_redemption(db: Session, admin, redemption_id, paid: bool, reference, note) -> dict:
+    from app.modules.wallet import service as wallet
+
+    r = wallet.decide(db, admin, redemption_id, paid, reference, note)
+    return _redemption_out(r, _emails(db, [r.user_id, r.decided_by]))
+
+
+def payments(db: Session) -> list[dict]:
+    from app.modules.subscriptions.models import PaymentOrder
+
+    rows = list(db.scalars(select(PaymentOrder).order_by(PaymentOrder.created_at.desc()).limit(200)))
+    emails = _emails(db, [r.user_id for r in rows])
+    return [
+        {
+            "id": r.id, "user_email": emails.get(r.user_id), "purpose": r.purpose, "amount_paise": r.amount_paise,
+            "currency": r.currency, "mode": r.mode, "status": r.status, "provider_order_id": r.provider_order_id,
+            "provider_payment_id": r.provider_payment_id, "failure_reason": r.failure_reason,
+            "created_at": r.created_at, "paid_at": r.paid_at,
+        }
+        for r in rows
+    ]
+
+
+def plans(db: Session) -> list[dict]:
+    from app.core import timeutil
+    from app.modules.subscriptions import service as subs
+    from app.modules.subscriptions.models import PaymentOrder, WhatsAppPlan
+
+    now = timeutil.utc_now()
+    rows = db.execute(
+        select(WhatsAppPlan, PaymentOrder.provider_order_id)
+        .join(PaymentOrder, PaymentOrder.id == WhatsAppPlan.payment_order_id)
+        .order_by(WhatsAppPlan.created_at.desc())
+        .limit(200)
+    ).all()
+    emails = _emails(db, [p.user_id for p, _ in rows])
+    return [
+        {
+            "user_email": emails.get(p.user_id), "free_used": min(subs.free_used(db, p.user_id), subs.FREE_MESSAGES),
+            "messages_total": p.messages_granted + p.messages_carried, "messages_used": p.messages_used,
+            "starts_at": p.starts_at, "expires_at": p.expires_at, "ended_at": p.ended_at,
+            "active": p.ended_at is None and p.starts_at <= now < p.expires_at, "provider_order_id": order_id,
+        }
+        for p, order_id in rows
+    ]

@@ -14,7 +14,8 @@ separate apps:
 Melo, a friendly puppet, is the in-app guide.
 
 This document explains what the app does, how it is built, and how to run,
-test, deploy and look after it.
+test, deploy and look after it. Payments (the WhatsApp plan, Razorpay) and
+wallet payouts are covered in detail in [PAYMENTS.md](PAYMENTS.md).
 
 ---
 
@@ -135,12 +136,18 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
 
 ### 2.4 Wallet
 
-- Streak milestones pay once each: **₹10 at a best streak of 500** and
-  **₹20 at 1000**. Milestones count once the day has finished.
+- Best-streak milestones unlock **points** once each: **500 points at a best
+  streak of 500** and **1000 more at 1000**. Milestones count once the day
+  has finished.
+- The user redeems **500 points for ₹10** or **1000 points for ₹20** to a
+  mobile number. Each redemption is *PENDING* (shown as *Processing*) and
+  its points are taken at once; **payouts are made by hand** and an admin
+  marks them *Paid* (with the payment reference) or *Not paid* (the points
+  come back).
+- Redeeming never changes the best streak, badges or milestones. A repeated
+  or double tap never redeems twice. Details: [PAYMENTS.md](PAYMENTS.md#4-wallet-points-and-payouts).
 - "To go" uses the same number as the dashboard (today's finished plans
   included) and refreshes after every tick.
-- The user redeems by entering a mobile number. Each redemption is saved as
-  *PENDING* and taken off the balance at once; **payouts are made by hand**.
 
 ### 2.5 Reminders, alarms and WhatsApp
 
@@ -158,6 +165,14 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   | Notification (free) | This phone, quietly | 🔔 **Call the electrician** · 6:30 PM · Bring the warranty card |
   | Alarm (free) | This phone, loud, until Stop | ⏰ **Call the electrician** · It's 6:30 PM… Press Stop when you're on it. |
   | WhatsApp (premium) | Any number whose owner replied **YES**, even with the phone off | A personal message with the name, reminder, date and time |
+
+- **WhatsApp plan:** every account gets **3 WhatsApp reminders free**
+  (per account, not per number). After that the **WhatsApp plan** is needed:
+  **₹30 for 100 WhatsApp reminders over 30 days**, paid with Razorpay,
+  renewed only when the user chooses (unused messages carry over). Without
+  one, saving a WhatsApp reminder explains the plan, and nothing more is
+  sent. Settings → Notifications → *WhatsApp plan* shows what's left. Test
+  mode only for now. Details: [PAYMENTS.md](PAYMENTS.md).
 
 - **"Ring like an alarm"** shows a full-screen, looping alarm with a Stop
   button that stops by itself after 10, 30 or 60 seconds. The sound
@@ -363,7 +378,10 @@ scale to 180 px high and save as 256-colour PNGs.
 ### 2.12 Admin
 
 Admin accounts see app statistics and can disable, enable or change the role
-of users. Admin screens never give access to anyone's Vault.
+of users. **Payouts & payments** lists streak-point payouts (mark *Paid*
+with the payment reference, or *Reject* with a reason; who and when are
+recorded), WhatsApp plan payments and plans. Admin screens never give
+access to anyone's Vault.
 
 ---
 
@@ -574,7 +592,9 @@ Main tables (PostgreSQL):
 | `vault_credentials` | PIN hash and lockout state |
 | `vault_entries` | Encrypted notes (+ encrypted voice note) |
 | `vault_images` | Encrypted photos of Vault notes |
-| `wallet_redemptions` | Redemption requests |
+| `wallet_redemptions` | Redemption requests: rupees and points, status (`PENDING`, `PAID`, `REJECTED`), request id, payout reference, who decided and when |
+| `payment_orders`, `payment_events` | Razorpay checkouts (amount in paise, provider ids, status) and processed webhook events (see [PAYMENTS.md](PAYMENTS.md#6-database)) |
+| `whatsapp_plans`, `whatsapp_usage` | WhatsApp plans (100 messages, 30 days, one open per user) and the ledger of WhatsApp reminder sends (one row per reminder occurrence) |
 | `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (asked, waiting for YES; `asked_at`), `VERIFIED` (said YES), `STOPPED` (said STOP) |
 | `whatsapp_auto_replies` | One row per number that wrote something other than YES or STOP: when Memo last sent it the automatic answer |
 
@@ -600,6 +620,7 @@ Main tables (PostgreSQL):
 | `b3f6c2a9d8e1` | WhatsApp refusals count (3 a day, then try tomorrow) |
 | `c9e1a4d7f3b6` | `whatsapp_inbound_log`: every webhook call, numbers masked (kept 7 days) |
 | `d4a7e2b9c1f5` | `whatsapp_auto_replies`: when Memo last answered a number's non-YES/STOP message |
+| `e8b3f1c6a2d7` | Payments, WhatsApp plans and usage ledger, wallet points and payout record (additive only) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -627,9 +648,10 @@ refresh, forgot/reset password and the health checks needs
 | Vault access | `GET /vault/status`, `POST /vault/setup`, `/vault/unlock`, `/vault/change-pin`, `/vault/refresh`, `/vault/reset-pin` |
 | Vault notes | `GET/POST /vault/entries`, `GET/PATCH/DELETE /vault/entries/{id}`, `POST /vault/entries/{id}/{pin,unpin,favorite,unfavorite,archive,unarchive,trash,restore}`, `GET /vault/folders`, `POST /vault/trash/empty` |
 | Vault media | `PUT/GET/DELETE /vault/entries/{id}/audio`, `POST /vault/entries/{id}/images`, `GET/DELETE /vault/entries/{id}/images/{image_id}` |
-| Wallet | `GET /wallet`, `POST /wallet/redeem` |
+| Wallet | `GET /wallet` (points, choices), `POST /wallet/redeem` (`points` 500/1000, `request_id`), `GET /wallet/redemptions` |
+| WhatsApp plan | `GET /subscriptions/whatsapp`, `POST /subscriptions/whatsapp/order`, `POST /subscriptions/whatsapp/verify`; `POST /payments/razorpay/webhook` (Razorpay, signed). Reminders with WhatsApp answer 402 `SUBSCRIPTIONREQUIRED` when nothing is left |
 | WhatsApp consent | `POST /whatsapp/verify` (sends the YES / STOP permission message), `GET /whatsapp/status?phone=…`, `GET /whatsapp/inbound/recent` (admins); `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in, always 200) |
-| Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role` |
+| Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role`; `GET /admin/redemptions`, `POST /admin/redemptions/{id}/paid`, `/reject`, `GET /admin/payments`, `GET /admin/whatsapp-plans` |
 | Maintenance | `POST /maintenance/cleanup` (header `X-Cron-Secret`) |
 
 Interactive docs are at `/docs` on a running server.
@@ -651,6 +673,7 @@ Interactive docs are at `/docs` on a running server.
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`, `SMTP_DEBUG` | Email through SMTP (Gmail needs an App Password; ports 587 and 465 both work). `SMTP_SERVER`/`SMTP_EMAIL` are accepted aliases |
 | `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_INTEGRATED_NUMBER`, `MSG91_WHATSAPP_TEMPLATE_NAME`, `MSG91_WHATSAPP_NAMESPACE`, `MSG91_WHATSAPP_TEMPLATE_STYLE` | WhatsApp reminders (optional) |
 | `MSG91_INBOUND_SECRET` | Secret in the URL MSG91 forwards incoming WhatsApp messages to (YES and STOP replies). Without it the inbound endpoint is off |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_MODE` | WhatsApp plan payments. Blank keys = payments off. Keys must match the mode (`rzp_test_` with `test`, `rzp_live_` with `live`). See [PAYMENTS.md](PAYMENTS.md#7-configuration) |
 | `GOOGLE_CLIENT_IDS` | Comma-separated OAuth client IDs accepted for Google sign-in |
 | `REMINDER_POLL_SECONDS`, `STREAK_FINALIZE_MINUTES` | Worker timing. Reminders are checked at second 1 of every minute and then every `REMINDER_POLL_SECONDS` (kept between 5 and 30) |
 | `TRACK_BONUS_*` | Plan completion bonus rules |
@@ -848,7 +871,7 @@ and open `web/story/index.html?scene=3&at=6` (scene number, seconds).
 | Backend | `alembic check` | Confirms the models and migrations match |
 | App | `npx tsc --noEmit` | Type check |
 | App | `npm run lint` | ESLint |
-| App | `npm test` | Jest (app render and badge rules) |
+| App | `npm test` | Jest (app render, badge rules, WhatsApp plan and wallet screens) |
 | App | `cd android && ./gradlew assembleDebug` | Android build |
 
 A quick disposable database with Docker:
@@ -939,8 +962,9 @@ block. On Render this isn't needed.
   reminders* permission (Settings → Notifications → Exact alarms).
 - **Render free plan:** sleeps when idle; the first request after that can
   take up to a minute (the keep-awake job reduces this). A paid plan avoids it.
-- **Wallet payouts** are manual: check pending redemptions in the database
-  (`wallet_redemptions`) and pay them, then mark them.
+- **Wallet payouts** are manual: Admin → *Payouts & payments* lists pending
+  ones; pay them outside Memo, then *Mark paid* with the reference
+  ([PAYMENTS.md](PAYMENTS.md#manual-payout-procedure)).
 
 ---
 

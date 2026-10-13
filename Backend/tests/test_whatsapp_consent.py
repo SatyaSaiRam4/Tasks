@@ -149,7 +149,7 @@ def test_stop_then_yes_again_still_gets_the_due_reminder(client, auth, monkeypat
     monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
     sent = []
     monkeypatch.setattr(worker, "is_configured", lambda: True)
-    monkeypatch.setattr(worker, "send_whatsapp_reminder", lambda phone, variables: sent.append(phone) or True)
+    monkeypatch.setattr(worker, "send_template", lambda phone, variables: sent.append(phone) or "accepted")
     monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db.get_bind()))
 
     client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)

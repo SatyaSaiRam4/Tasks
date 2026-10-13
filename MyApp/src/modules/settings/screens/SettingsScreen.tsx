@@ -262,6 +262,7 @@ export function SettingsScreen() {
         {toggle('notify_reminders', 'Reminders', 'Your date & time reminders', false, 'bell')}
         {toggle('notify_streak_warnings', 'Streak warnings', 'At 8 PM if today’s tasks aren’t done', false, 'flame')}
         {toggle('notify_achievements', 'Achievements', 'When you unlock something', false, 'award')}
+        <ListRow icon="message" title="WhatsApp plan" subtitle="3 free WhatsApp reminders, then ₹30 for 100" onPress={() => navigation.navigate('WhatsAppPlan')} />
         <ListRow icon="clock" title="Exact alarms" subtitle="Allow on-time delivery on Android 12+" onPress={() => openExactAlarmSettings().catch(() => undefined)} last />
       </ListGroup>
 

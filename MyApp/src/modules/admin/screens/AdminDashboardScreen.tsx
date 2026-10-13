@@ -68,6 +68,14 @@ export function AdminDashboardScreen() {
           </Card>
 
           <Button label="Manage users" icon="users" iconRight="chevron-right" onPress={() => navigation.navigate('AdminUsers')} style={styles.cta} />
+          <Button
+            label="Payouts & payments"
+            icon="wallet"
+            iconRight="chevron-right"
+            variant="secondary"
+            onPress={() => navigation.navigate('AdminMoney')}
+            style={styles.cta}
+          />
         </>
       )}
     </Screen>

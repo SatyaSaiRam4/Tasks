@@ -21,7 +21,7 @@ from sqlalchemy import select
 from app.core.config import MSG91_WHATSAPP_TEMPLATE_STYLE, REMINDER_POLL_SECONDS, STREAK_FINALIZE_MINUTES
 from app.db.session import SessionLocal
 from app.integrations.messages import whatsapp_variables
-from app.integrations.msg91 import is_configured, send_whatsapp_reminder
+from app.integrations.msg91 import ACCEPTED, is_configured, send_template
 from app.modules.reminders import service as reminders_service
 
 logger = logging.getLogger("workers")
@@ -49,6 +49,17 @@ def _poll_due_reminders() -> None:
                     if datetime.now(UTC) - reminder.remind_at > UNVERIFIED_WAIT:
                         reminders_service.mark_whatsapp_result(db, reminder.id, False)
                     continue
+                # The account's allowance (3 free, then the plan): one unit per
+                # reminder occurrence, taken before sending. An existing row
+                # means an earlier try got this far: never send twice.
+                from app.modules.subscriptions import service as plans
+
+                usage, retried = plans.reserve(db, reminder)
+                if retried or usage.status == "BLOCKED":
+                    reminders_service.mark_whatsapp_result(db, reminder.id, usage.status == "ACCEPTED")
+                    if usage.status == "BLOCKED":
+                        logger.info("WhatsApp reminder %s not sent: no free messages or plan left", reminder.id)
+                    continue
                 user = db.get(User, reminder.user_id)
                 variables = whatsapp_variables(
                     MSG91_WHATSAPP_TEMPLATE_STYLE,
@@ -58,7 +69,9 @@ def _poll_due_reminders() -> None:
                     reminder.remind_at,
                     user.timezone if user else None,
                 )
-                sent = send_whatsapp_reminder(reminder.whatsapp_number, variables)
+                outcome = send_template(reminder.whatsapp_number, variables)
+                plans.settle(db, usage, outcome)
+                sent = outcome == ACCEPTED
                 reminders_service.mark_whatsapp_result(db, reminder.id, sent)
                 if not sent:
                     logger.warning("WhatsApp send failed for reminder %s", reminder.id)

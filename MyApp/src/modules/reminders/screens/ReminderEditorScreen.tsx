@@ -15,7 +15,7 @@ import { ListGroup, ListRow } from '../../../components/ListRow';
 import { Button } from '../../../components/Button';
 import { ConfirmSheet } from '../../../components/Sheet';
 import { Skeleton } from '../../../components/Feedback';
-import { getErrorMessage } from '../../../utils/apiError';
+import { errorCode, getErrorMessage } from '../../../utils/apiError';
 import { formatFullDate, fromDateKey, toDateKey } from '../../../utils/date';
 import {
   cancelReminderNotification,
@@ -32,6 +32,7 @@ import {
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { WhatsAppVerify } from '../WhatsAppVerify';
 import type { ContactStatus } from '../whatsappApi';
+import { allowanceLine, useGetWhatsAppPlanQuery } from '../../subscriptions/subscriptionsApi';
 
 /** A bare 10-digit number is almost always an Indian mobile number typed without +91. */
 function normalizeWhatsapp(raw: string): string {
@@ -72,6 +73,9 @@ export function ReminderEditorScreen() {
   const [alarmPrompt, setAlarmPrompt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The account's WhatsApp allowance (3 free, then the plan), while WhatsApp is on.
+  const plan = useGetWhatsAppPlanQuery(undefined, { skip: !whatsapp, refetchOnMountOrArgChange: true });
+  const [needsPlan, setNeedsPlan] = useState(false);
 
   useEffect(() => {
     const r = existing.data;
@@ -88,6 +92,7 @@ export function ReminderEditorScreen() {
 
   const save = async () => {
     setError(null);
+    setNeedsPlan(false);
     if (!title.trim()) return setError('What should we remind you about?');
     if (!time) return setError('Pick a time.');
     const [hh, mm] = time.split(':').map(Number);
@@ -121,6 +126,10 @@ export function ReminderEditorScreen() {
       else navigation.goBack();
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save this reminder.'));
+      if (errorCode(err) === 'SUBSCRIPTIONREQUIRED') {
+        setNeedsPlan(true);
+        plan.refetch();
+      }
     }
   };
 
@@ -196,6 +205,18 @@ export function ReminderEditorScreen() {
           <View style={styles.mtLg}>
             <TextField label="WhatsApp number" value={number} onChangeText={setNumber} placeholder="9876543210" keyboardType="phone-pad" />
             {/^\+\d{8,15}$/.test(normalizeWhatsapp(number)) ? <WhatsAppVerify phone={normalizeWhatsapp(number)} onStatus={setWaStatus} /> : null}
+            {plan.data ? (
+              <Text style={[styles.allowance, plan.data.purchase_required && { color: colors.warning }]}>{allowanceLine(plan.data)}</Text>
+            ) : null}
+            {plan.data?.purchase_required || needsPlan ? (
+              <Button
+                label="See the WhatsApp plan"
+                icon="message"
+                variant="secondary"
+                onPress={() => navigation.navigate('WhatsAppPlan' as never)}
+                style={styles.mtSm}
+              />
+            ) : null}
           </View>
         ) : null}
 
@@ -257,6 +278,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   mtSm: {
+    marginTop: spacing.sm,
+  },
+  allowance: {
+    ...t.caption,
     marginTop: spacing.sm,
   },
   error: {
