@@ -49,13 +49,21 @@ def is_configured() -> bool:
     )
 
 
-def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
+# What came of one template send, for the WhatsApp usage ledger:
+#   "accepted"  MSG91 took it (2xx, no error in the body).
+#   "rejected"  MSG91 definitely refused it (an HTTP error or an error body):
+#               nothing went out, so the user isn't charged.
+#   "unknown"   no answer (timeout, dropped connection): it may have gone out,
+#               so it isn't sent again and it isn't refunded.
+ACCEPTED, REJECTED, UNKNOWN = "accepted", "rejected", "unknown"
+
+
+def send_template(to_number: str, variables: list[str]) -> str:
     """Sends the configured template to `to_number` (E.164, e.g.
     +919876543210), with `variables` filling its {{1}}, {{2}}… in order.
-    Returns True on a 2xx response from MSG91, False otherwise (never raises,
-    so a WhatsApp outage never breaks the reminder itself)."""
+    Returns ACCEPTED, REJECTED or UNKNOWN (above); never raises."""
     if not is_configured():
-        return False
+        return REJECTED
 
     bare_number = to_number.lstrip("+")
     payload = {
@@ -83,9 +91,13 @@ def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
 
     try:
         response = httpx.post(MSG91_WHATSAPP_URL, json=payload, headers=headers, timeout=10.0)
+    except httpx.ConnectError as exc:
+        # Never reached MSG91: nothing went out.
+        logger.warning("MSG91 unreachable for %s: %s", bare_number[-4:], exc)
+        return REJECTED
     except httpx.HTTPError as exc:
-        logger.warning("MSG91 request to %s failed: %s", bare_number, exc)
-        return False
+        logger.warning("MSG91 request to %s ended without an answer: %s", bare_number[-4:], exc)
+        return UNKNOWN
 
     # MSG91 can answer 200 with {"hasError": true, ...}; that is not a send.
     try:
@@ -93,12 +105,15 @@ def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
     except ValueError:
         body = {}
     if not response.is_success or (isinstance(body, dict) and body.get("hasError")):
-        logger.warning("MSG91 rejected WhatsApp to %s: HTTP %s %s", bare_number, response.status_code, response.text[:300])
-        return False
-    logger.info("MSG91 accepted WhatsApp to %s (request_id=%s)", bare_number, body.get("request_id") if isinstance(body, dict) else None)
-    return True
+        logger.warning("MSG91 rejected WhatsApp to %s: HTTP %s %s", bare_number[-4:], response.status_code, response.text[:300])
+        return REJECTED
+    logger.info("MSG91 accepted WhatsApp to %s (request_id=%s)", bare_number[-4:], body.get("request_id") if isinstance(body, dict) else None)
+    return ACCEPTED
 
 
+def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
+    """send_template, as True/False (the permission message uses this)."""
+    return send_template(to_number, variables) == ACCEPTED
 
 # Free text (no template) inside the 24 hours after the person wrote to us.
 MSG91_WHATSAPP_TEXT_URL = "https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/"

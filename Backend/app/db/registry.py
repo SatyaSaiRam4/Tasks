@@ -10,6 +10,7 @@ def import_all_models() -> None:
     from app.modules.auth import models as _auth  # noqa: F401
     from app.modules.reminders import models as _reminders  # noqa: F401
     from app.modules.streaks import models as _streaks  # noqa: F401
+    from app.modules.subscriptions import models as _subscriptions  # noqa: F401
     from app.modules.tracks import models as _tracks  # noqa: F401
     from app.modules.users import models as _users  # noqa: F401
     from app.modules.vault import models as _vault  # noqa: F401

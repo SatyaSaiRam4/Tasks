@@ -29,6 +29,47 @@ export interface AdminUserOut {
   created_at: string;
 }
 
+export interface AdminRedemption {
+  id: string;
+  user_email: string | null;
+  amount: number;
+  points: number;
+  phone: string;
+  status: 'PENDING' | 'PAID' | 'REJECTED';
+  payout_reference: string | null;
+  note: string | null;
+  decided_by_email: string | null;
+  decided_at: string | null;
+  created_at: string;
+}
+
+export interface AdminPayment {
+  id: string;
+  user_email: string | null;
+  purpose: string;
+  amount_paise: number;
+  currency: string;
+  mode: 'test' | 'live';
+  status: 'CREATED' | 'PAID' | 'FAILED' | 'EXPIRED';
+  provider_order_id: string;
+  provider_payment_id: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  paid_at: string | null;
+}
+
+export interface AdminPlan {
+  user_email: string | null;
+  free_used: number;
+  messages_total: number;
+  messages_used: number;
+  starts_at: string;
+  expires_at: string;
+  ended_at: string | null;
+  active: boolean;
+  provider_order_id: string;
+}
+
 export const adminApi = baseApi.injectEndpoints({
   endpoints: builder => ({
     getAdminDashboard: builder.query<AdminDashboardOut, void>({
@@ -70,10 +111,37 @@ export const adminApi = baseApi.injectEndpoints({
         'AdminDashboard',
       ],
     }),
+
+    listAdminRedemptions: builder.query<AdminRedemption[], { status?: string } | void>({
+      query: arg => ({ url: '/admin/redemptions', params: cleanParams({ status: arg?.status }) }),
+      providesTags: ['AdminMoney'],
+    }),
+    /** Only after the payout has really been sent: the UPI / bank reference is recorded with who and when. */
+    markRedemptionPaid: builder.mutation<AdminRedemption, { id: string; reference: string }>({
+      query: ({ id, reference }) => ({ url: `/admin/redemptions/${id}/paid`, method: 'POST', body: { reference } }),
+      invalidatesTags: ['AdminMoney'],
+    }),
+    rejectRedemption: builder.mutation<AdminRedemption, { id: string; note: string }>({
+      query: ({ id, note }) => ({ url: `/admin/redemptions/${id}/reject`, method: 'POST', body: { note } }),
+      invalidatesTags: ['AdminMoney'],
+    }),
+    listAdminPayments: builder.query<AdminPayment[], void>({
+      query: () => '/admin/payments',
+      providesTags: ['AdminMoney'],
+    }),
+    listAdminPlans: builder.query<AdminPlan[], void>({
+      query: () => '/admin/whatsapp-plans',
+      providesTags: ['AdminMoney'],
+    }),
   }),
 });
 
 export const {
+  useListAdminRedemptionsQuery,
+  useMarkRedemptionPaidMutation,
+  useRejectRedemptionMutation,
+  useListAdminPaymentsQuery,
+  useListAdminPlansQuery,
   useGetAdminDashboardQuery,
   useListAdminUsersQuery,
   useDisableAdminUserMutation,

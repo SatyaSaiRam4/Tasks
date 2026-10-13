@@ -142,6 +142,8 @@ export const baseApi = createApi({
     'AdminUser',
     'AdminDashboard',
     'Wallet',
+    'WhatsAppPlan',
+    'AdminMoney',
   ],
   endpoints: () => ({}),
 });

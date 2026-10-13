@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from '@ant-design/react-native/lib/toast';
 import { brand, colors, font, gradients, radius, spacing, type as t } from '../../../theme';
 import { Screen } from '../../../components/Screen';
@@ -14,36 +14,48 @@ import { Icon } from '../../../components/Icon';
 import { RealIcon } from '../../../components/RealIcon';
 import { getErrorMessage } from '../../../utils/apiError';
 import { formatFullDate } from '../../../utils/date';
-import { useGetWalletQuery, useRedeemMutation } from '../walletApi';
+import { newRequestId, useGetWalletQuery, useRedeemMutation, type WalletRedemption } from '../walletApi';
 
 /**
- * The wallet: money earned from streak milestones (500 streak points → ₹10,
- * 1000 → ₹20), shown side by side. To redeem, the user enters an amount (up
- * to the balance) and a mobile number.
+ * The wallet: streak points that turn into money. Best-streak milestones
+ * unlock points once each (500 at a best streak of 500, 1000 more at 1000).
+ * The user redeems 500 points (₹10) or 1000 points (₹20) to a mobile number;
+ * payouts are sent by hand and each request shows Processing, Paid or Not
+ * paid. Everything comes from the server; nothing is decided on the phone.
  */
 export function WalletScreen() {
   const wallet = useGetWalletQuery();
   const [redeem, { isLoading: redeeming }] = useRedeemMutation();
   const [phone, setPhone] = useState('');
-  const [amount, setAmount] = useState('');
+  const [points, setPoints] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // One id per redemption: a second tap or a retry after a dropped connection
+  // gets the same redemption back instead of a new one.
+  const requestId = useRef(newRequestId());
+  // Set at once (state updates wait for the next render), so a double tap sends once.
+  const sending = useRef(false);
   const w = wallet.data;
   // The same streak the dashboard shows (today's finished plans included).
   const live = Math.max(w?.live_best_streak ?? 0, w?.best_streak ?? 0);
 
+  const choice = w?.choices.find(c => c.points === points && c.available) ?? null;
+
   const submit = async () => {
+    if (redeeming || sending.current) return;
     setError(null);
-    const rupees = Number(amount);
-    if (!Number.isInteger(rupees) || rupees < 1) return setError('Enter an amount in rupees, e.g. 10.');
-    if (w && rupees > w.balance) return setError(`You can redeem up to ₹${w.balance}.`);
+    if (!choice) return setError('Choose 500 or 1000 points.');
     if (!/^\+?\d{10,15}$/.test(phone.replace(/[\s-]/g, ''))) return setError('Enter your mobile number, e.g. 9876543210.');
+    sending.current = true;
     try {
-      const r = await redeem({ phone, amount: rupees }).unwrap();
+      const r = await redeem({ phone, points: choice.points, request_id: requestId.current }).unwrap();
+      requestId.current = newRequestId();
       setPhone('');
-      setAmount('');
-      Toast.success(`₹${r.amount} is on its way to ${r.phone}.`, 2);
+      setPoints(null);
+      Toast.success(`₹${r.amount} (${r.points} points) is on its way to ${r.phone}.`, 2);
     } catch (err) {
       setError(getErrorMessage(err, 'Could not redeem right now.'));
+    } finally {
+      sending.current = false;
     }
   };
 
@@ -61,10 +73,12 @@ export function WalletScreen() {
         <>
           <Card tone="hero" contentStyle={styles.balanceCard}>
             <RealIcon name="coin" size={52} />
-            <Text style={styles.balanceLabel}>Balance</Text>
-            <Text style={styles.balance}>₹{w.balance}</Text>
+            <Text style={styles.balanceLabel}>Points to redeem</Text>
+            <Text style={styles.balance} accessibilityLabel={`${w.points_available} points, worth ${w.balance} rupees`}>
+              {w.points_available}
+            </Text>
             <Text style={styles.balanceNote}>
-              {w.balance > 0 ? 'Ready to redeem' : `Best streak: ${live}`}
+              {w.points_available > 0 ? `Worth ₹${w.balance} · ready to redeem` : `Best streak: ${live}`}
             </Text>
           </Card>
 
@@ -74,7 +88,9 @@ export function WalletScreen() {
               <Card key={m.days} style={styles.flex} contentStyle={styles.milestone} accent={m.reached ? colors.success : undefined}>
                 <RealIcon name={m.reached ? 'trophy' : 'flame'} size={30} />
                 <Text style={styles.milestoneAmount}>₹{m.amount}</Text>
-                <Text style={styles.milestoneGoal}>{m.days} streaks</Text>
+                <Text style={styles.milestoneGoal}>
+                  {m.points || m.days} points · streak {m.days}
+                </Text>
                 <ProgressBar
                   progress={Math.min(live / m.days, 1)}
                   height={4}
@@ -90,15 +106,28 @@ export function WalletScreen() {
 
           <Text style={styles.section}>Redeem</Text>
           <Card contentStyle={styles.redeem}>
-            <TextField
-              label={`Amount (up to ₹${w.balance})`}
-              value={amount}
-              onChangeText={v => setAmount(v.replace(/[^0-9]/g, ''))}
-              placeholder={w.balance ? String(w.balance) : '0'}
-              keyboardType="number-pad"
-              maxLength={6}
-              editable={w.balance > 0}
-            />
+            <View style={styles.choices} accessibilityRole="radiogroup">
+              {w.choices.map(c => {
+                const selected = points === c.points && c.available;
+                return (
+                  <Pressable
+                    key={c.points}
+                    onPress={() => {
+                      setPoints(c.points);
+                      setError(null);
+                    }}
+                    disabled={!c.available || redeeming}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: !c.available }}
+                    accessibilityLabel={`${c.points} points for ${c.amount} rupees${c.available ? '' : ', not enough points yet'}`}
+                    style={[styles.choice, selected && styles.choiceSelected, !c.available && styles.choiceOff]}
+                  >
+                    <Text style={[styles.choicePoints, selected && styles.choiceTextSelected]}>{c.points} points</Text>
+                    <Text style={[styles.choiceAmount, selected && styles.choiceTextSelected]}>₹{c.amount}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             <TextField
               label="Mobile number (UPI / wallet)"
               value={phone}
@@ -107,13 +136,13 @@ export function WalletScreen() {
               keyboardType="phone-pad"
               maxLength={16}
               error={error}
-              editable={w.balance > 0}
+              editable={w.points_available > 0 && !redeeming}
             />
             <Button
-              label={w.balance > 0 ? `Redeem ₹${amount || 0}` : 'Nothing to redeem yet'}
+              label={w.points_available <= 0 ? 'No points to redeem yet' : choice ? `Redeem ₹${choice.amount}` : 'Choose 500 or 1000 points'}
               onPress={submit}
               loading={redeeming}
-              disabled={w.balance <= 0 || !amount}
+              disabled={!choice || redeeming}
               size="lg"
             />
             <Text style={[t.caption, styles.redeemNote]}>Payments are sent by hand within a few days.</Text>
@@ -126,14 +155,9 @@ export function WalletScreen() {
                 {w.redemptions.map((r, i) => (
                   <ListRow
                     key={r.id}
-                    title={`₹${r.amount} to ${r.phone}`}
-                    subtitle={formatFullDate(r.created_at)}
-                    right={
-                      <View style={styles.status}>
-                        {r.status === 'PAID' ? <RealIcon name="check" size={16} /> : <Icon name="clock" size={14} color={colors.textSecondary} />}
-                        <Text style={t.caption}>{r.status === 'PAID' ? 'Paid' : 'Processing'}</Text>
-                      </View>
-                    }
+                    title={`₹${r.amount} · ${r.points} points`}
+                    subtitle={redemptionDetail(r)}
+                    right={<RedemptionState status={r.status} />}
                     last={i === w.redemptions.length - 1}
                   />
                 ))}
@@ -146,7 +170,64 @@ export function WalletScreen() {
   );
 }
 
+/** "To +91… · 12 Oct", plus the payout reference or why it wasn't paid. */
+function redemptionDetail(r: WalletRedemption): string {
+  const base = `To ${r.phone} · ${formatFullDate(r.created_at)}`;
+  if (r.status === 'PAID' && r.payout_reference) return `${base} · Ref ${r.payout_reference}`;
+  if (r.status === 'REJECTED') return `${base} · ${r.note ? `${r.note}. ` : ''}Points returned`;
+  return base;
+}
+
+function RedemptionState({ status }: { status: WalletRedemption['status'] }) {
+  const label = status === 'PAID' ? 'Paid' : status === 'REJECTED' ? 'Not paid' : 'Processing';
+  return (
+    <View style={styles.status} accessibilityLabel={label}>
+      {status === 'PAID' ? (
+        <RealIcon name="check" size={16} />
+      ) : (
+        <Icon name={status === 'REJECTED' ? 'x' : 'clock'} size={14} color={status === 'REJECTED' ? colors.danger : colors.textSecondary} />
+      )}
+      <Text style={[t.caption, status === 'REJECTED' && { color: colors.danger }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  choices: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  choice: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  choiceSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  choiceOff: {
+    opacity: 0.45,
+  },
+  choicePoints: {
+    ...font.semibold,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  choiceAmount: {
+    ...font.serif,
+    fontSize: 26,
+    lineHeight: 30,
+    color: colors.text,
+  },
+  choiceTextSelected: {
+    color: colors.onPrimary,
+  },
   mtLg: {
     marginTop: spacing.lg,
   },

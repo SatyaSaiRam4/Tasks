@@ -65,12 +65,17 @@ def run_cleanup(db: Session) -> dict[str, int]:
     # The WhatsApp webhook log is only for diagnosis: keep a week.
     db.execute(delete(WhatsAppInboundLog).where(WhatsAppInboundLog.received_at < now - timedelta(days=7)))
     db.commit()
+    # Checkouts left unpaid for a day (payment records themselves are kept).
+    from app.modules.subscriptions.service import expire_abandoned
+
+    abandoned = expire_abandoned(db)
     result = {
         "users_finalized": finalized,
         "plans_deleted": plans,
         "tasks_deleted": tasks,
         "reminders_deleted": reminders,
         "bin_notes_deleted": notes,
+        "checkouts_expired": abandoned,
     }
     logger.info("Daily cleanup: %s", result)
     return result

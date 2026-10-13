@@ -29,6 +29,10 @@ engine = create_engine(TEST_DATABASE_URL)
 TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 TABLES = [
+    "whatsapp_usage",
+    "whatsapp_plans",
+    "payment_events",
+    "payment_orders",
     "whatsapp_auto_replies",
     "whatsapp_inbound_log",
     "whatsapp_contacts",

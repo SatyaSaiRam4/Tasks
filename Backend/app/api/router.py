@@ -8,6 +8,7 @@ from app.modules.dashboard.router import router as dashboard_router
 from app.modules.maintenance.router import router as maintenance_router
 from app.modules.reminders.router import router as reminders_router
 from app.modules.streaks.router import router as streaks_router
+from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.tracks.router import router as tracks_router
 from app.modules.users.router import router as users_router
 from app.modules.vault.router import router as vault_router
@@ -27,5 +28,6 @@ api_router.include_router(reminders_router)
 api_router.include_router(vault_router)
 api_router.include_router(wallet_router)
 api_router.include_router(whatsapp_router)
+api_router.include_router(subscriptions_router)
 api_router.include_router(admin_router)
 api_router.include_router(maintenance_router)

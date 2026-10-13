@@ -20,6 +20,13 @@ def _require_verified(db: Session, phone: str | None) -> None:
         )
 
 
+def _require_allowance(db: Session, user_id: UUID) -> None:
+    """402 SUBSCRIPTIONREQUIRED when the 3 free WhatsApp reminders are used and there's no plan left."""
+    from app.modules.subscriptions.service import require_allowance
+
+    require_allowance(db, user_id)
+
+
 def _whatsapp_status_for(whatsapp_number: str | None) -> WhatsAppStatus:
     return WhatsAppStatus.PENDING if whatsapp_number else WhatsAppStatus.NOT_REQUESTED
 
@@ -54,6 +61,8 @@ def list_reminders(
 def create_reminder(db: Session, user_id: UUID, data: dict) -> Reminder:
     _validate_track(db, user_id, data.get("track_id"))
     _require_verified(db, data.get("whatsapp_number"))
+    if data.get("whatsapp_number"):
+        _require_allowance(db, user_id)
     reminder = Reminder(
         user_id=user_id,
         title=data["title"],
@@ -95,6 +104,9 @@ def update_reminder(db: Session, user_id: UUID, reminder_id: UUID, fields: dict)
     if clear_track:
         reminder.track_id = None
 
+    if whatsapp_touched and reminder.whatsapp_number:
+        # Another WhatsApp message will go out: the account needs something left.
+        _require_allowance(db, user_id)
     if whatsapp_touched:
         # Re-arm the WhatsApp side-channel whenever the number or time changes,
         # so an edited reminder still gets (re)sent instead of silently reusing
