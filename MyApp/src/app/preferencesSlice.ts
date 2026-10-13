@@ -20,6 +20,13 @@ export interface PreferencesState {
   alarmVersion: number;
   /** The welcome story is open (first sign-in, or replayed from Settings). */
   storyOpen: boolean;
+  /**
+   * The tour was started again from Settings (not a new user's first one).
+   * During a new user's first story and tour, Home keeps Melo's corner off
+   * (no animation or weather showing through behind the guide); a replay
+   * leaves it on.
+   */
+  tourReplay: boolean;
 }
 
 const initialState: PreferencesState = {
@@ -34,6 +41,7 @@ const initialState: PreferencesState = {
   tapSound: false,
   alarmVersion: 0,
   storyOpen: false,
+  tourReplay: false,
 };
 
 const preferencesSlice = createSlice({
@@ -55,8 +63,11 @@ const preferencesSlice = createSlice({
     storyClosed(state) {
       state.storyOpen = false;
     },
+    tourReplayed(state) {
+      state.tourReplay = true;
+    },
   },
 });
 
-export const { preferencesSynced, preferencesReset, alarmChanged, storyOpened, storyClosed } = preferencesSlice.actions;
+export const { preferencesSynced, preferencesReset, alarmChanged, storyOpened, storyClosed, tourReplayed } = preferencesSlice.actions;
 export default preferencesSlice.reducer;

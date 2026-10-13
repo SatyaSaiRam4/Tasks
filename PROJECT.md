@@ -66,6 +66,7 @@ Tasks/
 │   │   ├── widget/          Android home-screen widget bridge
 │   │   └── config/env.ts    Backend URL
 │   ├── web/story/           Source of the 3D welcome story (three.js)
+│   ├── web/satya/           Source of Melo's 3D page (Home corner, tour, weather layer)
 │   ├── assets/              Fonts, images, Melo's model, built web pages
 │   ├── android/  ios/       Native projects
 │   └── __tests__/           Jest tests
@@ -87,6 +88,8 @@ Home is the first tab. It shows:
   link to the Wallet.
 - **My plans:** active and upcoming plans (`n / 10`); tap one to open it.
 - **Next reminder:** its title, date and time.
+- **Melo's corner** at the bottom (see [2.9](#29-welcome-story-tour-and-melo)),
+  with the real weather shown lightly behind him.
 
 Home is also where new **badges are revealed** and where congratulations
 for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-reveal)).
@@ -154,7 +157,7 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   |---|---|---|
   | Notification (free) | This phone, quietly | 🔔 **Call the electrician** · 6:30 PM · Bring the warranty card |
   | Alarm (free) | This phone, loud, until Stop | ⏰ **Call the electrician** · It's 6:30 PM… Press Stop when you're on it. |
-  | WhatsApp (premium) | Any number whose owner tapped **👍**, even with the phone off | A personal message with the name, reminder, date and time |
+  | WhatsApp (premium) | Any number whose owner replied **YES**, even with the phone off | A personal message with the name, reminder, date and time |
 
 - **"Ring like an alarm"** shows a full-screen, looping alarm with a Stop
   button that stops by itself after 10, 30 or 60 seconds. The sound
@@ -162,22 +165,25 @@ for achievements and finished plans appear (see [4.2](#42-badges-and-the-home-re
   Settings, which also has *Test alarm*.
 - Task notifications read ✅ **Walk 20 minutes** · Time for this task in
   "Fitness". The 8 PM streak warning reads 🔥 **2 tasks left today**.
-- **A WhatsApp number must tap 👍 first** (so nobody can use Memo to
+- **A WhatsApp number must reply YES first** (so nobody can use Memo to
   message someone else's number to tease them). Under the number in the
-  reminder editor, *Ask for permission on WhatsApp* sends that number **one**
-  message through the reminder template (which has 👍 / 👎 buttons): "👋
-  Satya wants to send you reminders from the Memo app on this WhatsApp.
-  Within 1 minute, tap 👍 to allow or 👎 to refuse (or reply YES / STOP)."
-  No codes. The app shows a live 1-minute countdown and checks every 2
-  seconds, so it turns to *Allowed* (or *Refused*) as soon as they tap. A 👍
-  after the minute doesn't count: *Send again* (3 times a day at most). The
-  reminder can be saved while waiting; WhatsApp messages go out only to
-  numbers that tapped 👍. 👎 / STOP (or UNSUBSCRIBE, CANCEL, END, QUIT, NO)
-  stops all reminders to it. The editor then shows **Verify again**, which
-  sends the 👍 / 👎 message once more; after **3 refusals within a day** it
-  says *This number refused 3 times today. Try again tomorrow.* (see
-  [7.4](#74-whatsapp-number-permission)). The status always comes fresh from
-  the server and keeps refreshing, so a later 👍 shows without reopening.
+  reminder editor, *Ask on WhatsApp* sends that number **one** short
+  message through the reminder template: "Satya wants to send you Memo
+  reminders here. Reply YES to allow or STOP to refuse." No codes, no
+  emoji buttons (a 👍 / 👎 reply is still understood). The app shows a
+  1-minute countdown and checks every 1.5 seconds, so it turns green
+  (*Accepted · they replied YES*) as soon as they reply. It keeps checking
+  while the editor is open, so a **STOP, even right after YES**, turns it
+  red (*Not accepted · they replied STOP*) within a few seconds; *Send
+  again* appears once the minute since the ask is over. No answer in the
+  minute: *No answer within 1 minute* and *Send again* (3 times a day at
+  most). After **3 refusals within a day** it says *Not accepted 3 times
+  today. Try again tomorrow.* (see [7.4](#74-whatsapp-number-permission)).
+- **What gets sent:** reminders go out on time (the worker runs at second
+  1 of every minute). While a number is stopped (or hasn't said YES yet)
+  nothing is sent to it; a reminder that comes due then waits **5
+  minutes** for a YES and goes out if one arrives, otherwise it's dropped
+  (*Failed*). After YES again, every later reminder is sent as normal.
 
 ### 2.6 Private Vault
 
@@ -248,20 +254,63 @@ the **light** theme.
 - **Melo on Home** (`MeloCorner.tsx`, `web/satya/melo.js`, built with
   `npm run build:melo`): he arrives as a ball in his own robe red that rolls
   in from one side and flips open in a burst of gold, red and white stars
-  with a ripple across the floor; he pops out and strolls off, turns his
+  (with sparkles fanning out in two arcs either side of the ball, never
+  bunched at the top) and a ripple across the floor; he pops out and strolls off, turns his
   face to you mid-walk, blushes (soft pink, steam puffs) and dashes off the
   screen in a kick of dust; then, Chopper-style, he leans back in from the
   edge with half of him showing and a sweat drop to check whether you're
   still watching (twice; a tap finds him) and comes back to give his tip in
   a speech bubble. He leaves soft footprints that fade as he walks. A tap at any time makes him blush, with
   red hearts that pop out to his sides (below the speech bubble).
-  Particles have darker edges so they show on the light and dark themes. He also reacts to the user's
+  Particles have darker edges so they show on the light and dark themes. If
+  Android closes his page in the background or it fails to load, the corner
+  loads it again (3 tries, then again each time Home comes back); it stays
+  hidden only on phones without 3D (WebGL).
+  His full show plays even with Memo's own *Reduced motion* on (like the
+  badge reveal). Only the phone's system *Remove animations* setting makes
+  him skip the entrance and walking: then he stands in the middle of his
+  corner and gives his tip at once. (Before, he stayed off stage, ready to
+  roll in, so the corner looked empty.) He also reacts to the user's
   day (proud, worried, sleepy). Check it in a browser: serve `MyApp/assets`
   and open `web/satya/index.html?mode=stroll&at=40&hold=peek&f=0.5`
   (`at` fast-forwards; `hold` freezes a phase).
+- **Weather in Melo's corner** (`src/modules/satya/weather.ts`,
+  `web/satya/meloWeather.js`): the real weather where the user is. Melo
+  himself doesn't change; the weather is shown, not worn:
+  - **Behind him**, kept faint: a soft sun glow (a few twinkles at night),
+    slow clouds, thin rain, a flash in a storm, drifting snow or mist.
+  - **A caring weather report**: every other time he stops to talk, his
+    speech bubble talks about the weather instead of his tip, for example
+    "It's raining in Hyderabad ☔ Take an umbrella and stay dry!", "Sunny
+    and 33° in Chennai ☀️ Keep a water bottle with you.", "Chilly 12° in
+    Shimla 🧣 Wear something warm today." (`weatherCare`).
+  - **A small label** in the top-right corner, e.g. `☀️ 31° · Hyderabad`.
+  No card, no forecast. The first time Home opens, Android asks for **rough
+  location** (city level) once; if the user says no, there's simply no
+  weather and Memo never asks again (it can be turned on in Android's app
+  settings). The city name comes from the phone's own Geocoder. The
+  location goes only to Open-Meteo (free, no key), rounded to about 1 km;
+  Memo's server never sees it. The weather is kept for 30 minutes.
+  Preview in a browser: `web/satya/index.html?weather=rain` (also `clear`,
+  `cloudy`, `fog`, `storm`, `snow`; `&night=1` for night; add
+  `&mode=stroll` for Home's corner).
 - **Melo's tour:** nine short steps (making a plan, adding tasks, ticking,
   streak points, rewards, reminders, the Vault) with typed-out text and a
   gesture each, plus Back and Skip.
+- **Who sees the tour:** only a new user (the server says they haven't
+  finished or skipped it) and anyone who taps *Replay tour*. The app
+  decides only from what the server said in this session (sign-in, token
+  refresh or `/users/me`; `userConfirmed` and `selectIsNewUser` in
+  `authSlice.ts`), never from the copy saved on the phone alone, and the
+  saved copy is updated whenever the user changes (`saveUser`). Before
+  this, the copy saved at sign-in still said "tour not done", so the tour
+  could pop up again at launch and vanish a moment later.
+- **Quiet Home during a new user's first story and tour:** Melo's corner
+  (his animation and the weather, and the location question) is off until
+  the guide is finished or skipped, so nothing moves behind it; then he
+  arrives in his ball as usual. A tour replayed from Settings (*Replay
+  tour*) leaves him playing behind it (`tourReplay` in
+  `app/preferencesSlice.ts`).
 
 ### 2.10 Why Memo?
 
@@ -270,12 +319,46 @@ to-do apps (Google Tasks, Microsoft To Do, Todoist, TickTick) in a small
 diagram and a yes / some / no table. It was checked in October 2026; keep it
 honest and update it if those apps change.
 
-### 2.11 Android home-screen widget
+### 2.11 Android home-screen widgets
 
-Shows the streak, today's tasks and the next reminder, with Melo standing on
-the right (`res/drawable-nodpi/melo_widget.png`, rendered from his 3D model);
-tap to open Memo. Nothing from the Vault is shown. Add it with a long press on the home
-screen → Widgets → Memo.
+Three widgets to choose from (long press on the home screen → Widgets →
+Memo; on Android 12+ the picker shows each one's real layout):
+
+| In the picker | Size | Shows |
+|---|---|---|
+| **Memo** | 4×2 | The weather, M logo and streak, today's tasks, the next reminder, Melo animated |
+| **Memo · Melo** | 2×2 | The weather on top, Melo animated in the middle, M logo and streak below |
+| **Memo · Today** | 4×1 | One slim row: M logo, streak, today's tasks, the next reminder, the weather |
+
+All three draw the same saved data (`MemoWidgetProvider.kt`, with
+`MemoSmallWidgetProvider` and `MemoWideWidgetProvider`; layouts
+`memo_widget.xml`, `memo_widget_small.xml`, `memo_widget_wide.xml`) and
+update together. The big one in detail:
+
+Shows Memo's **M** logo with the streak, today's tasks and the next
+reminder, the **weather** on a small line centred at the top (the same
+`☀️ 31° · Hyderabad` as Home, saved whenever Home loads the weather and hidden once
+it's more than 3 hours old or location isn't allowed), with **Melo animated as in the app** on the right: he blinks,
+waves, talks, does his shy wiggle with red hearts, hops, then spins with
+sparkles, over and over (about 10 seconds). Widgets can't play real
+animations, so a `ViewFlipper` steps through 68 frames rendered from his 3D
+page (`res/drawable-nodpi/melo_widget_00.png` … `67`, 180 px, 256-colour
+PNGs, about 540 KB in all) every 150 ms, switching straight from one to the next (fading between
+them made him flicker); it runs
+only while the widget is on screen. The logo is `memo_widget_mark.png`
+(from `assets/images/memo-mark-dark.png`). Tap to open Memo. Nothing from
+the Vault is shown. Add it with a long press on the home screen → Widgets →
+Memo.
+
+To re-render the frames after Melo changes: serve `MyApp/assets`, load
+`web/satya/index.html?gesture=none` (460 × 500) in headless Chrome with
+`requestAnimationFrame` driven by a fixed clock and a transparent
+background. Every 150 ms take a screenshot while playing, in turn: 1.2 s
+standing, `wave`, `talk`, `shy` with `window.melo.burst('heart', 4, 260)`,
+`hop`, `cheer` with `window.melo.burst('sparkle', 5, 180)`, 0.45 s
+standing (`window.satya.now(name)` starts a move). Crop every frame to the
+same box around Melo (his standing size plus 22 % each side and 14 % above),
+scale to 180 px high and save as 256-colour PNGs.
 
 ### 2.12 Admin
 
@@ -363,7 +446,7 @@ of users. Admin screens never give access to anyone's Vault.
 | Design system | `src/theme/` "Midnight & Champagne": `palette.ts` (colours, light and dark themes, accents), `typography.ts` (Cormorant Garamond for display, Manrope for UI), `tokens.ts` (spacing, radius, motion), `index.ts` (applied once at start-up, before any screen is created) |
 | Bottom sheets | Drawn in the main window by `components/SheetHost.tsx` (not a Modal). A sheet with a focused text field moves to the top, clear of the keyboard |
 | Notifications | `react-native-notify-kit`: reminders, task reminders, the streak warning and alarms, scheduled on the phone. `BackgroundSync` keeps them up to date while signed in |
-| Native modules (Android) | `AppReloadModule` (in-place restart for theme changes), `MemoWidgetModule` + `MemoWidgetProvider` (widget), `TapSoundModule` (tap click) |
+| Native modules (Android) | `AppReloadModule` (in-place restart for theme changes), `MemoWidgetModule` + `MemoWidgetProvider` (widget), `TapSoundModule` (tap click), `MemoLocationModule` (rough location for the weather on Home) |
 | Media | `react-native-nitro-sound` (voice notes), `react-native-image-picker` (photos) |
 | 3D | Melo is a GLB model in a WebView (`assets/web/satya/`). The welcome story is `web/story/story.js` (three.js), bundled into `assets/web/story/` with `npm run build:story` |
 
@@ -428,10 +511,15 @@ of users. Admin screens never give access to anyone's Vault.
 - A newly reached badge **stays locked everywhere** (Home, Profile) until
   the first time Home is on screen afterwards.
 - On that visit, once no other card is open, Home scrolls the streak card
-  into view and the locked badge comes to life: two heartbeats, a growing
-  tremble and glow, then it breaks open with a flash, sparks and a short
-  vibration, becomes the gold medal and settles. Then the "Congrats! You've
-  upgraded to Bronze" card opens.
+  into view and the locked badge **breaks open in its place, like a stone
+  statue**: two heartbeats, then it shakes harder and harder (with small
+  buzzes) while dark cracks spread over the grey stone; it bursts, stone
+  chips flying out and falling away, with a flash, sparks and a stronger
+  buzz, becomes the gold medal and settles with a bounce. Then the
+  "Congrats! You've upgraded to Bronze" card opens (`RevealBadge` in
+  `Tiers.tsx`, about 4 seconds). It's the reward moment, so it plays even
+  with Memo's own *Reduced motion* or *Animations* off; only the phone's
+  system *Remove animations* setting shortens it to a quick switch.
 - What counts as revealed is what **this phone** has shown (saved on the
   phone as `@memo/badge_revealed_v3_<user>`). The server's
   `user_settings.badge_seen` is also written, for the record.
@@ -460,6 +548,9 @@ of users. Admin screens never give access to anyone's Vault.
   the profile is public and "Show profile photo" is on.
 - Vault content never appears in lists, notifications, the widget, admin
   screens or the on-device cache.
+- The weather on Home uses rough location (city level, asked once). It
+  goes only to Open-Meteo, rounded to about 1 km, and is never sent to
+  Memo's server or stored beyond the 30-minute weather on the phone.
 
 ---
 
@@ -535,7 +626,7 @@ refresh, forgot/reset password and the health checks needs
 | Vault notes | `GET/POST /vault/entries`, `GET/PATCH/DELETE /vault/entries/{id}`, `POST /vault/entries/{id}/{pin,unpin,favorite,unfavorite,archive,unarchive,trash,restore}`, `GET /vault/folders`, `POST /vault/trash/empty` |
 | Vault media | `PUT/GET/DELETE /vault/entries/{id}/audio`, `POST /vault/entries/{id}/images`, `GET/DELETE /vault/entries/{id}/images/{image_id}` |
 | Wallet | `GET /wallet`, `POST /wallet/redeem` |
-| WhatsApp consent | `POST /whatsapp/verify` (sends the 👍/👎 permission message), `GET /whatsapp/status?phone=…`, `GET /whatsapp/inbound/recent` (admins); `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in, always 200) |
+| WhatsApp consent | `POST /whatsapp/verify` (sends the YES / STOP permission message), `GET /whatsapp/status?phone=…`, `GET /whatsapp/inbound/recent` (admins); `POST /whatsapp/inbound?token=…` (MSG91 webhook, no sign-in, always 200) |
 | Admin | `GET /admin/dashboard`, `GET /admin/users`, `POST /admin/users/{id}/disable`, `/enable`, `PATCH /admin/users/{id}/role` |
 | Maintenance | `POST /maintenance/cleanup` (header `X-Cron-Secret`) |
 
@@ -559,7 +650,7 @@ Interactive docs are at `/docs` on a running server.
 | `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_INTEGRATED_NUMBER`, `MSG91_WHATSAPP_TEMPLATE_NAME`, `MSG91_WHATSAPP_NAMESPACE`, `MSG91_WHATSAPP_TEMPLATE_STYLE` | WhatsApp reminders (optional) |
 | `MSG91_INBOUND_SECRET` | Secret in the URL MSG91 forwards incoming WhatsApp messages to (YES and STOP replies). Without it the inbound endpoint is off |
 | `GOOGLE_CLIENT_IDS` | Comma-separated OAuth client IDs accepted for Google sign-in |
-| `REMINDER_POLL_SECONDS`, `STREAK_FINALIZE_MINUTES` | Worker timing |
+| `REMINDER_POLL_SECONDS`, `STREAK_FINALIZE_MINUTES` | Worker timing. Reminders are checked at second 1 of every minute and then every `REMINDER_POLL_SECONDS` (kept between 5 and 30) |
 | `TRACK_BONUS_*` | Plan completion bonus rules |
 | `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The admin account created at start-up. Never use the example values |
 | `CRON_SECRET` | Enables `POST /maintenance/cleanup` |
@@ -610,28 +701,36 @@ cd Backend && python -m app.integrations.email you@example.com
 
 ### 7.4 WhatsApp number permission
 
-A number gets reminders only after its owner taps **👍** (or replies YES)
-within **1 minute** of one permission message, sent through the **existing
-reminder template** (no authentication template, no codes: it's a request
-for consent). Code: `Backend/app/modules/whatsapp/`,
-`MyApp/src/modules/reminders/WhatsAppVerify.tsx`.
+A number gets reminders only after its owner replies **YES** to one short
+permission message, sent through the **existing reminder template** (no
+authentication template, no codes: it's a request for consent). Code:
+`Backend/app/modules/whatsapp/`, `MyApp/src/modules/reminders/WhatsAppVerify.tsx`.
 
 1. The app calls `POST /whatsapp/verify` with the number. Unless it's
-   already allowed, stopped, or inside an open 1-minute window, the server
-   sends the permission message (`consent_variables` in
-   `app/integrations/messages.py`) and marks it `PENDING` (`asked_at`).
-2. MSG91 forwards the reply or button tap to `POST /api/v1/whatsapp/inbound`.
-   👍 / YES (also Y, OK, ALLOW, START, HAAN) within the minute marks it
-   `VERIFIED`; 👎 / STOP (also NO, UNSUBSCRIBE, CANCEL, END, QUIT) marks it
-   `STOPPED` at any time and counts a refusal (`refusals`, `refusals_since`).
-   A stopped number can be asked again; after 3 refusals in 24 hours
-   `POST /whatsapp/verify` answers 429 until `try_again_at`. A YES the owner
-   sends on their own also turns a stopped number back on.
+   already allowed or inside an open 1-minute window, the server sends the
+   permission message (`consent_variables` in
+   `app/integrations/messages.py`): "Satya wants to send you Memo
+   reminders here. Reply YES to allow or STOP to refuse." It marks the
+   number `PENDING` (`asked_at`).
+2. MSG91 forwards the reply to `POST /api/v1/whatsapp/inbound`. YES (also
+   Y, OK, ALLOW, START, HAAN, or a 👍) marks it `VERIFIED` (a YES MSG91
+   delivers late still counts up to 10 minutes after the ask). STOP (also
+   NO, UNSUBSCRIBE, CANCEL, END, QUIT, or a 👎) marks it `STOPPED` at any
+   time, even right after YES, and counts a refusal (`refusals`,
+   `refusals_since`). A stopped number can be asked again; after 3
+   refusals in 24 hours `POST /whatsapp/verify` answers 429 until
+   `try_again_at`. A YES the owner sends on their own also turns a
+   stopped number back on.
 3. `GET /whatsapp/status?phone=…` reports `NONE`, `PENDING` (with
-   `expires_at`), `EXPIRED`, `VERIFIED` or `STOPPED`; the app polls it every
-   2 seconds while `PENDING`.
-4. Reminders can be saved with a `PENDING` or `VERIFIED` number; the worker
-   sends only to `VERIFIED` ones (others are marked *Failed*).
+   `expires_at`), `EXPIRED`, `VERIFIED` or `STOPPED`. The app polls it
+   every 1.5 seconds while `PENDING` and every 3 seconds otherwise while
+   the reminder editor is open, so YES and STOP both show within seconds.
+4. Reminders can be saved with a `PENDING` or `VERIFIED` number. The
+   worker (`app/workers/reminder_worker.py`) runs at second 1 of every
+   minute, so a reminder goes out on time. It sends only to `VERIFIED`
+   numbers; a due reminder for a number that isn't (yet, or again) waits
+   up to 5 minutes (`UNVERIFIED_WAIT`) for a YES, then is marked *Failed*
+   without sending.
 
 **MSG91 setup (required; without it no reply reaches the server):**
 1. MSG91 → **WhatsApp → Webhook (New) → Create Webhook**.
@@ -644,7 +743,7 @@ for consent). Code: `Backend/app/modules/whatsapp/`,
    answers 200 so MSG91 never pauses it again (a wrong token is only logged).
 
 MSG91's inbound body has `customerNumber`, `text`, and for button taps
-`button` as a JSON string (`{"payload":"👍","text":"👍"}`); the server also
+`button` as a JSON string (`{"payload":"YES","text":"YES"}`); the server also
 reads the old webhook's `customer_number`/`content` and Meta's
 `entry/changes/messages` shape.
 
@@ -654,16 +753,16 @@ reads the old webhook's `customer_number`/`content` and Meta's
   `payload` with numbers masked). `SELECT received_at, token_ok, summary
   FROM whatsapp_inbound_log ORDER BY received_at DESC LIMIT 20;` shows at
   once whether MSG91 is calling, with the right token, and what it sent. A
-  👍 delivered late by MSG91 still counts up to 10 minutes after the ask.
+  YES delivered late by MSG91 still counts up to 10 minutes after the ask.
 - Render log, every webhook call: `WhatsApp inbound: [{'from': '…3323',
-  'text': '👍', 'result': 'verified'}]`. A refused call logs `WhatsApp
+  'text': 'YES', 'result': 'verified'}]`. A refused call logs `WhatsApp
   inbound refused: MSG91_INBOUND_SECRET is not set on the server` or `wrong
   token`. **No `POST /api/v1/whatsapp/inbound` line at all** means MSG91 isn't
   calling the webhook (step 1–3 above).
 - Admins: `GET /api/v1/whatsapp/inbound/recent` lists the last 50 webhook
   calls (numbers masked) and whether the secret is set.
 - In the app, while waiting, the number shows the last reply that reached
-  Memo (if it wasn't 👍/YES), or after 40 seconds says nothing has arrived.
+  Memo (if it wasn't YES or STOP), or after 40 seconds says nothing has arrived.
 
 **Free alternatives**, if MSG91 inbound isn't available on the account:
 Meta's own WhatsApp Cloud API (free messages inside the 24-hour window after
@@ -840,8 +939,12 @@ block. On Render this isn't needed.
 | Reminders late on Android | Allow exact alarms; turn off battery optimisation for Memo |
 | Password-reset email doesn't arrive | Run the email check in [7.1](#71-backend-environment-backendenv-or-render-environment-variables); Gmail needs an App Password |
 | The Vault locked while choosing a photo | Fixed: pickers no longer lock it. Pull the latest code |
-| A WhatsApp number stays *Waiting for 👍* | MSG91 must forward replies: create the Webhook (New) for *On Inbound Report Received* ([7.4](#74-whatsapp-number-permission)). Then look in the Render log ([7.4](#74-whatsapp-number-permission)): no `WhatsApp inbound` line means MSG91 isn't forwarding replies (set the incoming-message webhook); `refused` means the secret is missing or the token in the URL is wrong; `ignored: not YES or STOP` means the reply wasn't YES |
-| WhatsApp reminders show *Failed* | The number hadn't replied YES by the reminder time, or its owner replied STOP (then only they can turn it back on, by sending YES to Memo) |
+| A WhatsApp number stays *Waiting for YES or STOP* | MSG91 must forward replies: create the Webhook (New) for *On Inbound Report Received* ([7.4](#74-whatsapp-number-permission)). Then look in the Render log ([7.4](#74-whatsapp-number-permission)): no `WhatsApp inbound` line means MSG91 isn't forwarding replies (set the incoming-message webhook); `refused` means the secret is missing or the token in the URL is wrong; `ignored: not YES or STOP` means the reply wasn't YES |
+| WhatsApp reminders show *Failed* | The number hadn't replied YES within 5 minutes of the reminder time, or its owner replied STOP and didn't send YES again in those 5 minutes. Later reminders go out once they reply YES (or after *Send again* and a YES) |
+| No weather on Home | Location wasn't allowed (Memo asks only once: turn it on in Android → Apps → Memo → Permissions → Location), the phone is offline, or Melo's corner is off in Settings |
+| The widget's Melo doesn't move | Some launchers pause widget animations to save battery, or after the widget is resized; remove and re-add the widget |
+| Melo shows the weather but not the city | The phone couldn't name the place (no Geocoder, or offline at that moment); the weather still shows, and the city appears at the next update (every 30 minutes) |
+| *Continue with Google* signs straight into an old (or deleted) account without asking | Fixed: the app now forgets Google's last account before each Google sign-in (`getGoogleIdToken` in `src/modules/auth/google.ts`), so the account picker always opens. Before, if the session ended without *Sign out* (e.g. the user was removed from the database), Google silently reused the last account, and the server made a new Memo account for it |
 | Android build: `Keystore file … memo-debug.keystore not found` | Debug builds are signed with your own `memo-debug.keystore` (its SHA-1 is registered for Google sign-in). Copy it into `MyApp/android/app/`; it isn't in git |
 
 ---

@@ -31,7 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { storyClosed, storyOpened } from '../app/preferencesSlice';
-import { selectIsAuthenticated, selectCurrentUser } from '../modules/auth/authSlice';
+import { selectIsAuthenticated, selectCurrentUser, selectIsNewUser } from '../modules/auth/authSlice';
 import { brand, colors, font, gradients, radius, RAIL_WIDTH, shadow, spacing, TAB_BAR_HEIGHT } from '../theme';
 import { RealIcon, type RealIconName } from '../components/RealIcon';
 import { Glow, Gradient, Sheen } from '../components/Gradient';
@@ -326,7 +326,8 @@ export function RootNavigator() {
   const user = useAppSelector(selectCurrentUser);
   const dispatch = useAppDispatch();
   const storyOpen = useAppSelector(s => s.preferences.storyOpen);
-  const isNewUser = Boolean(isAuthenticated && user && !user.onboarding_completed);
+  // Only as the server says this session: a stale copy on the phone never restarts the tour.
+  const isNewUser = useAppSelector(selectIsNewUser);
   const showTour = isNewUser && !storyOpen;
 
   // A new user sees the story first, once; the tour follows when it closes.

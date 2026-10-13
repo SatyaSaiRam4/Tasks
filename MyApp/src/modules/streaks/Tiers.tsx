@@ -327,17 +327,32 @@ const SPARKS = 10;
 const BEATS_MS = 4 * 170 + 120 + 140;
 const SPARK_WHITE = '#FFFFFF';
 
+/** The locked badge's stone, light and dark. */
+const STONE = ['#9AA1AB', '#5C636D'];
+
+/** Stone chips that break off the locked badge: where each flies, how it turns. */
+const CHIPS = Array.from({ length: 9 }, (_, i) => {
+  const angle = -Math.PI * 0.95 + (i / 8) * Math.PI * 0.9 + (i % 2 ? 0.12 : -0.08);
+  return { angle, dist: 1.2 + (i % 3) * 0.35, spin: (i % 2 ? 1 : -1) * (260 + i * 40), w: 0.22 + (i % 3) * 0.06, h: 0.14 + ((i + 1) % 3) * 0.05 };
+});
+
 /**
- * A locked badge coming to life, like a game unlock: it trembles and starts
- * to glow, cracks open in a flash of light with sparks flying out, turns
- * into the earned medal and settles with a bounce. Then onDone().
+ * A locked badge breaking open like a stone statue: a heartbeat or two, then
+ * it shakes harder and harder while cracks spread across the grey stone, and
+ * it bursts, stone chips flying out and falling, with a flash of light and
+ * sparks, into the gold medal, which settles with a bounce. Then onDone()
+ * (the congratulations card). It's the reward moment, so it plays even when
+ * Memo's own animations are turned down; only the phone's Remove animations
+ * setting shortens it.
  */
 function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone: () => void }) {
-  const { reduced } = useMotion();
+  const { system: reduced } = useMotion();
   const shake = useRef(new Animated.Value(0)).current;
   const grow = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
   const beat = useRef(new Animated.Value(0)).current;
+  const crack = useRef(new Animated.Value(0)).current;
+  const burst = useRef(new Animated.Value(0)).current;
   const [lit, setLit] = useState(false);
   const done = useRef(onDone);
   done.current = onDone;
@@ -345,51 +360,60 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
   useEffect(() => {
     if (reduced) {
       setLit(true);
-      const id = setTimeout(() => done.current(), 300);
+      const id = setTimeout(() => done.current(), 600);
       return () => clearTimeout(id);
     }
     const pulse = (to: number) => Animated.timing(beat, { toValue: to, duration: 170, easing: Easing.inOut(Easing.quad), useNativeDriver: true });
+    const breakAt = BEATS_MS + 1500;
     const unlock = setTimeout(() => {
       setLit(true);
-      Vibration.vibrate(40);
-    }, 1250 + BEATS_MS);
+      Vibration.vibrate(60);
+    }, breakAt);
+    const thuds = [BEATS_MS + 500, BEATS_MS + 1000].map(ms => setTimeout(() => Vibration.vibrate(15), ms));
     const anim = Animated.sequence([
-      // First a heartbeat or two: it's waking up.
+      // A heartbeat or two: something's alive inside.
       pulse(1),
       pulse(0),
       Animated.delay(120),
       pulse(1),
       pulse(0),
       Animated.delay(140),
-      // Comes to life: a growing tremble while it swells and glows.
+      // Shakes harder and harder, swelling, as cracks spread over the stone.
       Animated.parallel([
-        Animated.timing(shake, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }),
-        Animated.timing(grow, { toValue: 1, duration: 1200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(shake, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(grow, { toValue: 1, duration: 1500, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(crack, { toValue: 1, duration: 1500, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]),
-      // Breaks open: a flash, and it pops.
+      // Bursts: chips fly and fall, a flash, sparks, and the medal pops out.
       Animated.parallel([
-        Animated.timing(flash, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(grow, { toValue: 2, duration: 220, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
+        Animated.timing(burst, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(flash, { toValue: 1, duration: 750, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(grow, { toValue: 2, duration: 240, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
       ]),
-      // Settles back into its place.
+      // Settles into its place.
       Animated.spring(grow, { toValue: 3, useNativeDriver: true, bounciness: 14, speed: 6 }),
     ]);
-    anim.start(() => setTimeout(() => done.current(), 250));
+    anim.start(() => setTimeout(() => done.current(), 350));
     return () => {
       clearTimeout(unlock);
+      thuds.forEach(clearTimeout);
       anim.stop();
     };
-  }, [reduced, shake, grow, flash, beat]);
+  }, [reduced, shake, grow, flash, beat, crack, burst]);
 
   const rotate = shake.interpolate({
-    inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-    outputRange: ['0deg', '-3deg', '3deg', '-5deg', '5deg', '-7deg', '7deg', '-10deg', '10deg', '-12deg', '0deg'],
+    inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1],
+    outputRange: ['0deg', '-3deg', '3deg', '-5deg', '5deg', '-8deg', '8deg', '-11deg', '11deg', '-14deg', '14deg', '-16deg', '0deg'],
   });
-  const scale = grow.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [1, 1.35, 2.1, 1.15] });
+  const jitter = shake.interpolate({
+    inputRange: [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1],
+    outputRange: [0, 0, 1.5, -1.5, 2.5, -2.5, 3, 0],
+  });
+  const scale = grow.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [1, 1.45, 2.3, 1.15] });
   const glow = grow.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [0, 0.9, 1, 0.45] });
-  const ring = flash.interpolate({ inputRange: [0, 1], outputRange: [0.4, 3.4] });
+  const ring = flash.interpolate({ inputRange: [0, 1], outputRange: [0.4, 3.6] });
   const ringOpacity = flash.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.95, 0] });
-  const halo = size * 1.6;
+  const halo = size * 1.7;
 
   return (
     <View style={[styles.revealBox, { width: size, height: size }]} accessibilityLabel={`${tier.name} badge unlocked`}>
@@ -409,7 +433,7 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
         const dist = size * (1.5 + (i % 3) * 0.35);
         return (
           <Animated.View
-            key={i}
+            key={`s${i}`}
             pointerEvents="none"
             style={[
               styles.spark,
@@ -425,8 +449,48 @@ function RevealBadge({ tier, size, onDone }: { tier: Tier; size: number; onDone:
           />
         );
       })}
-      <Animated.View style={{ transform: [{ rotate }, { scale }, { scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }}>
+      {/* Stone chips breaking off: they fly up and out, spin, and fall away. */}
+      {CHIPS.map((c, i) => (
+        <Animated.View
+          key={`c${i}`}
+          pointerEvents="none"
+          style={[
+            styles.chip,
+            {
+              width: size * c.w,
+              height: size * c.h,
+              backgroundColor: STONE[i % 3 ? 0 : 1],
+              opacity: burst.interpolate({ inputRange: [0, 0.02, 0.75, 1], outputRange: [0, 1, 1, 0] }),
+              transform: [
+                { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(c.angle) * size * c.dist] }) },
+                {
+                  translateY: burst.interpolate({
+                    inputRange: [0, 0.35, 1],
+                    outputRange: [0, Math.sin(c.angle) * size * c.dist * 0.8, Math.sin(c.angle) * size * c.dist * 0.4 + size * 1.1],
+                  }),
+                },
+                { rotate: burst.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${c.spin}deg`] }) },
+              ],
+            },
+          ]}
+        />
+      ))}
+      <Animated.View
+        style={{
+          transform: [{ translateX: jitter }, { rotate }, { scale }, { scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }],
+        }}
+      >
         <TierBadge tier={tier} earned={lit} size={size} />
+        {/* Cracks spreading over the stone before it breaks. */}
+        {!lit ? (
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: crack }]}>
+            <Svg width={size} height={size} viewBox="0 0 100 100">
+              <Path d="M50 8 L44 30 L56 42 L46 58 L54 72 L48 92" stroke="#2B2F36" strokeWidth={3.2} fill="none" strokeLinejoin="round" />
+              <Path d="M56 42 L74 36 L86 44 M46 58 L28 62 L16 54 M44 30 L30 22" stroke="#2B2F36" strokeWidth={2.4} fill="none" strokeLinejoin="round" />
+              <Path d="M54 72 L70 80 M48 20 L52 14" stroke="#3A3F47" strokeWidth={1.8} fill="none" />
+            </Svg>
+          </Animated.View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -505,6 +569,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 3,
     borderColor: '#FFFFFF',
+  },
+  chip: {
+    position: 'absolute',
+    borderRadius: 1.5,
+    borderTopLeftRadius: 0,
   },
   spark: {
     position: 'absolute',

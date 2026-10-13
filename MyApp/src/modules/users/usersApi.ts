@@ -1,6 +1,7 @@
 import { baseApi } from '../../api/baseApi';
 import { preferencesSynced } from '../../app/preferencesSlice';
 import { userUpdated, type AuthUser } from '../auth/authSlice';
+import { saveUser } from '../../utils/storage';
 
 export interface UserSettings {
   accent_color: string | null;
@@ -98,17 +99,18 @@ function syncUser(dispatch: (a: unknown) => unknown, getState: () => unknown, me
   dispatch(preferencesSynced(toPreferences(me.settings)));
   const current = (getState() as { auth: { user: AuthUser | null } }).auth.user;
   if (current) {
-    dispatch(
-      userUpdated({
-        ...current,
-        display_name: me.display_name,
-        public_id: me.public_id,
-        avatar: me.avatar,
-        timezone: me.timezone,
-        onboarding_completed: me.onboarding_completed,
-        role: me.role,
-      }),
-    );
+    const user: AuthUser = {
+      ...current,
+      display_name: me.display_name,
+      public_id: me.public_id,
+      avatar: me.avatar,
+      timezone: me.timezone,
+      onboarding_completed: me.onboarding_completed,
+      role: me.role,
+    };
+    dispatch(userUpdated(user));
+    // Saved too, so the next launch starts from the latest (e.g. the tour already done).
+    saveUser(user).catch(() => undefined);
   }
 }
 

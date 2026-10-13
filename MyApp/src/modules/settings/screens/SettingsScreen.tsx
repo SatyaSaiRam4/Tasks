@@ -5,7 +5,7 @@ import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { alarmChanged, storyOpened } from '../../../app/preferencesSlice';
+import { alarmChanged, storyOpened, tourReplayed } from '../../../app/preferencesSlice';
 import {
   ACCENTS,
   brand,
@@ -359,6 +359,8 @@ export function SettingsScreen() {
           title="Replay tour"
           subtitle="Walk through the app with Melo again"
           onPress={async () => {
+            // A replay: Melo keeps playing on Home behind the guide.
+            dispatch(tourReplayed());
             await resetOnboarding().unwrap().catch(() => undefined);
           }}
         />

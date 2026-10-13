@@ -8,6 +8,7 @@ import { formatDateTime } from '../utils/date';
  */
 interface WidgetModule {
   update: (signedIn: boolean, streak: number, today: string, next: string) => void;
+  setWeather?: (text: string) => void;
 }
 
 const native = NativeModules.MemoWidget as WidgetModule | undefined;
@@ -18,6 +19,12 @@ export function updateWidget(data: { streak: number; done: number; total: number
     data.total === 0 ? 'Nothing due today' : data.done >= data.total ? `All ${data.total} tasks done today ✓` : `Today: ${data.done} of ${data.total} tasks done`;
   const next = data.next ? `⏰ ${data.next.title} · ${formatDateTime(data.next.at)}` : 'No reminders coming up';
   native.update(true, data.streak, today, next);
+}
+
+/** The weather line next to the streak (e.g. "☀️ 31° · Hyderabad"); the widget hides it after 3 hours. */
+export function updateWidgetWeather(text: string) {
+  if (Platform.OS !== 'android' || !native?.setWeather) return;
+  native.setWeather(text);
 }
 
 export function clearWidget() {
