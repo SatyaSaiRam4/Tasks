@@ -97,3 +97,36 @@ def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
         return False
     logger.info("MSG91 accepted WhatsApp to %s (request_id=%s)", bare_number, body.get("request_id") if isinstance(body, dict) else None)
     return True
+
+
+# Free text (no template) inside the 24 hours after the person wrote to us.
+MSG91_WHATSAPP_TEXT_URL = "https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/"
+
+
+def send_whatsapp_text(to_number: str, text: str) -> bool:
+    """Sends plain text to a number that has just written to Memo's WhatsApp
+    (WhatsApp allows free text for 24 hours after their message; no template).
+    The fields go in both the query string and the JSON body, as MSG91's
+    examples show both. Returns True on success; never raises."""
+    if not is_configured():
+        return False
+    fields = {
+        "integrated_number": MSG91_WHATSAPP_INTEGRATED_NUMBER,
+        "recipient_number": to_number.lstrip("+"),
+        "content_type": "text",
+        "text": text,
+    }
+    headers = {"authkey": MSG91_AUTH_KEY, "Content-Type": "application/json", "accept": "application/json"}
+    try:
+        response = httpx.post(MSG91_WHATSAPP_TEXT_URL, params=fields, json=fields, headers=headers, timeout=10.0)
+    except httpx.HTTPError as exc:
+        logger.warning("MSG91 text to %s failed: %s", fields["recipient_number"], exc)
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if not response.is_success or (isinstance(body, dict) and body.get("hasError")):
+        logger.warning("MSG91 rejected text to %s: HTTP %s %s", fields["recipient_number"], response.status_code, response.text[:300])
+        return False
+    return True
