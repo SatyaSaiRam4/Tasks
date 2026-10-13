@@ -2,7 +2,7 @@ import { baseApi } from '../../api/baseApi';
 
 /**
  * NONE: never asked · PENDING: asked, inside the 1-minute answer window ·
- * EXPIRED: no answer in time · VERIFIED: tapped 👍 / said YES · STOPPED: tapped 👎 / said STOP.
+ * EXPIRED: no answer in time · VERIFIED: replied YES · STOPPED: replied STOP.
  */
 export type ContactStatus = 'NONE' | 'PENDING' | 'EXPIRED' | 'VERIFIED' | 'STOPPED';
 
@@ -13,7 +13,7 @@ export interface ContactInfo {
   asked_at: string | null;
   /** When the 1-minute answer window closes (while PENDING). */
   expires_at: string | null;
-  /** Refusals (👎 / STOP) today; after 3 it can be asked again only at `try_again_at`. */
+  /** Refusals (STOP) today; after 3 it can be asked again only at `try_again_at`. */
   refusals_today: number;
   try_again_at: string | null;
   /** Memo's WhatsApp number, digits only. */

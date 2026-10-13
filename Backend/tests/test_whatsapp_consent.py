@@ -28,7 +28,7 @@ def test_whatsapp_needs_a_yes_from_the_owner_and_stop_ends_it(client, auth, monk
     # Asking sends one permission message (no code), through the template.
     asked = client.post(f"{API}/whatsapp/verify", json={"phone": "91 98765 43210"}, headers=auth).json()
     assert asked["phone"] == PHONE and asked["status"] == "PENDING"
-    assert len(sent) == 1 and sent[0][0] == PHONE and "tap 👍 to allow" in sent[0][1][0]
+    assert len(sent) == 1 and sent[0][0] == PHONE and "Reply YES to allow or STOP to refuse" in sent[0][1][0] and "👍" not in sent[0][1][0]
     # Saved while waiting, but nothing goes out until they reply YES.
     assert _reminder(client, auth).status_code == 201
     assert client.get(f"{API}/whatsapp/status", params={"phone": PHONE}, headers=auth).json()["status"] == "PENDING"
@@ -133,3 +133,47 @@ def test_every_webhook_call_is_kept_in_the_inbound_log(client, monkeypatch, db):
     assert [r.token_ok for r in rows] == [False, True]
     assert "wrong token" in rows[0].summary and "not YES or STOP" in rows[1].summary
     assert "9876543210" not in rows[1].payload and "3210" in rows[1].payload  # numbers masked
+
+
+def test_stop_then_yes_again_still_gets_the_due_reminder(client, auth, monkeypatch, db):
+    """YES, then STOP just as a reminder comes due, then YES again: nothing is
+    sent while stopped, and the reminder goes out once they're back (within 5
+    minutes). One that stays stopped is dropped, never sent."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.workers import reminder_worker as worker
+
+    monkeypatch.setattr(wa, "is_configured", lambda: True)
+    monkeypatch.setattr(wa, "send_whatsapp_reminder", lambda phone, variables: True)
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    sent = []
+    monkeypatch.setattr(worker, "is_configured", lambda: True)
+    monkeypatch.setattr(worker, "send_whatsapp_reminder", lambda phone, variables: sent.append(phone) or True)
+    monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db.get_bind()))
+
+    client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
+    assert _inbound(client, "919876543210", "YES") == ["verified"]
+    rid = _reminder(client, auth).json()["id"]
+    db.execute(text("UPDATE reminders SET remind_at = now() - interval '20 seconds' WHERE id = :id"), {"id": rid})
+    db.commit()
+
+    assert _inbound(client, "919876543210", "STOP") == ["stopped"]
+    worker._poll_due_reminders()
+    assert sent == []
+    assert db.execute(text("SELECT whatsapp_status FROM reminders WHERE id = :id"), {"id": rid}).scalar() == "PENDING"
+
+    assert _inbound(client, "919876543210", "YES") == ["verified"]
+    worker._poll_due_reminders()
+    worker._poll_due_reminders()
+    assert sent == [PHONE]
+    assert db.execute(text("SELECT whatsapp_status FROM reminders WHERE id = :id"), {"id": rid}).scalar() == "SENT"
+
+    # Stopped and still stopped 5 minutes after its time: given up, never sent.
+    rid = _reminder(client, auth).json()["id"]
+    assert _inbound(client, "919876543210", "STOP") == ["stopped"]
+    db.execute(text("UPDATE reminders SET remind_at = now() - interval '6 minutes' WHERE id = :id"), {"id": rid})
+    db.commit()
+    worker._poll_due_reminders()
+    assert sent == [PHONE]
+    assert db.execute(text("SELECT whatsapp_status FROM reminders WHERE id = :id"), {"id": rid}).scalar() == "FAILED"
