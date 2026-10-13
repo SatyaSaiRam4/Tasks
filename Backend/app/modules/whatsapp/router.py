@@ -63,9 +63,8 @@ async def inbound(request: Request, background: BackgroundTasks, token: str = Qu
     """MSG91 (Webhook (New), event "On Inbound Report Received") forwards
     incoming WhatsApp messages and button taps here. The secret comes in the
     URL (?token=...) or a custom header (x-memo-token). Always answers 200:
-    MSG91 pauses a webhook after any 4XX. A message that isn't YES or STOP
-    gets one automatic answer a day ("Messages here aren't read"), sent after
-    this has answered."""
+    MSG91 pauses a webhook after any 4XX. Every message that isn't YES or
+    STOP gets a short automatic answer, sent right after this has answered."""
     given = token or request.headers.get("x-memo-token", "")
     raw = await request.body()
     if not MSG91_INBOUND_SECRET or given != MSG91_INBOUND_SECRET:
@@ -83,8 +82,9 @@ async def inbound(request: Request, background: BackgroundTasks, token: str = Qu
     results = [service.handle_inbound(db, sender, text) for sender, text in messages]
     for (sender, text), result in zip(messages, results):
         phone = service.normalize(sender)
-        if result == "ignored: not YES or STOP" and phone and (text or "").strip() and service.claim_auto_reply(db, phone):
-            background.add_task(service.send_auto_reply, phone)
+        if result == "ignored: not YES or STOP" and phone and (text or "").strip():
+            service.note_auto_reply(db, phone)
+            background.add_task(service.send_auto_reply, phone, db.get_bind())
     summary = [{"from": service.mask(service.normalize(s)), "text": (t or "")[:30], "result": r} for (s, t), r in zip(messages, results)]
     keys = sorted(payload.keys()) if isinstance(payload, dict) else f"list[{len(payload)}]"
     service.recent.appendleft({"at": datetime.now(timezone.utc).isoformat(), "keys": keys, "messages": summary})

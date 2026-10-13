@@ -99,34 +99,49 @@ def send_whatsapp_reminder(to_number: str, variables: list[str]) -> bool:
     return True
 
 
+
 # Free text (no template) inside the 24 hours after the person wrote to us.
 MSG91_WHATSAPP_TEXT_URL = "https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/"
 
 
-def send_whatsapp_text(to_number: str, text: str) -> bool:
+def _failed(response: httpx.Response) -> bool:
+    """MSG91 can answer 200 and still mean an error ({"hasError": true}, {"type": "error"}, {"status": "fail"})."""
+    if not response.is_success:
+        return True
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if not isinstance(body, dict):
+        return False
+    return bool(body.get("hasError")) or str(body.get("type", "")).lower() == "error" or str(body.get("status", "")).lower() in ("fail", "failed", "error")
+
+
+def send_whatsapp_text(to_number: str, text: str) -> tuple[bool, str]:
     """Sends plain text to a number that has just written to Memo's WhatsApp
     (WhatsApp allows free text for 24 hours after their message; no template).
-    The fields go in both the query string and the JSON body, as MSG91's
-    examples show both. Returns True on success; never raises."""
+    MSG91 documents the fields in the query string; if that's refused, the
+    same fields are tried once more as a JSON body. Returns (sent, what MSG91
+    answered) for the log; never raises."""
     if not is_configured():
-        return False
+        return False, "MSG91 not configured"
     fields = {
         "integrated_number": MSG91_WHATSAPP_INTEGRATED_NUMBER,
         "recipient_number": to_number.lstrip("+"),
         "content_type": "text",
         "text": text,
     }
-    headers = {"authkey": MSG91_AUTH_KEY, "Content-Type": "application/json", "accept": "application/json"}
-    try:
-        response = httpx.post(MSG91_WHATSAPP_TEXT_URL, params=fields, json=fields, headers=headers, timeout=10.0)
-    except httpx.HTTPError as exc:
-        logger.warning("MSG91 text to %s failed: %s", fields["recipient_number"], exc)
-        return False
-    try:
-        body = response.json()
-    except ValueError:
-        body = {}
-    if not response.is_success or (isinstance(body, dict) and body.get("hasError")):
-        logger.warning("MSG91 rejected text to %s: HTTP %s %s", fields["recipient_number"], response.status_code, response.text[:300])
-        return False
-    return True
+    headers = {"authkey": MSG91_AUTH_KEY, "accept": "application/json", "content-type": "application/json"}
+    detail = ""
+    for attempt in ({"params": fields}, {"json": fields}):
+        try:
+            response = httpx.post(MSG91_WHATSAPP_TEXT_URL, headers=headers, timeout=10.0, **attempt)
+        except httpx.HTTPError as exc:
+            detail = f"request failed: {exc}"
+            continue
+        detail = f"HTTP {response.status_code} {response.text[:300]}"
+        if not _failed(response):
+            logger.info("MSG91 accepted text to %s: %s", fields["recipient_number"][-4:], detail)
+            return True, detail
+    logger.warning("MSG91 refused text to %s: %s", fields["recipient_number"][-4:], detail)
+    return False, detail

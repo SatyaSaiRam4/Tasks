@@ -164,4 +164,4 @@ def _no_real_whatsapp(monkeypatch):
     """Tests never message a real WhatsApp number, even with MSG91 keys in .env."""
     from app.modules.whatsapp import service as wa
 
-    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, text: True)
+    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, text: (True, "test"))
