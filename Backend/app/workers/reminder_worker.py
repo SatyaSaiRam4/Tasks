@@ -13,6 +13,7 @@ The local push notification (scheduled on-device) is independent of all of this.
 """
 
 import logging
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import select
@@ -27,6 +28,11 @@ logger = logging.getLogger("workers")
 
 _scheduler: BackgroundScheduler | None = None
 
+# A reminder whose number hasn't said YES (or just said STOP) waits this long
+# for a YES before it's given up, so "STOP, then YES again" doesn't lose it.
+# Nothing is sent while the number isn't allowed.
+UNVERIFIED_WAIT = timedelta(minutes=5)
+
 
 def _poll_due_reminders() -> None:
     db = SessionLocal()
@@ -40,7 +46,8 @@ def _poll_due_reminders() -> None:
             for reminder in reminders_service.get_due_whatsapp_reminders(db):
                 # Never message a number whose owner hasn't replied YES, or said STOP.
                 if not is_verified(db, reminder.whatsapp_number):
-                    reminders_service.mark_whatsapp_result(db, reminder.id, False)
+                    if datetime.now(UTC) - reminder.remind_at > UNVERIFIED_WAIT:
+                        reminders_service.mark_whatsapp_result(db, reminder.id, False)
                     continue
                 user = db.get(User, reminder.user_id)
                 variables = whatsapp_variables(
@@ -106,7 +113,12 @@ def start_reminder_worker() -> None:
             "Reminders will not be sent on WhatsApp until then."
         )
     _scheduler = BackgroundScheduler(timezone="UTC")
-    _scheduler.add_job(_poll_due_reminders, "interval", seconds=REMINDER_POLL_SECONDS, id="reminder_whatsapp_poll")
+    # Reminders are set to whole minutes: polling at second 1 of every minute
+    # (and every few seconds after) sends them on time, not up to a poll late.
+    step = min(max(REMINDER_POLL_SECONDS, 5), 30)
+    _scheduler.add_job(
+        _poll_due_reminders, "cron", second=f"1-59/{step}", id="reminder_whatsapp_poll", max_instances=1, coalesce=True
+    )
     _scheduler.add_job(
         _finalize_all_streaks, "interval", minutes=STREAK_FINALIZE_MINUTES, id="streak_finalize", max_instances=1
     )

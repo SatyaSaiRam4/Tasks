@@ -1,17 +1,19 @@
 """WhatsApp consent: a number gets reminders only after its owner says YES.
 
 No codes. When a user adds a WhatsApp number, Memo sends that number one
-message through the approved reminder template: "<name> wants to send you
-reminders from the Memo app… Reply YES to allow them, or STOP to never get
-them." MSG91 forwards replies to POST /api/v1/whatsapp/inbound:
+short message through the approved reminder template: "<name> wants to send
+you Memo reminders here. Reply YES to allow or STOP to refuse." MSG91
+forwards replies to POST /api/v1/whatsapp/inbound:
 
 - YES (or START / OK / ALLOW / HAAN) marks the number VERIFIED. A YES the
   owner sends on their own (for example after STOP) counts too: it's theirs.
-- 👎 / STOP (or UNSUBSCRIBE / CANCEL / END / QUIT / NO) marks it STOPPED: no
-  reminders go there. It can be asked again ("Verify again"), but after 3
-  refusals within a day only once that day is over.
+- STOP (or UNSUBSCRIBE / CANCEL / END / QUIT / NO) marks it STOPPED at any
+  time, even right after YES: nothing more goes there. It can be asked again
+  ("Send again"), but after 3 refusals within a day only once that day is over.
+- An emoji reply (👍 / 👎) is still read as YES / STOP, though the message
+  only asks for the words.
 
-The owner has 1 minute to answer (👍/YES); after that the request expires
+The app counts down 1 minute after asking; after that the request expires
 and can be sent again, at most 3 times a day, so nobody can be pestered.
 """
 
@@ -31,11 +33,11 @@ from app.modules.auth.models import User
 
 from .models import ContactStatus, WhatsAppContact, WhatsAppInboundLog
 
-# The owner has this long to tap 👍 (or reply YES) after being asked; after
-# that the request expires and the user asks again (3 times a day at most:
-# see the router). STOP always works.
+# The owner has this long to reply YES after being asked; after that the
+# request expires and the user asks again (3 times a day at most: see the
+# router). STOP always works.
 ANSWER_WINDOW = timedelta(minutes=1)
-# A 👍 that MSG91 delivers late still counts up to this long after the ask
+# A YES that MSG91 delivers late still counts up to this long after the ask
 # (the app shows the 1-minute countdown; the network can be slower).
 LATE_GRACE = timedelta(minutes=10)
 # After this many refusals within a day, the number can't be asked again until the day is over.
@@ -80,7 +82,7 @@ def is_verified(db: Session, phone: str | None) -> bool:
 
 
 def _expired(contact: WhatsAppContact | None) -> bool:
-    """Asked, but the answer window has passed without a 👍/YES."""
+    """Asked, but the answer window has passed without a YES."""
     return bool(
         contact
         and contact.status == ContactStatus.PENDING
@@ -121,7 +123,7 @@ def describe(db: Session, phone: str) -> dict:
 
 
 def ask_permission(db: Session, user: User, phone: str) -> dict:
-    """Sends the number the "tap 👍 to allow" message (again once the 1-minute window has passed)."""
+    """Sends the number the "reply YES to allow" message (again once the 1-minute window has passed)."""
     contact = db.get(WhatsAppContact, phone)
     if contact and contact.status == ContactStatus.VERIFIED:
         return describe(db, phone)
@@ -173,8 +175,8 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
         return "ignored: not YES or STOP"
     status_ = ContactStatus.STOPPED if kind == "STOP" else ContactStatus.VERIFIED
     contact = db.get(WhatsAppContact, phone)
-    # A 👍/YES counts only inside the 1-minute window after being asked, or
-    # when the owner turns a stopped number back on themselves.
+    # A YES to an ask counts up to 10 minutes after it (MSG91 can be slow); a
+    # YES the owner sends to a stopped number turns it back on.
     if (
         kind == "YES"
         and contact is not None
