@@ -104,7 +104,7 @@ export function ReminderEditorScreen() {
       return setError(
         waStatus === 'STOPPED'
             ? 'This number replied STOP, so Memo can’t message it.'
-            : 'Ask this number for permission first (“Ask for permission on WhatsApp”).',
+            : 'Ask this number first (“Ask on WhatsApp”); they reply YES to allow.',
       );
     }
 
