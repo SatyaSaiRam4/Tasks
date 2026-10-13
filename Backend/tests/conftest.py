@@ -29,6 +29,7 @@ engine = create_engine(TEST_DATABASE_URL)
 TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 TABLES = [
+    "whatsapp_auto_replies",
     "whatsapp_inbound_log",
     "whatsapp_contacts",
     "vault_images",
@@ -156,3 +157,11 @@ def register(client, email="alex@example.com", name="Alex", tz="UTC"):
 def auth(client):
     headers, _user = register(client)
     return headers
+
+
+@pytest.fixture(autouse=True)
+def _no_real_whatsapp(monkeypatch):
+    """Tests never message a real WhatsApp number, even with MSG91 keys in .env."""
+    from app.modules.whatsapp import service as wa
+
+    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, text: True)

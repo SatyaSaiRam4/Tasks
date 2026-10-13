@@ -1,7 +1,7 @@
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -59,11 +59,13 @@ def contact_status(phone: str = Query(...), current_user: User = Depends(get_cur
 
 
 @router.post("/inbound")
-async def inbound(request: Request, token: str = Query(default=""), db: Session = Depends(get_db)):
+async def inbound(request: Request, background: BackgroundTasks, token: str = Query(default=""), db: Session = Depends(get_db)):
     """MSG91 (Webhook (New), event "On Inbound Report Received") forwards
     incoming WhatsApp messages and button taps here. The secret comes in the
     URL (?token=...) or a custom header (x-memo-token). Always answers 200:
-    MSG91 pauses a webhook after any 4XX."""
+    MSG91 pauses a webhook after any 4XX. A message that isn't YES or STOP
+    gets one automatic answer a day ("Messages here aren't read"), sent after
+    this has answered."""
     given = token or request.headers.get("x-memo-token", "")
     raw = await request.body()
     if not MSG91_INBOUND_SECRET or given != MSG91_INBOUND_SECRET:
@@ -79,6 +81,10 @@ async def inbound(request: Request, token: str = Query(default=""), db: Session 
         payload = dict(form)
     messages = service.messages_from(payload)
     results = [service.handle_inbound(db, sender, text) for sender, text in messages]
+    for (sender, text), result in zip(messages, results):
+        phone = service.normalize(sender)
+        if result == "ignored: not YES or STOP" and phone and (text or "").strip() and service.claim_auto_reply(db, phone):
+            background.add_task(service.send_auto_reply, phone)
     summary = [{"from": service.mask(service.normalize(s)), "text": (t or "")[:30], "result": r} for (s, t), r in zip(messages, results)]
     keys = sorted(payload.keys()) if isinstance(payload, dict) else f"list[{len(payload)}]"
     service.recent.appendleft({"at": datetime.now(timezone.utc).isoformat(), "keys": keys, "messages": summary})

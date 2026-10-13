@@ -576,6 +576,7 @@ Main tables (PostgreSQL):
 | `vault_images` | Encrypted photos of Vault notes |
 | `wallet_redemptions` | Redemption requests |
 | `whatsapp_contacts` | WhatsApp numbers and their consent: `PENDING` (asked, waiting for YES; `asked_at`), `VERIFIED` (said YES), `STOPPED` (said STOP) |
+| `whatsapp_auto_replies` | One row per number that wrote something other than YES or STOP: when Memo last sent it the automatic "messages here aren't read" answer |
 
 **Migrations** (`Backend/alembic/versions/`, oldest first):
 
@@ -598,6 +599,7 @@ Main tables (PostgreSQL):
 | `a8d4e1f6b2c9` | Clears stale "asked" times left from the code version (those numbers looked asked but never got the message) |
 | `b3f6c2a9d8e1` | WhatsApp refusals count (3 a day, then try tomorrow) |
 | `c9e1a4d7f3b6` | `whatsapp_inbound_log`: every webhook call, numbers masked (kept 7 days) |
+| `d4a7e2b9c1f5` | `whatsapp_auto_replies`: when Memo last answered a number's non-YES/STOP message (once a day) |
 
 Apply them with `alembic upgrade head` (Render does this on every deploy;
 see [10.1](#101-backend-on-render)).
@@ -731,6 +733,17 @@ authentication template, no codes: it's a request for consent). Code:
    numbers; a due reminder for a number that isn't (yet, or again) waits
    up to 5 minutes (`UNVERIFIED_WAIT`) for a YES, then is marked *Failed*
    without sending.
+
+**Other messages (no chatting):** WhatsApp has no way to stop people
+writing to a business number, and replies only ever reach Memo's number
+(never the Memo user or anyone else). Anything that isn't YES or STOP is
+ignored, and the number gets **one automatic answer a day**: "This number
+only sends Memo reminders. Messages here aren't read. Reply STOP to stop
+getting reminders." It's free text, which WhatsApp allows for 24 hours
+after the person writes (no template), sent with `send_whatsapp_text` in
+`app/integrations/msg91.py` after the webhook has answered. When it was
+last sent is kept per number in `whatsapp_auto_replies`, so restarts or a
+webhook MSG91 sends twice never cause a second answer.
 
 **MSG91 setup (required; without it no reply reaches the server):**
 1. MSG91 → **WhatsApp → Webhook (New) → Create Webhook**.

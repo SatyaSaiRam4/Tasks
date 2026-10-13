@@ -12,6 +12,9 @@ forwards replies to POST /api/v1/whatsapp/inbound:
   ("Send again"), but after 3 refusals within a day only once that day is over.
 - An emoji reply (👍 / 👎) is still read as YES / STOP, though the message
   only asks for the words.
+- Anything else isn't a chat: WhatsApp can't stop people writing to a
+  business number, so Memo answers once ("This number only sends Memo
+  reminders. Messages here aren't read…"), at most once a day per number.
 
 The app counts down 1 minute after asking; after that the request expires
 and can be sent again, at most 3 times a day, so nobody can be pestered.
@@ -28,10 +31,10 @@ from sqlalchemy.orm import Session
 from app.core.config import MSG91_WHATSAPP_INTEGRATED_NUMBER, MSG91_WHATSAPP_TEMPLATE_STYLE
 from app.core.timeutil import utc_now
 from app.integrations.messages import consent_variables
-from app.integrations.msg91 import is_configured, send_whatsapp_reminder
+from app.integrations.msg91 import is_configured, send_whatsapp_reminder, send_whatsapp_text
 from app.modules.auth.models import User
 
-from .models import ContactStatus, WhatsAppContact, WhatsAppInboundLog
+from .models import ContactStatus, WhatsAppAutoReply, WhatsAppContact, WhatsAppInboundLog
 
 # The owner has this long to reply YES after being asked; after that the
 # request expires and the user asks again (3 times a day at most: see the
@@ -43,6 +46,9 @@ LATE_GRACE = timedelta(minutes=10)
 # After this many refusals within a day, the number can't be asked again until the day is over.
 MAX_REFUSALS = 3
 REFUSAL_PERIOD = timedelta(hours=24)
+# What Memo answers to anything other than YES / STOP, once a day per number.
+AUTO_REPLY = "This number only sends Memo reminders. Messages here aren't read. Reply STOP to stop getting reminders."
+AUTO_REPLY_EVERY = timedelta(hours=24)
 STOP_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "BAND", "BANDH", "NO"}
 YES_WORDS = {"YES", "Y", "YA", "YEAH", "YEP", "YES!", "OK", "OKAY", "ALLOW", "START", "HAAN", "HA", "HAN", "AGREE", "SURE"}
 YES_EMOJI = ("👍", "✅", "👌")
@@ -202,6 +208,27 @@ def handle_inbound(db: Session, sender: str | None, text: str | None) -> str:
         contact.refusals += 1
     db.commit()
     return "verified" if status_ == ContactStatus.VERIFIED else "stopped"
+
+
+def claim_auto_reply(db: Session, phone: str) -> bool:
+    """True if Memo should answer this number now (and records it first, so a
+    webhook MSG91 sends twice never gets two answers); False if it answered
+    within the last 24 hours."""
+    now = utc_now()
+    row = db.get(WhatsAppAutoReply, phone)
+    if row and now - row.replied_at < AUTO_REPLY_EVERY:
+        return False
+    if row is None:
+        db.add(WhatsAppAutoReply(phone=phone, replied_at=now))
+    else:
+        row.replied_at = now
+    db.commit()
+    return True
+
+
+def send_auto_reply(phone: str) -> None:
+    """Sends the "messages here aren't read" answer (run after the webhook has answered MSG91)."""
+    send_whatsapp_text(phone, AUTO_REPLY)
 
 
 def _unpack(value):

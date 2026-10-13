@@ -177,3 +177,29 @@ def test_stop_then_yes_again_still_gets_the_due_reminder(client, auth, monkeypat
     worker._poll_due_reminders()
     assert sent == [PHONE]
     assert db.execute(text("SELECT whatsapp_status FROM reminders WHERE id = :id"), {"id": rid}).scalar() == "FAILED"
+
+
+def test_other_messages_get_one_automatic_answer_a_day(client, monkeypatch, clock):
+    """WhatsApp can't stop people writing to Memo's number, so anything that
+    isn't YES or STOP gets "Messages here aren't read" once a day, never a chat."""
+    texts = []
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, text: texts.append((phone, text)) or True)
+    monkeypatch.setattr(wa, "utc_now", clock)
+
+    assert _inbound(client, "919876543210", "hi, who is this?") == ["ignored: not YES or STOP"]
+    assert texts == [(PHONE, wa.AUTO_REPLY)] and "aren't read" in wa.AUTO_REPLY and "STOP" in wa.AUTO_REPLY
+    # More messages the same day: no more answers.
+    _inbound(client, "919876543210", "hello??")
+    clock.advance(hours=23)
+    _inbound(client, "919876543210", "reply pls")
+    assert len(texts) == 1
+    # YES and STOP are handled as usual, never answered with it.
+    _inbound(client, "919876543210", "STOP")
+    _inbound(client, "919876543210", "YES")
+    assert len(texts) == 1
+    # A day later, one more answer; another number gets its own.
+    clock.advance(hours=2)
+    _inbound(client, "919876543210", "still there?")
+    _inbound(client, "919811112222", "hey")
+    assert texts[1:] == [(PHONE, wa.AUTO_REPLY), ("+919811112222", wa.AUTO_REPLY)]

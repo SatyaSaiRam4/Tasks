@@ -56,3 +56,14 @@ class WhatsAppInboundLog(Base):
     token_ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)  # [(masked sender, text, result)]
     payload: Mapped[str] = mapped_column(Text, nullable=False)  # the body, numbers masked, cut to 4 KB
+
+
+class WhatsAppAutoReply(Base):
+    """When Memo last answered a number that wrote something other than YES or
+    STOP ("This number only sends Memo reminders…"), so it answers at most
+    once a day and a chat can never get going."""
+
+    __tablename__ = "whatsapp_auto_replies"
+
+    phone: Mapped[str] = mapped_column(String(20), primary_key=True)  # E.164
+    replied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
