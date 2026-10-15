@@ -121,6 +121,11 @@ MSG91_WHATSAPP_NAMESPACE = os.getenv("MSG91_WHATSAPP_NAMESPACE", "").strip()
 #              original template).
 #   "detailed" three variables: {{1}} first name, {{2}} reminder, {{3}} date
 #              and time.
+#   "task_time" two variables: {{1}} the task (and its note), {{2}} date and
+#              time (the memo_scheduled_task_update template).
+# The number of variables must match the approved template exactly, or
+# WhatsApp refuses every message ("number of localizable_params … does not
+# match").
 MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "single").strip().lower()
 
 # How often the reminder worker polls for due WhatsApp sends.

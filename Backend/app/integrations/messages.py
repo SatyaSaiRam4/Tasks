@@ -26,6 +26,9 @@ def whatsapp_variables(style: str, name: str, title: str, note: str | None, at: 
     extra = " ".join((note or "").split())
     if style == "detailed":
         return [first, title, when]
+    if style == "task_time":
+        # "Task: *{{1}}*" / "Scheduled date and time: {{2}}" (memo_scheduled_task_update).
+        return [title + (f" · 📝 {extra}" if extra else ""), when]
     one_line = f"⏰ {title} · {when}" + (f" · 📝 {extra}" if extra else "")
     return [one_line]
 
@@ -36,4 +39,7 @@ def consent_variables(style: str, requester: str) -> list[str]:
     who = (requester or "Someone").split()[0]
     if style == "detailed":
         return ["there", f"{who} wants to send you Memo reminders. Reply *YES* to allow or *STOP* to refuse", "Reply now"]
+    if style == "task_time":
+        # {{1}} is already bold in that template, so no *…* inside it.
+        return [f"{who} wants to send you Memo reminders. Reply YES to allow or STOP to refuse", "Now"]
     return [f"{who} wants to send you Memo reminders. Reply *YES* to allow or *STOP* to refuse."]

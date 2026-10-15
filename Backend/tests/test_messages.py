@@ -17,3 +17,15 @@ def test_detailed_template_fills_three_variables():
         "Pay the bill",
         "Sat, 10 Oct at 6:30 PM",
     ]
+
+
+def test_task_time_template_fills_two_variables():
+    from app.integrations.messages import consent_variables
+
+    assert whatsapp_variables("task_time", "Satya Sai", "Pay the bill", "Online", AT, "Asia/Kolkata") == [
+        "Pay the bill · 📝 Online",
+        whatsapp_variables("detailed", "x", "y", None, AT, "Asia/Kolkata")[2],
+    ]
+    assert len(whatsapp_variables("task_time", "A", "Call", None, AT, None)) == 2
+    asks = consent_variables("task_time", "Satya Sai")
+    assert len(asks) == 2 and "YES" in asks[0] and "*" not in asks[0]
