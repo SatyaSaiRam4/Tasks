@@ -447,14 +447,14 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- The M blinks: 24 frames open, 1 closed, every 160 ms (about every 4 s). -->
+        <!-- The M's eyes: ahead, a blink, a glance left and right, a double blink; 140 ms a frame (about 4.6 s a loop). -->
         <ViewFlipper
             android:layout_width="wrap_content"
             android:layout_height="20dp"
             android:layout_marginEnd="6dp"
             android:autoStart="true"
             android:contentDescription="Memo"
-            android:flipInterval="160">
+            android:flipInterval="140">
 
             <ImageView
                 android:layout_width="wrap_content"
@@ -497,7 +497,7 @@
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_blink" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
@@ -532,7 +532,35 @@
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_left" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark_left" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark_left" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark_left" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark_left" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
@@ -553,56 +581,35 @@
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_right" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_right" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_right" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_right" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:adjustViewBounds="true"
-                android:importantForAccessibility="no"
-                android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:adjustViewBounds="true"
-                android:importantForAccessibility="no"
-                android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:adjustViewBounds="true"
-                android:importantForAccessibility="no"
-                android:scaleType="fitCenter"
-                android:src="@drawable/memo_widget_mark" />
+                android:src="@drawable/memo_widget_mark_right" />
             <ImageView
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
@@ -631,6 +638,48 @@
                 android:importantForAccessibility="no"
                 android:scaleType="fitCenter"
                 android:src="@drawable/memo_widget_mark_blink" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark_blink" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:adjustViewBounds="true"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/memo_widget_mark" />
         </ViewFlipper>
 
         <TextView

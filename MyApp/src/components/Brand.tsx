@@ -10,59 +10,108 @@ import { useMotion } from '../hooks/useMotion';
  * on either theme. Sources: assets/memo-logo-{dark,light}-v2.png and
  * assets/memo-app-icon-{dark,light}.png.
  *
- * The character blinks now and then: a "-blink" copy of each image has its
- * eyes closed (same size and position), shown for a moment every few seconds.
+ * The character's eyes are always alive: it looks ahead, blinks, glances
+ * left and right. Each image has copies with the eyes closed ("-blink") and
+ * looking left / right ("-left", "-right"), the same size and position; the
+ * right one is shown at each moment.
  */
-const LOGO = {
-  dark: { source: require('../../assets/images/memo-logo-dark.png'), blink: require('../../assets/images/memo-logo-dark-blink.png'), ratio: 1432 / 544 },
-  light: { source: require('../../assets/images/memo-logo-light.png'), blink: require('../../assets/images/memo-logo-light-blink.png'), ratio: 1431 / 542 },
-};
-const MARK = {
-  dark: { source: require('../../assets/images/memo-mark-dark.png'), blink: require('../../assets/images/memo-mark-dark-blink.png'), ratio: 734 / 606 },
-  light: { source: require('../../assets/images/memo-mark-light.png'), blink: require('../../assets/images/memo-mark-light-blink.png'), ratio: 732 / 605 },
-};
+/** The four looks of each image: ahead, eyes closed, looking left, looking right. */
+type Eyes = 'ahead' | 'closed' | 'left' | 'right';
+type Look = Record<Eyes, number> & { ratio: number };
 
-const BLINK_MS = 140;
+const LOGO: Record<'dark' | 'light', Look> = {
+  dark: {
+    ahead: require('../../assets/images/memo-logo-dark.png'),
+    closed: require('../../assets/images/memo-logo-dark-blink.png'),
+    left: require('../../assets/images/memo-logo-dark-left.png'),
+    right: require('../../assets/images/memo-logo-dark-right.png'),
+    ratio: 1432 / 544,
+  },
+  light: {
+    ahead: require('../../assets/images/memo-logo-light.png'),
+    closed: require('../../assets/images/memo-logo-light-blink.png'),
+    left: require('../../assets/images/memo-logo-light-left.png'),
+    right: require('../../assets/images/memo-logo-light-right.png'),
+    ratio: 1431 / 542,
+  },
+};
+const MARK: Record<'dark' | 'light', Look> = {
+  dark: {
+    ahead: require('../../assets/images/memo-mark-dark.png'),
+    closed: require('../../assets/images/memo-mark-dark-blink.png'),
+    left: require('../../assets/images/memo-mark-dark-left.png'),
+    right: require('../../assets/images/memo-mark-dark-right.png'),
+    ratio: 734 / 606,
+  },
+  light: {
+    ahead: require('../../assets/images/memo-mark-light.png'),
+    closed: require('../../assets/images/memo-mark-light-blink.png'),
+    left: require('../../assets/images/memo-mark-light-left.png'),
+    right: require('../../assets/images/memo-mark-light-right.png'),
+    ratio: 732 / 605,
+  },
+};
 
 /**
- * True for a moment every 2.5–5.5 s (sometimes a quick double blink), like
- * Melo. Off when the phone asks for less motion.
+ * The eyes' little routine, on a loop (milliseconds per look): ahead, blink,
+ * glance left, back, glance right, back, a quick double blink. Something
+ * moves about every second; a blink comes about every 2 seconds.
  */
-function useBlink(): boolean {
+const ROUTINE: [Eyes, number][] = [
+  ['ahead', 700],
+  ['closed', 110],
+  ['ahead', 500],
+  ['left', 650],
+  ['ahead', 250],
+  ['right', 650],
+  ['ahead', 450],
+  ['closed', 110],
+  ['ahead', 140],
+  ['closed', 110],
+  ['ahead', 600],
+];
+
+/** Where the eyes are right now. Still (ahead) when the phone asks for less motion. */
+function useEyes(): Eyes {
   const { system: still } = useMotion();
-  const [closed, setClosed] = useState(false);
+  const [eyes, setEyes] = useState<Eyes>('ahead');
   useEffect(() => {
     if (still) return;
+    let step = 0;
     let timer: ReturnType<typeof setTimeout>;
-    const blink = (times: number) => {
-      setClosed(true);
-      timer = setTimeout(() => {
-        setClosed(false);
-        timer = times > 1 ? setTimeout(() => blink(times - 1), 160) : setTimeout(() => blink(Math.random() < 0.2 ? 2 : 1), 2500 + Math.random() * 3000);
-      }, BLINK_MS);
+    const next = () => {
+      const [look, ms] = ROUTINE[step];
+      setEyes(look);
+      step = (step + 1) % ROUTINE.length;
+      timer = setTimeout(next, ms);
     };
-    timer = setTimeout(() => blink(1), 1200 + Math.random() * 2500);
+    // Each logo starts at its own moment, so two on screen don't move in lockstep.
+    timer = setTimeout(next, Math.random() * 800);
     return () => {
       clearTimeout(timer);
-      setClosed(false);
+      setEyes('ahead');
     };
   }, [still]);
-  return closed;
+  return eyes;
 }
 
-/** The image, with its eyes-closed copy laid exactly on top while blinking. */
-function Blinking({ source, blink, width, height }: { source: number; blink: number; width: number; height: number }) {
-  const closed = useBlink();
+const LOOKS: Eyes[] = ['ahead', 'closed', 'left', 'right'];
+
+/** All four looks laid exactly on top of each other; only the current one shows. */
+function Living({ look, width, height }: { look: Look; width: number; height: number }) {
+  const eyes = useEyes();
   return (
     <View style={{ width, height }}>
-      <Image source={source} style={{ width, height }} resizeMode="contain" accessibilityIgnoresInvertColors />
-      {/* Always mounted (loaded once, no flicker); only its opacity changes. */}
-      <Image
-        source={blink}
-        style={[StyleSheet.absoluteFill, { width, height }, closed ? styles.shown : styles.hidden]}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
+      {LOOKS.map(kind => (
+        // Always mounted (loaded once, no flicker); only the opacity changes.
+        <Image
+          key={kind}
+          source={look[kind]}
+          style={[StyleSheet.absoluteFill, { width, height }, kind === eyes ? styles.shown : styles.hidden]}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+      ))}
     </View>
   );
 }
@@ -74,8 +123,8 @@ function cut(onDark?: boolean) {
 
 /** The "M" character on its own, `size` tall. */
 export function BrandMark({ size = 32, onDark }: { size?: number; onDark?: boolean }) {
-  const { source, blink, ratio } = MARK[cut(onDark)];
-  return <Blinking source={source} blink={blink} width={size * ratio} height={size} />;
+  const look = MARK[cut(onDark)];
+  return <Living look={look} width={size * look.ratio} height={size} />;
 }
 
 /**
@@ -85,11 +134,11 @@ export function BrandMark({ size = 32, onDark }: { size?: number; onDark?: boole
  * the dark-theme cut whatever the theme.
  */
 export function Wordmark({ size = 'md', light = false }: { size?: 'sm' | 'md' | 'lg'; light?: boolean }) {
-  const { source, blink, ratio } = LOGO[cut(light)];
+  const look = LOGO[cut(light)];
   const height = size === 'lg' ? 92 : size === 'sm' ? 34 : 40;
   return (
     <View accessible accessibilityRole="header" accessibilityLabel="Memo">
-      <Blinking source={source} blink={blink} width={height * ratio} height={height} />
+      <Living look={look} width={height * look.ratio} height={height} />
     </View>
   );
 }
