@@ -725,6 +725,27 @@ cd Backend && python -m app.integrations.email you@example.com
 
   Footer `Sent by Memo.`. Get it approved in MSG91, then set
   `MSG91_WHATSAPP_TEMPLATE_NAME` and `MSG91_WHATSAPP_TEMPLATE_STYLE=detailed`.
+- `task_time`: two variables, for the **`memo_scheduled_task_update`**
+  template (Utility):
+
+  ```
+  Hello! Here is your scheduled reminder.
+
+  Task: *{{1}}*
+  Scheduled date and time: {{2}}.
+
+  Thank you for using Memo.
+  ```
+
+  `{{1}}` is the task (with its note, if any), `{{2}}` the date and time.
+  The YES/STOP permission message uses it too (`{{1}}` = the request, `{{2}}`
+  = "Now"). Set `MSG91_WHATSAPP_TEMPLATE_NAME=memo_scheduled_task_update`,
+  `MSG91_WHATSAPP_TEMPLATE_STYLE=task_time` and the template's namespace.
+
+**The style must match the template's number of variables exactly.**
+Otherwise MSG91 accepts the message but WhatsApp refuses it; MSG91 → Logs
+shows *Failed* with "number of localizable_params (3) does not match the
+expected number of params (2)".
 
 ### 7.4 WhatsApp number permission
 
