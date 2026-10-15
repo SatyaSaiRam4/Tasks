@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 from app.modules.whatsapp import router as wa_router
@@ -202,3 +203,31 @@ def test_every_other_message_gets_an_automatic_answer_at_once(client, monkeypatc
     assert texts[-1] == ("+919811112222", wa.AUTO_REPLY)
     logged = [r[0] for r in db.execute(text("SELECT summary FROM whatsapp_inbound_log WHERE summary LIKE 'auto-reply%'"))]
     assert len(logged) == 3 and all("sent" in s for s in logged)
+
+
+def test_a_reply_delivered_to_both_servers_is_handled_once(client, auth, monkeypatch, db):
+    """Two backends (or two MSG91 webhooks) get the same message: only the first acts on it."""
+    from sqlalchemy import text
+
+    texts = []
+    monkeypatch.setattr(wa, "is_configured", lambda: True)
+    monkeypatch.setattr(wa, "send_whatsapp_reminder", lambda phone, variables: True)
+    monkeypatch.setattr(wa, "send_whatsapp_text", lambda phone, t: texts.append(t) or (True, "ok"))
+    monkeypatch.setattr(wa_router, "MSG91_INBOUND_SECRET", "s3cret")
+    client.post(f"{API}/whatsapp/verify", json={"phone": PHONE}, headers=auth)
+
+    # MSG91's real shape: the message list arrives as a JSON string, with WhatsApp's id.
+    def delivery(wamid, body):
+        message = {"from": "919876543210", "id": wamid, "text": {"body": body}, "type": "text"}
+        return {"uuid": wamid, "customerNumber": "919876543210", "text": body, "messages": json.dumps([message])}
+
+    first = client.post(f"{API}/whatsapp/inbound?token=s3cret", json=delivery("wamid.STOP0000001", "STOP")).json()["results"]
+    again = client.post(f"{API}/whatsapp/inbound?token=s3cret", json=delivery("wamid.STOP0000001", "STOP")).json()["results"]
+    assert first == ["stopped"] and again == ["duplicate: already handled"]
+    assert db.execute(text("SELECT refusals FROM whatsapp_contacts")).scalar() == 1
+
+    client.post(f"{API}/whatsapp/inbound?token=s3cret", json=delivery("wamid.HI00000002", "hi"))
+    client.post(f"{API}/whatsapp/inbound?token=s3cret", json=delivery("wamid.HI00000002", "hi"))
+    assert len(texts) == 1  # one automatic answer
+    # A new message (new id) with the same words is handled as usual.
+    assert client.post(f"{API}/whatsapp/inbound?token=s3cret", json=delivery("wamid.STOP0000003", "STOP")).json()["results"] == ["stopped"]

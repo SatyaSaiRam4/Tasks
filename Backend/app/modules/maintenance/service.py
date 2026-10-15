@@ -25,7 +25,7 @@ from app.modules.reminders.models import Reminder, ReminderStatus
 from app.modules.streaks.engine import finalize_user
 from app.modules.tracks.models import Track
 from app.modules.vault.models import VaultEntry
-from app.modules.whatsapp.models import WhatsAppInboundLog
+from app.modules.whatsapp.models import WhatsAppInboundLog, WhatsAppInboundSeen
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ def run_cleanup(db: Session) -> dict[str, int]:
     notes = db.execute(delete(VaultEntry).where(VaultEntry.deleted_at < bin_cutoff)).rowcount
     # The WhatsApp webhook log is only for diagnosis: keep a week.
     db.execute(delete(WhatsAppInboundLog).where(WhatsAppInboundLog.received_at < now - timedelta(days=7)))
+    db.execute(delete(WhatsAppInboundSeen).where(WhatsAppInboundSeen.received_at < now - timedelta(days=7)))
     db.commit()
     # Checkouts left unpaid for a day (payment records themselves are kept).
     from app.modules.subscriptions.service import expire_abandoned

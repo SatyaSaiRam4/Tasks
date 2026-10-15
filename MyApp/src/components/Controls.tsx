@@ -8,7 +8,7 @@ import { easeOut, usePressScale } from '../animations';
 import { Glow, Gradient } from './Gradient';
 import { Icon, type IconName } from './Icon';
 import { useAppSelector } from '../app/hooks';
-import { API_BASE_URL } from '../config/env';
+import { useApiBaseUrl } from '../api/servers';
 
 // ---- IconButton ---------------------------------------------------------------
 
@@ -243,8 +243,10 @@ export function GoldRule({ style }: { style?: StyleProp<ViewStyle> }) {
 export function Avatar({ name, emoji, photo, size = 44 }: { name: string; emoji?: string | null; photo?: string | null; size?: number }) {
   // Photos are served only to signed-in users, so the request carries the token.
   const token = useAppSelector(s => s.auth.accessToken);
+  // The server in use right now (the app moves to another if one is down).
+  const apiBase = useApiBaseUrl();
   const [failed, setFailed] = useState<string | null>(null);
-  const showPhoto = !!photo && failed !== photo;
+  const showPhoto = !!photo && failed !== `${apiBase}${photo}`;
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -257,9 +259,9 @@ export function Avatar({ name, emoji, photo, size = 44 }: { name: string; emoji?
       <Gradient colors={gradients.hero} borderRadius={size / 2} style={styles.avatarInner}>
         {showPhoto ? (
           <Image
-            source={{ uri: `${API_BASE_URL}${photo}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined }}
+            source={{ uri: `${apiBase}${photo}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined }}
             style={{ width: size - ring * 2, height: size - ring * 2, borderRadius: size / 2 }}
-            onError={() => setFailed(photo)}
+            onError={() => setFailed(`${apiBase}${photo}`)}
             accessibilityIgnoresInvertColors
           />
         ) : (

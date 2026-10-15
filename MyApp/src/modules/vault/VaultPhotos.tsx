@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Tex
 import Toast from '@ant-design/react-native/lib/toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppSelector } from '../../app/hooks';
-import { API_BASE_URL } from '../../config/env';
+import { apiFetch } from '../../api/servers';
 import { colors, font, radius, spacing, type as t, withAlpha } from '../../theme';
 import { Icon } from '../../components/Icon';
 import { ListGroup, ListRow } from '../../components/ListRow';
@@ -30,7 +30,7 @@ function useVaultPhoto(entryId: string | undefined, imageId: string | undefined)
     if (!entryId || !imageId || !token || !vaultToken) return;
     let alive = true;
     setFailed(false);
-    fetch(`${API_BASE_URL}/vault/entries/${entryId}/images/${imageId}`, {
+    apiFetch(`/vault/entries/${entryId}/images/${imageId}`, {
       headers: { Authorization: `Bearer ${token}`, 'x-vault-token': vaultToken },
     })
       .then(res => {

@@ -34,7 +34,7 @@ from app.integrations.messages import consent_variables
 from app.integrations.msg91 import is_configured, send_whatsapp_reminder, send_whatsapp_text
 from app.modules.auth.models import User
 
-from .models import ContactStatus, WhatsAppAutoReply, WhatsAppContact, WhatsAppInboundLog
+from .models import ContactStatus, WhatsAppAutoReply, WhatsAppContact, WhatsAppInboundLog, WhatsAppInboundSeen
 
 # The owner has this long to reply YES after being asked; after that the
 # request expires and the user asks again (3 times a day at most: see the
@@ -271,8 +271,41 @@ SENDER_KEYS = ("customer_number", "customerNumber", "customer_mobile", "sender",
 TEXT_KEYS = ("text", "body", "message", "caption", "title", "payload", "emoji", "content")
 
 
-def messages_from(payload) -> list[tuple[str | None, str | None]]:
-    """(sender, text) pairs from an MSG91 inbound webhook body. MSG91's formats
+ID_KEYS = ("id", "uuid", "messageId", "message_id")
+
+
+def _message_id(item, parent) -> str | None:
+    """WhatsApp's id for one message ("wamid…"), from the message or the MSG91 envelope around it."""
+    for source in (item, parent):
+        if isinstance(source, dict):
+            for key in ID_KEYS:
+                value = source.get(key)
+                if isinstance(value, str) and len(value) >= 8:
+                    return value[:160]
+    return None
+
+
+def first_time(db: Session, message_id: str | None) -> bool:
+    """Records a WhatsApp message id; False if any server has already handled it."""
+    if not message_id:
+        return True
+    from sqlalchemy.dialects.postgresql import insert
+
+    inserted = db.execute(
+        insert(WhatsAppInboundSeen).values(message_id=message_id, received_at=utc_now()).on_conflict_do_nothing().returning(WhatsAppInboundSeen.message_id)
+    ).scalar()
+    db.commit()
+    return inserted is not None
+
+
+def messages_from(payload, with_ids: bool = False) -> list[tuple]:
+    """(sender, text) pairs from an MSG91 inbound webhook body, or (sender,
+    text, WhatsApp message id) with with_ids."""
+    return [m if with_ids else m[:2] for m in _messages(payload)]
+
+
+def _messages(payload) -> list[tuple[str | None, str | None, str | None]]:
+    """(sender, text, message id) from an MSG91 inbound webhook body. MSG91's formats
     differ between its old webhook, its new one and Meta's own shape, so this
     reads them all: JSON hidden in strings, Meta's entry/changes/messages,
     button and quick-reply answers. Only messages clearly marked outgoing (our
@@ -280,7 +313,7 @@ def messages_from(payload) -> list[tuple[str | None, str | None]]:
     payload = _unpack(payload)
     items = payload if isinstance(payload, list) else [payload]
     # Meta's shape: entry[].changes[].value.messages[]
-    expanded = []
+    expanded = []  # (message, the envelope it came in)
     for item in items:
         msgs = []
         if isinstance(item, dict):
@@ -289,14 +322,14 @@ def messages_from(payload) -> list[tuple[str | None, str | None]]:
                     msgs.extend(((change or {}).get("value") or {}).get("messages") or [])
             if isinstance(item.get("messages"), list):
                 msgs.extend(item["messages"])
-        expanded.extend(msgs or [item])
+        expanded.extend([(m, item) for m in msgs] or [(item, None)])
     out = []
-    for item in expanded:
+    for item, parent in expanded:
         if isinstance(item, dict) and "out" in str(item.get("direction", "")).lower():
             continue
-        sender = _find(item, SENDER_KEYS)
+        sender = _find(item, SENDER_KEYS) or (_find(parent, SENDER_KEYS) if parent else None)
         text = _find(item, TEXT_KEYS) if isinstance(item, dict) else None
-        out.append((sender, text))
+        out.append((sender, text, _message_id(item, parent)))
     return out
 
 
