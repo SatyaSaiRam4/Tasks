@@ -3,7 +3,7 @@ import time
 from sqlalchemy import create_engine, event, exc, text
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import DATABASE_URL
+from app.core.config import DATABASE_URL, DB_MAX_OVERFLOW, DB_POOL_SIZE
 
 # How long a pooled connection may sit unused before it is tested again.
 IDLE_PING_SECONDS = 60
@@ -17,8 +17,10 @@ IDLE_PING_SECONDS = 60
 engine = create_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=5,
-    max_overflow=10,
+    # Per server. With more than one backend on the same database, their total
+    # must fit the database pooler's limit (see DB_POOL_SIZE in PROJECT.md).
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
     pool_recycle=1800,  # recycle connections every 30min
     pool_use_lifo=True,  # reuse the warmest connection, let extras go idle
     connect_args={"keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10, "keepalives_count": 3},

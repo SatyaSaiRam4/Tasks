@@ -17,6 +17,7 @@ import { store } from './src/app/store';
 import { hydrateApiCache, refreshHydrated } from './src/api/persistCache';
 import { useAppDispatch, useAppSelector } from './src/app/hooks';
 import { restoreSession, selectIsAuthenticated, selectIsBootstrapped } from './src/modules/auth/authSlice';
+import { chooseServer } from './src/api/servers';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { initNotifications, loadAlarmPreferences, subscribeToNotificationEvents } from './src/notifications';
 import { colors, radius } from './src/theme';
@@ -65,6 +66,8 @@ function AppContent() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   useEffect(() => {
+    // Find a backend that's up (two run the same code); doesn't hold up start-up.
+    chooseServer();
     // Last session's data first, so screens open full; then sign in and refresh it.
     hydrateApiCache(dispatch)
       .then(async entries => {

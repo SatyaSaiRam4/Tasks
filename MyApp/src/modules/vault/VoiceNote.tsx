@@ -5,7 +5,7 @@ type SoundType = ReturnType<typeof import('react-native-nitro-sound').createSoun
 import { useAppSelector } from '../../app/hooks';
 import { colors, font, radius, spacing, type as t, withAlpha } from '../../theme';
 import { Icon } from '../../components/Icon';
-import { API_BASE_URL } from '../../config/env';
+import { apiBaseUrl } from '../../api/servers';
 import { selectVaultToken } from './vaultSlice';
 import { keepVaultOpenWhile, touchVault } from './VaultAutoLock';
 
@@ -155,7 +155,7 @@ export function VoiceNote({
       if (recording) {
         await sound.startPlayer(recording.uri);
       } else {
-        await sound.startPlayer(`${API_BASE_URL}/vault/entries/${entryId}/audio`, {
+        await sound.startPlayer(`${apiBaseUrl()}/vault/entries/${entryId}/audio`, {
           authorization: `Bearer ${accessToken ?? ''}`,
           'x-vault-token': vaultToken ?? '',
         });

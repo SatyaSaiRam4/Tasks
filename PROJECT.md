@@ -65,7 +65,7 @@ Tasks/
 │   │   ├── notifications/   Local notifications and alarms
 │   │   ├── theme/           "Midnight & Champagne" design system
 │   │   ├── widget/          Android home-screen widget bridge
-│   │   └── config/env.ts    Backend URL
+│   │   └── config/env.ts    Backend URLs (two servers)
 │   ├── web/story/           Source of the 3D welcome story (three.js)
 │   ├── web/satya/           Source of Melo's 3D page (Home corner, tour, weather layer)
 │   ├── assets/              Fonts, images, Melo's model, built web pages
@@ -458,7 +458,7 @@ access to anyone's Vault.
 | Stack | React Native 0.87 (New Architecture, Hermes), React 19, TypeScript, Node ≥ 22.11 |
 | State and data | Redux Toolkit + RTK Query. `src/api/baseApi.ts` adds the tokens, refreshes an expired session once, and locks the Vault if the server says so. Data is kept 5 minutes after a screen closes |
 | On-device cache | `src/api/persistCache.ts` keeps the last data per user (never the Vault or admin data) so screens open instantly and refresh in the background; cleared on logout |
-| Backend URL | `src/config/env.ts`: release builds use `https://tasks-singapore.onrender.com`; debug builds use the local address when `USE_LOCAL_API` is true |
+| Backend URLs | `src/config/env.ts`: release builds use **two** servers, `https://tasks-singapore.onrender.com` and `https://tasks-wvlv.onrender.com` (same code, same database), and `src/api/servers.ts` picks whichever is up (see [10.1](#101-backend-on-render)); debug builds use the local address when `USE_LOCAL_API` is true |
 | Navigation | `src/navigation/RootNavigator.tsx`: five tabs (Home, Plans, Reminders, Vault, Profile) inside a root stack with the pushed screens (plan detail and editor, reminder editor, Vault note, streak history, find a friend, settings, Why Memo?, wallet, change password, admin) |
 | Layout | Phones: floating tab bar. Tablets: centred tab bar and two columns. Wide windows: a navigation rail |
 | Design system | `src/theme/` "Midnight & Champagne": `palette.ts` (colours, light and dark themes, accents), `typography.ts` (Cormorant Garamond for display, Manrope for UI), `tokens.ts` (spacing, radius, motion), `index.ts` (applied once at start-up, before any screen is created) |
@@ -665,6 +665,7 @@ Interactive docs are at `/docs` on a running server.
 | Variable | Purpose |
 |---|---|
 | `HOST`, `DB_PORT`, `DATABASE`, `USER`, `PASSWORD` | PostgreSQL connection |
+| `DB_POOL_SIZE`, `DB_MAX_OVERFLOW` | Database connections per server: kept open (default 5) and extra under load (default 10). With two servers, keep `2 × (DB_POOL_SIZE + DB_MAX_OVERFLOW)` within the Supabase pooler's limit |
 | `JWT_SECRET` | **Required.** A long random secret, unique per environment |
 | `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS` | Token settings |
 | `VAULT_ENCRYPTION_KEYS` | **Required for the Vault.** Comma-separated Fernet keys; the first encrypts, all decrypt (key rotation) |
@@ -695,9 +696,10 @@ cd Backend && python -m app.integrations.email you@example.com
 
 ### 7.2 App configuration
 
-- Backend URL: `MyApp/src/config/env.ts` (`PRODUCTION_API_ORIGIN`,
-  `LOCAL_API_ORIGIN`, `USE_LOCAL_API`). Only public URLs belong there:
-  anything in the app can be read by users.
+- Backend URLs: `MyApp/src/config/env.ts` (`PRODUCTION_API_ORIGINS`, in
+  order of preference; `LOCAL_API_ORIGIN`, `USE_LOCAL_API`). Only public
+  URLs belong there: anything in the app can be read by users. Requests
+  time out after 15 s (`API_TIMEOUT_MS`; uploads 60 s).
 - Theme, accent and alarm sound are stored on the phone; everything else is
   in the user's server-side settings.
 
@@ -778,7 +780,11 @@ number was last answered.
 2. Service **WhatsApp**, event **On Inbound Report Received**.
 3. URL `https://tasks-singapore.onrender.com/api/v1/whatsapp/inbound?token=<MSG91_INBOUND_SECRET>`
    (or the URL without `?token=` plus a custom header `x-memo-token:
-   <MSG91_INBOUND_SECRET>`). Content type JSON. Create.
+   <MSG91_INBOUND_SECRET>`). Content type JSON. Create. If MSG91 lets you,
+   create a **second** webhook the same way with
+   `https://tasks-wvlv.onrender.com/...`, so replies arrive even when one
+   server is down. Each WhatsApp message is handled once (by its `wamid`,
+   kept 7 days in `whatsapp_inbound_seen`), whichever server gets it first.
 4. On Render, set `MSG91_INBOUND_SECRET` to the same long random value.
 5. If MSG91 shows the webhook as paused, resume it. The server always
    answers 200 so MSG91 never pauses it again (a wrong token is only logged).
@@ -890,8 +896,16 @@ docker rm -f memo-pg-check
 
 ### 10.1 Backend on Render
 
-- Service **tasks-singapore** (`https://tasks-singapore.onrender.com`),
-  region Singapore (close to the database), root directory `Backend`.
+The same backend runs as **two** Render services, both connected to the
+**same** Supabase database, so the app keeps working when one is asleep,
+suspended or down:
+
+| Service | URL |
+|---|---|
+| **tasks-singapore** | `https://tasks-singapore.onrender.com` |
+| **tasks-wvlv** | `https://tasks-wvlv.onrender.com` |
+
+- Region Singapore (close to the database), root directory `Backend`.
 - Build command: `pip install -r requirements.txt`.
 - **Start command:**
   ```
@@ -899,10 +913,32 @@ docker rm -f memo-pg-check
   ```
   The first part applies new database migrations on every deploy, before the
   server starts. Without it, a release that adds columns crashes on start
-  with "column … does not exist".
+  with "column … does not exist". (When both deploy at once, one applies the
+  migration and the other finds it already done.)
 - Environment variables: see [7.1](#71-backend-environment-backendenv-or-render-environment-variables).
-- Keep **one** instance: the worker runs inside the API process, and several
-  instances would send the same WhatsApp reminders more than once.
+  **Both services need the same values**, in particular the database
+  (`HOST`, `DB_PORT`, `DATABASE`, `USER`, `PASSWORD`), `JWT_SECRET` (else
+  switching servers signs people out and locks the Vault),
+  `VAULT_ENCRYPTION_KEYS` (else Vault notes can't be read), `CRON_SECRET`,
+  `GOOGLE_CLIENT_IDS`, the MSG91 and Razorpay variables.
+- **How the app chooses** (`MyApp/src/api/servers.ts`, `src/api/baseApi.ts`):
+  at launch it asks both servers' `/health/live` at once and uses the first
+  that answers (remembered across restarts). If the current server is
+  suspended or failing (502/503/504, a web page instead of the API),
+  unreachable, or doesn't answer within 15 s, it moves to the other one.
+  Reading is retried there automatically; a change (saving, paying,
+  redeeming) is resent only when Render refused it before it reached the
+  app (502/503), so nothing is ever done twice. After a timeout the user
+  just tries again (it goes to the other server).
+- **Both run the worker.** That's safe: each WhatsApp reminder has one
+  ledger row (`whatsapp_usage`, unique per reminder occurrence), so only the
+  server that takes it sends it; streak finalising locks per user; the
+  daily cleanup and expiring checkouts are idempotent. Rate limits and the
+  admin "recent inbound" list are per server (in memory).
+- **Free plan hours:** Render counts free instance hours per workspace, so
+  two services kept awake all month use about twice as many as one (a
+  suspended service answers 503 "This service has been suspended"). See the
+  keep-awake job in [10.3](#103-scheduled-jobs).
 - Deploys happen when `main` changes on GitHub
   (`https://github.com/SatyaSaiRam4/Tasks`). Work happens on the `man` branch
   and is merged into `main` by pull request.
@@ -927,10 +963,14 @@ backed up **separately**.
 |---|---|---|
 | Worker (inside the API) | Continuously | WhatsApp sends, reminders → Done, streak finalising, cleanup at 02:00 IST |
 | `.github/workflows/daily-cleanup.yml` | 02:00 IST | Calls `POST /maintenance/cleanup`: settles streaks, deletes plans and tasks 7 days after they end or are deleted, done reminders after 7 days, and Vault bin notes after 30 days (`VAULT_BIN_DAYS`) |
-| `.github/workflows/keep-awake.yml` | Every 10 minutes | Pings `/health/ready` so Render's free plan and the database stay awake |
+| `.github/workflows/keep-awake.yml` | Every 10 minutes | Pings `/health/ready` on each server so Render's free plan and the database stay awake; passes if at least one answers |
 
-Both workflows need the repository secrets `API_URL` and (cleanup)
-`CRON_SECRET`.
+Repository secrets: `API_URL` (`https://tasks-singapore.onrender.com`),
+`API_URL_BACKUP` (`https://tasks-wvlv.onrender.com`, optional) and (cleanup)
+`CRON_SECRET`. The cleanup runs once, on the first server that answers.
+Leaving `API_URL_BACKUP` unset lets the backup sleep to save free hours (the
+app then waits up to a minute for it to start, only when the main one is
+down).
 
 ### 10.4 Optional: your own server
 

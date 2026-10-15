@@ -55,10 +55,15 @@ def _poll_due_reminders() -> None:
                 from app.modules.subscriptions import service as plans
 
                 usage, retried = plans.reserve(db, reminder)
-                if retried or usage.status == "BLOCKED":
-                    reminders_service.mark_whatsapp_result(db, reminder.id, usage.status == "ACCEPTED")
-                    if usage.status == "BLOCKED":
-                        logger.info("WhatsApp reminder %s not sent: no free messages or plan left", reminder.id)
+                if retried:
+                    # Another try got this far first (another server running the
+                    # same worker, or a crash mid-send): it records the result.
+                    # Never send twice. Left alone, a stuck one is closed after
+                    # 30 minutes by auto_complete_due.
+                    continue
+                if usage.status == "BLOCKED":
+                    reminders_service.mark_whatsapp_result(db, reminder.id, False)
+                    logger.info("WhatsApp reminder %s not sent: no free messages or plan left", reminder.id)
                     continue
                 user = db.get(User, reminder.user_id)
                 variables = whatsapp_variables(

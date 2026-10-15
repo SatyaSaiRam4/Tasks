@@ -1,7 +1,7 @@
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine, pool
+from sqlalchemy import create_engine, pool, text
 
 from alembic import context
 from app.core.config import DATABASE_URL
@@ -48,6 +48,11 @@ def run_migrations_online() -> None:
             include_object=include_object,
         )
         with context.begin_transaction():
+            # One migration run at a time: when both Render services deploy
+            # together, the second waits here, then finds nothing left to do
+            # (instead of failing on "already exists" and not starting).
+            # Released when this transaction ends.
+            connection.execute(text("SELECT pg_advisory_xact_lock(727201)"))
             context.run_migrations()
 
 

@@ -1,15 +1,16 @@
 /**
- * Backend API configuration — the single place the app's backend URL is set.
- * Every request goes through the RTK Query client in src/api/baseApi.ts,
- * which uses API_BASE_URL.
+ * Backend API configuration: the single place the app's backend URLs are set.
+ * Every request goes through src/api/baseApi.ts, which picks one of these
+ * (src/api/servers.ts) and moves to the next when it's down.
  *
  * React Native has no build-time environment variables (no Vite/CRA/Next
- * style VITE_* or REACT_APP_*), so the URL is chosen here:
- *  - Release builds always talk to the production backend on Render (Singapore,
- *    next to the Mumbai database).
- *  - Debug builds (`npx react-native run-android`) use LOCAL_API_ORIGIN when
- *    USE_LOCAL_API is true, so local development keeps working. Set it to
- *    false to point a debug build at production.
+ * style VITE_* or REACT_APP_*), so the URLs are chosen here:
+ *  - Release builds talk to the production backend, which runs as two Render
+ *    services with the same code and the same database. Whichever is up is
+ *    used; the app switches by itself if one is asleep, suspended or down.
+ *  - Debug builds (`npx react-native run-android`) use LOCAL_API_ORIGIN only
+ *    when USE_LOCAL_API is true, so local development keeps working. Set it
+ *    to false to point a debug build at production.
  *
  * Local origin, by setup:
  *  - Android emulator: "http://10.0.2.2:8000" (the host machine's localhost).
@@ -20,17 +21,15 @@
  *
  * Only public URLs belong here: anything in the app bundle can be read by users.
  */
-const PRODUCTION_API_ORIGIN = 'https://tasks-singapore.onrender.com';
+const PRODUCTION_API_ORIGINS = ['https://tasks-singapore.onrender.com', 'https://tasks-wvlv.onrender.com'];
 const LOCAL_API_ORIGIN = 'http://127.0.0.1:8003';
 const USE_LOCAL_API = false;
 
 /** The backend's API prefix (see Backend/app/api/router.py). */
-const API_PREFIX = '/api/v1';
+export const API_PREFIX = '/api/v1';
 
-const origin = __DEV__ && USE_LOCAL_API ? LOCAL_API_ORIGIN : PRODUCTION_API_ORIGIN;
-
-/** e.g. "https://tasks-singapore.onrender.com/api/v1" — no trailing slash, prefix added once. */
-export const API_BASE_URL = `${origin.replace(/\/+$/, '')}${API_PREFIX}`;
+/** Every backend the app may use, in order of preference. */
+export const API_ORIGINS: string[] = __DEV__ && USE_LOCAL_API ? [LOCAL_API_ORIGIN] : PRODUCTION_API_ORIGINS;
 
 /** Network request timeout, in milliseconds. */
 export const API_TIMEOUT_MS = 15000;

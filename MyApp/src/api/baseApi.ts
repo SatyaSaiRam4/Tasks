@@ -4,9 +4,11 @@ import {
   type BaseQueryFn,
   type FetchArgs,
   type FetchBaseQueryError,
+  type FetchBaseQueryMeta,
 } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
-import { API_BASE_URL } from '../config/env';
+import { API_ORIGINS, API_TIMEOUT_MS } from '../config/env';
+import { apiBaseUrl, currentServer, failOver } from './servers';
 import { credentialsSet, loggedOut, type AuthUser } from '../modules/auth/authSlice';
 import { vaultLocked } from '../modules/vault/vaultSlice';
 import { saveSession, clearSession } from '../utils/storage';
@@ -22,9 +24,7 @@ export interface TokenResponse {
 /** Endpoints that send a file (multipart form): fetch sets their content type. */
 const UPLOAD_ENDPOINTS = new Set(['uploadVaultAudio', 'uploadPhoto', 'uploadVaultImage']);
 
-const rawBaseQuery = fetchBaseQuery({
-  baseUrl: API_BASE_URL,
-  prepareHeaders: (headers, { getState, endpoint }) => {
+const prepareHeaders = (headers: Headers, { getState, endpoint }: { getState: () => unknown; endpoint: string }) => {
     const state = getState() as RootState;
     const token = state.auth.accessToken;
     if (token) {
@@ -36,10 +36,59 @@ const rawBaseQuery = fetchBaseQuery({
     }
     if (!UPLOAD_ENDPOINTS.has(endpoint)) headers.set('content-type', 'application/json');
     return headers;
-  },
-});
+};
 
-type RawResult = Awaited<ReturnType<typeof rawBaseQuery>>;
+/** One client per backend server (see src/api/servers.ts). */
+const serverQueries = API_ORIGINS.map((_, i) => fetchBaseQuery({ baseUrl: apiBaseUrl(i), prepareHeaders, timeout: API_TIMEOUT_MS }));
+
+type RawResult = Awaited<ReturnType<(typeof serverQueries)[number]>>;
+
+/**
+ * The server, not the request, is the problem: Render answers 502/503/504
+ * (a suspended service answers 503 with a web page), the server can't be
+ * reached, it doesn't answer in time, or it answers a web page instead of
+ * the API's JSON.
+ */
+export function serverDown(result: RawResult): boolean {
+  const error = result.error;
+  if (!error) return false;
+  if (error.status === 'FETCH_ERROR' || error.status === 'TIMEOUT_ERROR') return true;
+  if (error.status === 'PARSING_ERROR') return error.originalStatus >= 500 || error.originalStatus === 404;
+  return error.status === 502 || error.status === 503 || error.status === 504;
+}
+
+/**
+ * Whether the same request may be sent to another server. Reading is always
+ * safe. A change (POST, PATCH…) is sent again only when the first server
+ * certainly didn't run it (Render refused it before it reached the app: 502 /
+ * 503), so nothing is ever done twice; after a timeout the user retries.
+ */
+function mayResend(method: string, result: RawResult): boolean {
+  if (method === 'GET' || method === 'HEAD') return true;
+  const status = result.error?.status;
+  const original = result.error && 'originalStatus' in result.error ? result.error.originalStatus : undefined;
+  return status === 502 || status === 503 || original === 502 || original === 503;
+}
+
+/** Sends a request to the current server, moving to the next one(s) if it's down. */
+const rawBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError, {}, FetchBaseQueryMeta> = async (
+  args,
+  api,
+  extraOptions,
+) => {
+  const method = (typeof args === 'string' ? 'GET' : args.method ?? 'GET').toUpperCase();
+  // Files take longer to send than ordinary requests.
+  const request = UPLOAD_ENDPOINTS.has(api.endpoint) && typeof args !== 'string' ? { ...args, timeout: 60000 } : args;
+  let result!: RawResult;
+  for (let attempt = 0; attempt < serverQueries.length; attempt++) {
+    const server = currentServer();
+    result = await serverQueries[server](request, api, extraOptions);
+    if (!serverDown(result)) return result;
+    failOver(server);
+    if (!mayResend(method, result)) return result;
+  }
+  return result;
+};
 
 // Endpoints that never need — and must never trigger — a token refresh.
 const AUTH_FREE_URLS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];

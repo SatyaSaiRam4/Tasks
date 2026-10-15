@@ -127,6 +127,14 @@ MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "sing
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
 
 # ---------------------------------------------------------------------------
+# Database connections per server: kept warm, and extra under load. Two
+# backends on the same database use twice as many; keep the total within
+# the Supabase pooler's limit (Database settings -> Connection pooling).
+# ---------------------------------------------------------------------------
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+
+# ---------------------------------------------------------------------------
 # Razorpay (payments for the WhatsApp plan). Leave the keys blank and payments
 # are simply off: the app says the plan can't be bought yet. RAZORPAY_MODE is
 # "test" (keys start rzp_test_) or "live" (keys start rzp_live_); keys that

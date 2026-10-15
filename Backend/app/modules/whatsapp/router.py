@@ -78,8 +78,13 @@ async def inbound(request: Request, background: BackgroundTasks, token: str = Qu
     except ValueError:
         form = await request.form()
         payload = dict(form)
-    messages = service.messages_from(payload)
-    results = [service.handle_inbound(db, sender, text) for sender, text in messages]
+    found = service.messages_from(payload, with_ids=True)
+    # A message another server (or an earlier delivery) already handled is skipped.
+    results = [
+        service.handle_inbound(db, sender, text) if service.first_time(db, message_id) else "duplicate: already handled"
+        for sender, text, message_id in found
+    ]
+    messages = [(sender, text) for sender, text, _ in found]
     for (sender, text), result in zip(messages, results):
         phone = service.normalize(sender)
         if result == "ignored: not YES or STOP" and phone and (text or "").strip():

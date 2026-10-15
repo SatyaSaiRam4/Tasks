@@ -2,9 +2,12 @@
 # points, and deletes plans, tasks and done reminders that are more than 7 days
 # past their end. The Vault is never touched.
 #
-# Needs two repository secrets (Settings → Secrets and variables → Actions):
-#   API_URL      e.g. https://tasks-singapore.onrender.com
-#   CRON_SECRET  the same value as CRON_SECRET on the server
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   API_URL         e.g. https://tasks-singapore.onrender.com
+#   API_URL_BACKUP  e.g. https://tasks-wvlv.onrender.com (optional)
+#   CRON_SECRET     the same value as CRON_SECRET on the servers
+# Both servers share the database, so the cleanup runs once, on the first
+# that answers.
 name: Daily cleanup
 
 on:
@@ -15,13 +18,21 @@ on:
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Wake the API
-        # A sleeping Render instance can take about a minute to start.
-        run: curl --silent --show-error --retry 5 --retry-delay 20 --retry-all-errors --max-time 90 "${{ secrets.API_URL }}/health/ready"
-      - name: Run cleanup
+      - name: Run cleanup on the first server that answers
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          API_URL_BACKUP: ${{ secrets.API_URL_BACKUP }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 15 --max-time 300 \
-            -X POST -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.API_URL }}/api/v1/maintenance/cleanup"
+          for url in "$API_URL" "$API_URL_BACKUP"; do
+            [ -z "$url" ] && continue
+            # A sleeping Render instance can take about a minute to start.
+            if curl --silent --show-error --fail --retry 5 --retry-delay 20 --retry-all-errors --max-time 90 "$url/health/ready"; then
+              curl --fail-with-body --silent --show-error --retry 3 --retry-delay 15 --max-time 300 \
+                -X POST -H "X-Cron-Secret: $CRON_SECRET" "$url/api/v1/maintenance/cleanup" && exit 0
+            fi
+            echo "::warning::$url didn't run the cleanup; trying the next server"
+          done
+          exit 1

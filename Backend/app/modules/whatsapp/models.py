@@ -60,10 +60,21 @@ class WhatsAppInboundLog(Base):
 
 class WhatsAppAutoReply(Base):
     """When Memo last answered a number that wrote something other than YES or
-    STOP ("This number only sends Memo reminders…"), so it answers at most
-    once a day and a chat can never get going."""
+    STOP (the short "only reminders come from this number" answer)."""
 
     __tablename__ = "whatsapp_auto_replies"
 
     phone: Mapped[str] = mapped_column(String(20), primary_key=True)  # E.164
     replied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WhatsAppInboundSeen(Base):
+    """WhatsApp message ids already handled. More than one backend can receive
+    the same MSG91 webhook (two servers, two webhooks): a message is acted on
+    only by whichever saw it first, so a STOP never counts twice and an
+    automatic answer never goes twice. The daily cleanup keeps 7 days."""
+
+    __tablename__ = "whatsapp_inbound_seen"
+
+    message_id: Mapped[str] = mapped_column(String(160), primary_key=True)  # WhatsApp's "wamid…"
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False, index=True)

@@ -274,11 +274,13 @@ WhatsApp sends).
    (see PROJECT.md 10.1), which applies `e8b3f1c6a2d7`. To review it first:
    `alembic upgrade d4a7e2b9c1f5:e8b3f1c6a2d7 --sql` prints the SQL without
    running it.
-3. In Render → tasks-singapore → Environment, **add** (don't change existing
-   ones): `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (test keys),
+3. In Render → **both** services (tasks-singapore and tasks-wvlv) →
+   Environment, **add** the same values (don't change existing ones): `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (test keys),
    `RAZORPAY_MODE=test`, `RAZORPAY_WEBHOOK_SECRET`.
 4. Razorpay Dashboard (Test mode) → **Webhooks → Add New Webhook**:
-   URL `https://tasks-singapore.onrender.com/api/v1/payments/razorpay/webhook`,
+   URL `https://tasks-singapore.onrender.com/api/v1/payments/razorpay/webhook`
+   (and a second webhook with `https://tasks-wvlv.onrender.com/...`, same
+   secret and events: each event is processed once whichever server gets it),
    secret = `RAZORPAY_WEBHOOK_SECRET`, events **payment.captured**,
    **payment.failed**, **order.paid**.
 5. Build a new app (the Razorpay SDK is native) and pay with Razorpay's test
