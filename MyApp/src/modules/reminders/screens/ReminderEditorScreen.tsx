@@ -33,6 +33,7 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { WhatsAppVerify } from '../WhatsAppVerify';
 import type { ContactStatus } from '../whatsappApi';
 import { allowanceLine, useGetWhatsAppPlanQuery } from '../../subscriptions/subscriptionsApi';
+import { PLAN_PURCHASE_ENABLED } from '../../../config/env';
 
 /** A bare 10-digit number is almost always an Indian mobile number typed without +91. */
 function normalizeWhatsapp(raw: string): string {
@@ -127,6 +128,8 @@ export function ReminderEditorScreen() {
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save this reminder.'));
       if (errorCode(err) === 'SUBSCRIPTIONREQUIRED') {
+        // The server names the plan's price; a build that can't sell it says so instead.
+        if (!PLAN_PURCHASE_ENABLED) setError('Your 3 free WhatsApp reminders are used. Turn off "Also send on WhatsApp" to save this reminder; more WhatsApp reminders are coming soon.');
         setNeedsPlan(true);
         plan.refetch();
       }

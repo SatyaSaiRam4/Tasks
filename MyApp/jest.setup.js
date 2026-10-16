@@ -42,3 +42,18 @@ jest.mock('react-native-razorpay', () => ({
   __esModule: true,
   default: { open: jest.fn(() => Promise.reject({ code: 0, description: 'Payment cancelled' })) },
 }));
+
+// The on-device API cache saves on a timer; tests don't need it (and the
+// timer would keep Jest running after the tests finish).
+jest.mock('./src/api/persistCache', () => ({
+  persistApiCache: () => undefined,
+  hydrateApiCache: () => Promise.resolve([]),
+  refreshHydrated: () => undefined,
+  clearPersistedApiCache: () => Promise.resolve(),
+}));
+
+// React Native's test stand-in for animation frames reads Jest's clock, which
+// throws if a frame lands just after a test file finishes (Redux schedules its
+// batched updates on frames). Same behaviour, plain clock.
+global.requestAnimationFrame = callback => setTimeout(() => callback(Date.now()), 16);
+global.cancelAnimationFrame = id => clearTimeout(id);

@@ -458,7 +458,7 @@ access to anyone's Vault.
 | Stack | React Native 0.87 (New Architecture, Hermes), React 19, TypeScript, Node ≥ 22.11 |
 | State and data | Redux Toolkit + RTK Query. `src/api/baseApi.ts` adds the tokens, refreshes an expired session once, and locks the Vault if the server says so. Data is kept 5 minutes after a screen closes |
 | On-device cache | `src/api/persistCache.ts` keeps the last data per user (never the Vault or admin data) so screens open instantly and refresh in the background; cleared on logout |
-| Backend URLs | `src/config/env.ts`: release builds use **two** servers, `https://tasks-singapore.onrender.com` and `https://tasks-wvlv.onrender.com` (same code, same database), and `src/api/servers.ts` picks whichever is up (see [10.1](#101-backend-on-render)); debug builds use the local address when `USE_LOCAL_API` is true |
+| Backend URLs | `src/config/env.ts`: release builds use **two** servers, `https://tasks-wvlv.onrender.com` (preferred) and `https://tasks-singapore.onrender.com` (backup) (same code, same database), and `src/api/servers.ts` picks whichever is up (see [10.1](#101-backend-on-render)); debug builds use the local address when `USE_LOCAL_API` is true |
 | Navigation | `src/navigation/RootNavigator.tsx`: five tabs (Home, Plans, Reminders, Vault, Profile) inside a root stack with the pushed screens (plan detail and editor, reminder editor, Vault note, streak history, find a friend, settings, Why Memo?, wallet, change password, admin) |
 | Layout | Phones: floating tab bar. Tablets: centred tab bar and two columns. Wide windows: a navigation rail |
 | Design system | `src/theme/` "Midnight & Champagne": `palette.ts` (colours, light and dark themes, accents), `typography.ts` (Cormorant Garamond for display, Manrope for UI), `tokens.ts` (spacing, radius, motion), `index.ts` (applied once at start-up, before any screen is created) |
@@ -923,8 +923,8 @@ suspended or down:
 
 | Service | URL |
 |---|---|
-| **tasks-singapore** | `https://tasks-singapore.onrender.com` |
-| **tasks-wvlv** | `https://tasks-wvlv.onrender.com` |
+| **tasks-wvlv** (preferred by the app) | `https://tasks-wvlv.onrender.com` |
+| **tasks-singapore** (backup) | `https://tasks-singapore.onrender.com` |
 
 - Region Singapore (close to the database), root directory `Backend`.
 - Build command: `pip install -r requirements.txt`.
@@ -1004,9 +1004,26 @@ block. On Render this isn't needed.
 ### 10.5 App builds
 
 - Android debug: `npx react-native run-android`.
-- Android release: `cd MyApp/android && ./gradlew assembleRelease` (APK) or
-  `bundleRelease` (AAB for Google Play). Read
-  [section 13](#13-before-publishing-to-the-stores) first.
+- Android release (Google Play): `cd MyApp/android && ./gradlew bundleRelease`
+  → `app/build/outputs/bundle/release/app-release.aab` (upload this to Play);
+  `assembleRelease` → `app/build/outputs/apk/release/app-release.apk` (APKPure,
+  and to try on a phone).
+- **App id:** `com.memomelo.app` (`applicationId`; permanent once published).
+  The code's package stays `com.myapp` (`namespace`).
+- **Version:** `versionCode` must go up by 1 for every Play upload;
+  `versionName` is what users see (Settings shows "Version 2.1").
+- **Signing:** releases are signed with the **upload key**
+  `~/memo-release-keys/memo-upload.jks` (alias `memo-upload`, password in
+  `~/memo-release-keys/keystore.properties`). The build reads
+  `MyApp/android/keystore.properties` (a copy of that file, git-ignored).
+  Without it, release builds are unsigned (Play refuses them), never signed
+  with the debug key. **Back up `~/memo-release-keys/` somewhere private**
+  (password manager or encrypted drive). With Play App Signing, a lost
+  upload key can be reset through Play support, but it takes days.
+- Upload key SHA-1 `97:40:E5:F2:E0:33:5E:C2:49:04:24:02:BE:BF:B3:CC:A1:CB:A1:62`.
+- **WhatsApp plan purchases are off in this build** (`PLAN_PURCHASE_ENABLED`
+  in `src/config/env.ts`), as Play doesn't allow a Razorpay-only purchase
+  (see [PAYMENTS.md](PAYMENTS.md#13-google-play-payment-policy)).
 - iOS: archive from Xcode (`MyApp/ios/MyApp.xcworkspace`).
 
 ---
@@ -1054,21 +1071,44 @@ block. On Render this isn't needed.
 
 ## 13. Before publishing to the stores
 
-These are needed before a public release:
+Done in the app: app id `com.memomelo.app`, release signing with an upload
+key, version 2.1 (code 1), in-app **account deletion** (Settings → Account →
+Delete account, confirmed with an emailed code) and the web page
+**`/account/delete`**, the **privacy policy** at **`/privacy`** (linked in
+Settings → Account), WhatsApp plan purchases off.
 
-1. **Android package name:** `applicationId` is still `com.myapp`
-   (`MyApp/android/app/build.gradle`). Choose the final one (for example
-   `com.memo.app`) before the first upload; it can't change afterwards.
-2. **Release signing:** release builds are currently signed with the
-   **debug** keystore. Create a private upload keystore, add it as a
-   `release` signing config, and keep it safe (losing it blocks updates).
-3. **Version:** raise `versionCode` and `versionName` for every release.
-4. **iOS:** set the bundle identifier and signing team in Xcode, and add the
-   bundled fonts to the Xcode project (iOS currently falls back to the
-   system fonts).
-5. **Store listing:** app icon, screenshots, privacy policy (the app stores
-   accounts, reminders and encrypted Vault content; WhatsApp numbers are
-   sent to MSG91) and the data-safety form.
+Still to do (outside the code):
+
+1. **Backend first:** deploy this version to both Render services (adds
+   migration `a1d5c9e3f7b2`, the pages and the deletion endpoints) and set
+   `SUPPORT_EMAIL` (the contact shown on `/privacy` and `/account/delete`;
+   use the same as the Play listing).
+2. **Google sign-in for the new app id:** Google Cloud Console → APIs &
+   Services → Credentials → Create credentials → OAuth client ID → Android:
+   package `com.memomelo.app`, SHA-1 of the **upload key** (above). After the
+   first upload, add another Android client with the **App signing key**
+   SHA-1 from Play Console → Setup → App signing (the one users' phones see),
+   and one with the debug SHA-1
+   (`18:CB:52:CB:05:D0:E3:82:AC:CB:CA:84:2C:A5:53:F6:EB:0B:E9:42`) for debug
+   builds. The backend's `GOOGLE_CLIENT_IDS` (the web client) stays as it is.
+3. **Play Console:** create the app, upload `app-release.aab` (internal
+   testing first), turn on Play App Signing.
+4. **App content forms:** privacy policy URL
+   (`https://tasks-wvlv.onrender.com/privacy`), account deletion URL
+   (`…/account/delete`), Data safety (see below), content rating, target
+   audience (not for children), ads: none.
+5. **Permission declarations:** `USE_FULL_SCREEN_INTENT` (alarm reminders
+   that ring full screen), exact alarms (reminders at the set minute),
+   microphone (Vault voice notes), approximate location (weather on Home,
+   asked once, used on the phone only).
+6. **Data safety (what to declare):** collected: name, email, user IDs,
+   photos (profile, Vault), audio (Vault voice notes), approximate location
+   (used on device, sent only to the weather service), app content (plans,
+   reminders, notes), phone numbers (WhatsApp reminders and payouts),
+   purchase history (WhatsApp plan, when enabled). Encrypted in transit;
+   users can request deletion; not sold; no ads.
+7. **iOS:** set the bundle identifier and signing team in Xcode, and add the
+   bundled fonts to the Xcode project.
 
 ---
 

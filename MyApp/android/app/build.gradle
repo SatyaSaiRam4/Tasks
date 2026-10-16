@@ -72,6 +72,14 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// The release (upload) key's location and passwords, if this machine has them.
+def releaseKeystoreFile = rootProject.file("keystore.properties")
+def releaseKeystore = null
+if (releaseKeystoreFile.exists()) {
+    releaseKeystore = new Properties()
+    releaseKeystoreFile.withInputStream { releaseKeystore.load(it) }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -87,11 +95,14 @@ android {
         }
     }
     defaultConfig {
-        applicationId "com.myapp"
+        // The app's id on Google Play: permanent once published. (The code's
+        // package stays com.myapp, the namespace above; Android allows both.)
+        applicationId "com.memomelo.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // Raise versionCode by 1 for every upload to Google Play.
         versionCode 1
-        versionName "1.0"
+        versionName "2.1"
     }
     signingConfigs {
         debug {
@@ -105,15 +116,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // The Google Play upload key, read from MyApp/android/keystore.properties
+        // (git-ignored; it points at ~/memo-release-keys/memo-upload.jks). See
+        // PROJECT.md "App builds". Without that file, release builds come out
+        // unsigned rather than signed with the debug key.
+        if (releaseKeystore != null) {
+            release {
+                storeFile file(releaseKeystore['storeFile'])
+                storePassword releaseKeystore['storePassword']
+                keyAlias releaseKeystore['keyAlias']
+                keyPassword releaseKeystore['keyPassword']
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig releaseKeystore != null ? signingConfigs.release : null
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }

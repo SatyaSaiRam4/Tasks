@@ -81,3 +81,7 @@ MyApp/.git.old-unused/
 
 # Local database backups (contain user data)
 db_backups/
+
+# Release signing (the upload key lives in ~/memo-release-keys, never in git)
+**/keystore.properties
+*.jks

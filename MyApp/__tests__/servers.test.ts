@@ -47,8 +47,8 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 it('lists both production servers', () => {
-  expect(API_ORIGINS).toEqual(['https://tasks-singapore.onrender.com', 'https://tasks-wvlv.onrender.com']);
-  expect(apiBaseUrl(1)).toBe('https://tasks-wvlv.onrender.com/api/v1');
+  expect(API_ORIGINS).toEqual(['https://tasks-wvlv.onrender.com', 'https://tasks-singapore.onrender.com']);
+  expect(apiBaseUrl(0)).toBe('https://tasks-wvlv.onrender.com/api/v1');
 });
 
 it('moves to the other server when one is suspended, and stays there', async () => {
@@ -100,4 +100,11 @@ it('picks a server that answers at launch', async () => {
   behaviour[FIRST] = 'suspended';
   await chooseServer(2000);
   expect(currentServer()).toBe(1);
+});
+
+// Clear the API cache so its timers (unused data is kept 5 minutes) don't outlive the tests.
+afterAll(async () => {
+  store.dispatch(baseApi.util.resetApiState());
+  // Let Redux's last batched update (scheduled on an animation frame) run before Jest tears down.
+  await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
 });
