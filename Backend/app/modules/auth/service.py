@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import security
@@ -13,7 +13,7 @@ from app.core.config import ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, REFRESH_TOK
 from app.core.timeutil import DEFAULT_TIMEZONE, utc_now
 from app.integrations.email import send_email
 
-from .models import EmailVerificationCode, PasswordResetCode, RefreshSession, User, UserRole
+from .models import AccountDeletionCode, EmailVerificationCode, PasswordResetCode, RefreshSession, User, UserRole
 
 logger = logging.getLogger("auth")
 
@@ -156,6 +156,67 @@ def reset_password(db: Session, email: str, code: str, new_password: str) -> Non
     db.commit()
     # A password reset signs out every existing session.
     revoke_all_sessions(db, user.id)
+
+
+# ---- Deleting an account -----------------------------------------------------------------
+
+
+def request_account_deletion(db: Session, email: str) -> None:
+    """Emails a 6-digit code that confirms deleting the account. Always looks
+    the same to the caller, so it can't reveal which emails have accounts."""
+    user = get_user_by_email(db, email)
+    if not user:
+        return
+    db.query(AccountDeletionCode).filter(
+        AccountDeletionCode.user_id == user.id, AccountDeletionCode.used_at.is_(None)
+    ).update({"used_at": utc_now()})
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    db.add(
+        AccountDeletionCode(
+            user_id=user.id,
+            code_hash=_hash_token(code),
+            expires_at=utc_now() + timedelta(minutes=RESET_CODE_TTL_MINUTES),
+        )
+    )
+    db.commit()
+    send_email(
+        user.email,
+        "Your Memo account deletion code",
+        f"Hi {user.display_name},\n\nYour code to delete your Memo account is {code}. "
+        f"It expires in {RESET_CODE_TTL_MINUTES} minutes.\n\n"
+        "Entering it permanently deletes your account and everything in it: plans, tasks, "
+        "reminders, streaks, wallet, Vault notes, photos and voice notes. This can't be undone.\n\n"
+        "If you didn't ask for this, ignore this email: nothing will be deleted.",
+    )
+
+
+def delete_account(db: Session, email: str, code: str) -> None:
+    """Checks the emailed code, then deletes the account and all its data
+    (every table that belongs to a user is deleted with it; payment records
+    are kept without the user, as the accounts require)."""
+    invalid = HTTPException(status.HTTP_400_BAD_REQUEST, "That code is invalid or has expired.")
+    user = get_user_by_email(db, email)
+    if not user:
+        raise invalid
+    record = db.scalar(
+        select(AccountDeletionCode)
+        .where(AccountDeletionCode.user_id == user.id, AccountDeletionCode.used_at.is_(None))
+        .order_by(AccountDeletionCode.created_at.desc())
+    )
+    if not record or record.expires_at < utc_now() or record.attempts >= RESET_CODE_MAX_ATTEMPTS:
+        raise invalid
+    if not secrets.compare_digest(record.code_hash, _hash_token(code)):
+        record.attempts += 1
+        db.commit()
+        raise invalid
+    if user.role == UserRole.ADMIN:
+        admins = db.scalar(select(func.count()).select_from(User).where(User.role == UserRole.ADMIN, User.is_active.is_(True)))
+        if admins <= 1:
+            raise HTTPException(status.HTTP_409_CONFLICT, "The last admin account can't be deleted. Make someone else an admin first.")
+    user_id = user.id
+    db.delete(user)
+    db.commit()
+    logger.info("Account %s deleted at the owner's request", user_id)
 
 
 # ---- Google sign-in ------------------------------------------------------------------

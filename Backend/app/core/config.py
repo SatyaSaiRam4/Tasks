@@ -132,6 +132,12 @@ MSG91_WHATSAPP_TEMPLATE_STYLE = os.getenv("MSG91_WHATSAPP_TEMPLATE_STYLE", "sing
 REMINDER_POLL_SECONDS = int(os.getenv("REMINDER_POLL_SECONDS", "20"))
 
 # ---------------------------------------------------------------------------
+# Public pages (/privacy, /account/delete): the contact address they show.
+# Use the same address as the developer contact on your app listing (APKPure, stores).
+# ---------------------------------------------------------------------------
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "").strip()
+
+# ---------------------------------------------------------------------------
 # Database connections per server: kept warm, and extra under load. Two
 # backends on the same database use twice as many; keep the total within
 # the Supabase pooler's limit (Database settings -> Connection pooling).

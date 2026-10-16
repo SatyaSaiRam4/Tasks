@@ -10,6 +10,7 @@ from app.api.router import api_router
 from app.core.config import FRONTEND_ORIGIN
 from app.db.session import SessionLocal, test_connection
 from app.modules.auth.service import seed_admin
+from app.modules.pages.router import router as pages_router
 from app.workers.reminder_worker import start_reminder_worker, stop_reminder_worker
 
 
@@ -80,3 +81,5 @@ def health_ready():
 
 
 app.include_router(api_router)
+# Public pages app stores link to: the privacy policy and account deletion on the web.
+app.include_router(pages_router)
