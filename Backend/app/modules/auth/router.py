@@ -10,6 +10,8 @@ from . import service
 from .models import User
 from .schemas import (
     ChangePasswordRequest,
+    DeleteAccountConfirm,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     GoogleSignInRequest,
     LoginRequest,
@@ -113,6 +115,27 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
     except EmailSendFailed:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "We couldn't send the email. Please try again in a minute.")
     return {"message": "If that email has an account, a reset code is on its way."}
+
+
+@router.post("/delete-account/request", status_code=status.HTTP_202_ACCEPTED)
+def request_account_deletion(payload: DeleteAccountRequest, request: Request, db: Session = Depends(get_db)):
+    """Step 1 of deleting an account (in the app, or the /account/delete web page): emails a code."""
+    rate_limit.hit(f"delete-ip:{rate_limit.client_ip(request)}", limit=10, window_seconds=900)
+    rate_limit.hit(f"delete-email:{payload.email.lower()}", limit=3, window_seconds=900)
+    try:
+        service.request_account_deletion(db, payload.email)
+    except EmailNotConfigured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Email isn't available right now. Please try again later.")
+    except EmailSendFailed:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "We couldn't send the email. Please try again in a minute.")
+    return {"message": "If that email has an account, a code is on its way."}
+
+
+@router.post("/delete-account/confirm", status_code=status.HTTP_204_NO_CONTENT)
+def confirm_account_deletion(payload: DeleteAccountConfirm, request: Request, db: Session = Depends(get_db)):
+    """Step 2: with the emailed code, the account and all its data are deleted for good."""
+    rate_limit.hit(f"delete-confirm-ip:{rate_limit.client_ip(request)}", limit=10, window_seconds=900)
+    service.delete_account(db, payload.email, payload.code)
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
