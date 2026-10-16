@@ -47,6 +47,11 @@ export function failOver(from = current): number {
   return current;
 }
 
+/** A public page on the server in use, e.g. publicPage('/privacy'). */
+export function publicPage(path: string): string {
+  return `${API_ORIGINS[current].replace(/\/+$/, '')}${path}`;
+}
+
 /** For screens that put the API URL in an image or audio source. */
 export function useApiBaseUrl(): string {
   return useSyncExternalStore(

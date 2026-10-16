@@ -19,6 +19,17 @@ import { WhatsAppPlanScreen } from '../src/modules/subscriptions/screens/WhatsAp
 import { WalletScreen } from '../src/modules/wallet/screens/WalletScreen';
 
 jest.mock('@ant-design/react-native/lib/toast', () => ({ success: jest.fn(), fail: jest.fn(), info: jest.fn() }));
+// Buying is switched off in the Play build (PLAN_PURCHASE_ENABLED); these tests switch it per test.
+let mockPlanSales = true;
+jest.mock('../src/config/env', () => {
+  const actual = jest.requireActual('../src/config/env');
+  return {
+    ...actual,
+    get PLAN_PURCHASE_ENABLED() {
+      return mockPlanSales;
+    },
+  };
+});
 jest.mock('../src/notifications', () => ({ initNotifications: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('react-native-webview', () => {
   const ReactLib = require('react');
@@ -106,7 +117,7 @@ async function render(Screen: React.ComponentType) {
 async function flush() {
   for (let i = 0; i < 5; i++) {
     await act(async () => {
-      await new Promise<void>(r => setTimeout(() => r(), 0));
+      await new Promise<void>(r => setTimeout(() => r(), 20)); // one animation frame: Redux batches updates on frames
     });
   }
 }
@@ -123,6 +134,22 @@ function button(root: ReactTestRenderer.ReactTestRenderer, label: string | RegEx
 }
 
 describe('WhatsApp plan screen', () => {
+  beforeEach(() => {
+    mockPlanSales = true;
+  });
+
+  it('in a build that can’t sell the plan: no price, no payment, just "coming soon"', async () => {
+    mockPlanSales = false;
+    routes['GET /subscriptions/whatsapp'] = () => ({ json: PLAN });
+    const root = await render(WhatsAppPlanScreen);
+    const shown = texts(root);
+    expect(shown).toContain('Your 3 free WhatsApp reminders are used. More WhatsApp reminders are coming soon.');
+    expect(shown).toContain('WhatsApp plan coming soon');
+    expect(shown).not.toContain('₹30');
+    expect(shown).not.toContain('Razorpay');
+    expect(root.root.findAllByType(Button).some(b => /plan|Renew|Payments/.test(b.props.label))).toBe(false);
+  });
+
   it('explains that the free reminders are used and what the plan is', async () => {
     routes['GET /subscriptions/whatsapp'] = () => ({ json: PLAN });
     const root = await render(WhatsAppPlanScreen);
@@ -268,4 +295,11 @@ describe('wallet screen', () => {
     expect(sent[0].body).toMatchObject({ phone: '9876543210', points: 500 });
     expect(sent[0].body.request_id).toMatch(/^r[a-z0-9]{8,}$/);
   });
+});
+
+// Clear the API cache so its timers (unused data is kept 5 minutes) don't outlive the tests.
+afterAll(async () => {
+  store.dispatch(baseApi.util.resetApiState());
+  // Let Redux's last batched update (scheduled on an animation frame) run before Jest tears down.
+  await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
 });

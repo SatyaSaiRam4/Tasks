@@ -46,8 +46,9 @@ describe('checkout results', () => {
 describe('allowance wording', () => {
   it('counts the free ones down, then shows the plan', () => {
     expect(allowanceLine({ ...base, free_used: 1, free_remaining: 2 })).toBe('2 of 3 free WhatsApp reminders left');
+    // This build can't sell the plan (PLAN_PURCHASE_ENABLED is off for Google Play): no price shown.
     expect(allowanceLine({ ...base, free_used: 3, free_remaining: 0, purchase_required: true })).toBe(
-      'Free WhatsApp reminders used · plan ₹30 for 100',
+      'Your 3 free WhatsApp reminders are used · more coming soon',
     );
     expect(allowanceLine({ ...base, free_used: 3, free_remaining: 0, plan_status: 'ACTIVE', paid_remaining: 87 })).toBe(
       'WhatsApp plan: 87 messages left',

@@ -39,7 +39,7 @@ const prepareHeaders = (headers: Headers, { getState, endpoint }: { getState: ()
 };
 
 /** One client per backend server (see src/api/servers.ts). */
-const serverQueries = API_ORIGINS.map((_, i) => fetchBaseQuery({ baseUrl: apiBaseUrl(i), prepareHeaders, timeout: API_TIMEOUT_MS }));
+const serverQueries = API_ORIGINS.map((_, i) => fetchBaseQuery({ baseUrl: apiBaseUrl(i), prepareHeaders }));
 
 type RawResult = Awaited<ReturnType<(typeof serverQueries)[number]>>;
 
@@ -78,11 +78,22 @@ const rawBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError
 ) => {
   const method = (typeof args === 'string' ? 'GET' : args.method ?? 'GET').toUpperCase();
   // Files take longer to send than ordinary requests.
-  const request = UPLOAD_ENDPOINTS.has(api.endpoint) && typeof args !== 'string' ? { ...args, timeout: 60000 } : args;
+  const timeoutMs = UPLOAD_ENDPOINTS.has(api.endpoint) ? 60000 : API_TIMEOUT_MS;
   let result!: RawResult;
   for (let attempt = 0; attempt < serverQueries.length; attempt++) {
     const server = currentServer();
-    result = await serverQueries[server](request, api, extraOptions);
+    // Our own timeout, cancelled as soon as the server answers (fetchBaseQuery's
+    // `timeout` leaves a timer running after every request).
+    const controller = new AbortController();
+    const onAbort = () => controller.abort(api.signal.reason);
+    api.signal.addEventListener('abort', onAbort);
+    const timer = setTimeout(() => controller.abort(Object.assign(new Error('signal timed out'), { name: 'TimeoutError' })), timeoutMs);
+    try {
+      result = await serverQueries[server](args, { ...api, signal: controller.signal }, extraOptions);
+    } finally {
+      clearTimeout(timer);
+      api.signal.removeEventListener('abort', onAbort);
+    }
     if (!serverDown(result)) return result;
     failOver(server);
     if (!mayResend(method, result)) return result;

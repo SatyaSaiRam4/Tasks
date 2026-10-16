@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from '@ant-design/react-native/lib/toast';
 import { useNavigation } from '@react-navigation/native';
+import { publicPage } from '../../../api/servers';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { alarmChanged, storyOpened, tourReplayed } from '../../../app/preferencesSlice';
@@ -210,7 +211,9 @@ export function SettingsScreen() {
         <ListRow icon="message" title="Email" value={me.data.email} />
         <ListRow icon="key" title="Password" subtitle="Change your password" onPress={() => navigation.navigate('ChangePassword')} />
         <ListRow icon="logout" title="Sign out" onPress={() => setSheet('logout')} destructive />
-        <ListRow icon="logout" title="Sign out everywhere" subtitle="Ends every session on every device" onPress={() => setSheet('logoutAll')} destructive last />
+        <ListRow icon="logout" title="Sign out everywhere" subtitle="Ends every session on every device" onPress={() => setSheet('logoutAll')} destructive />
+        <ListRow icon="eye" title="Privacy policy" subtitle="What Memo keeps and why" onPress={() => Linking.openURL(publicPage('/privacy')).catch(() => undefined)} />
+        <ListRow icon="trash" title="Delete account" subtitle="Permanently delete your account and data" onPress={() => navigation.navigate('DeleteAccount')} destructive last />
       </ListGroup>
 
       <SectionHeader title="Appearance" />

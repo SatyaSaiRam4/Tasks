@@ -1,4 +1,5 @@
 import { baseApi } from '../../api/baseApi';
+import { PLAN_PURCHASE_ENABLED } from '../../config/env';
 
 /**
  * The account's WhatsApp allowance, always from the server: 3 free WhatsApp
@@ -79,5 +80,6 @@ export function rupees(paise: number): string {
 export function allowanceLine(p: WhatsAppPlan): string {
   if (p.plan_status === 'ACTIVE') return `WhatsApp plan: ${p.paid_remaining} messages left${p.free_remaining ? ` (+${p.free_remaining} free)` : ''}`;
   if (p.free_remaining > 0) return `${p.free_remaining} of ${p.free_total} free WhatsApp reminders left`;
+  if (!PLAN_PURCHASE_ENABLED) return `Your ${p.free_total} free WhatsApp reminders are used · more coming soon`;
   return `Free WhatsApp reminders used · plan ${rupees(p.price_paise)} for ${p.plan_messages}`;
 }

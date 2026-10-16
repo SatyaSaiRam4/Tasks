@@ -21,7 +21,8 @@
  *
  * Only public URLs belong here: anything in the app bundle can be read by users.
  */
-const PRODUCTION_API_ORIGINS = ['https://tasks-singapore.onrender.com', 'https://tasks-wvlv.onrender.com'];
+// In order of preference: tasks-wvlv is the active one; tasks-singapore is the backup.
+const PRODUCTION_API_ORIGINS = ['https://tasks-wvlv.onrender.com', 'https://tasks-singapore.onrender.com'];
 const LOCAL_API_ORIGIN = 'http://127.0.0.1:8003';
 const USE_LOCAL_API = false;
 
@@ -30,6 +31,16 @@ export const API_PREFIX = '/api/v1';
 
 /** Every backend the app may use, in order of preference. */
 export const API_ORIGINS: string[] = __DEV__ && USE_LOCAL_API ? [LOCAL_API_ORIGIN] : PRODUCTION_API_ORIGINS;
+
+/**
+ * Whether this build lets people buy the WhatsApp plan (₹30 via Razorpay).
+ * Off for the Google Play release: Play doesn't allow selling an in-app
+ * feature with Razorpay alone (see PAYMENTS.md, "Google Play payment
+ * policy"). Users still get their 3 free WhatsApp reminders and see their
+ * allowance; the plan shows as coming soon. Turn on only for builds where
+ * that's allowed (or once Play Billing is added).
+ */
+export const PLAN_PURCHASE_ENABLED = false;
 
 /** Network request timeout, in milliseconds. */
 export const API_TIMEOUT_MS = 15000;

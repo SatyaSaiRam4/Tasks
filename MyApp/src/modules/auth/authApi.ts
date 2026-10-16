@@ -118,6 +118,24 @@ export const authApi = baseApi.injectEndpoints({
     changePassword: builder.mutation<void, { current_password: string; new_password: string }>({
       query: body => ({ url: '/auth/change-password', method: 'POST', body }),
     }),
+
+    /** Deleting the account, step 1: emails a 6-digit code to the account's address. */
+    requestAccountDeletion: builder.mutation<{ message: string }, { email: string }>({
+      query: body => ({ url: '/auth/delete-account/request', method: 'POST', body }),
+    }),
+
+    /** Step 2: with the code, the account and all its data are deleted; this phone signs out. */
+    confirmAccountDeletion: builder.mutation<void, { email: string; code: string }>({
+      query: body => ({ url: '/auth/delete-account/confirm', method: 'POST', body }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          await signOutLocally(dispatch);
+        } catch {
+          // wrong code: stay signed in
+        }
+      },
+    }),
   }),
 });
 
@@ -132,4 +150,6 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useChangePasswordMutation,
+  useRequestAccountDeletionMutation,
+  useConfirmAccountDeletionMutation,
 } = authApi;

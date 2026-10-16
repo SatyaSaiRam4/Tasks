@@ -65,6 +65,7 @@ import { DiscoverScreen } from '../modules/discover/screens/DiscoverScreen';
 import { SettingsScreen } from '../modules/settings/screens/SettingsScreen';
 import { WhyMemoScreen } from '../modules/settings/screens/WhyMemoScreen';
 import { ChangePasswordScreen } from '../modules/settings/screens/ChangePasswordScreen';
+import { DeleteAccountScreen } from '../modules/settings/screens/DeleteAccountScreen';
 import { AdminDashboardScreen } from '../modules/admin/screens/AdminDashboardScreen';
 import { AdminUsersScreen } from '../modules/admin/screens/AdminUsersScreen';
 import { AdminMoneyScreen } from '../modules/admin/screens/AdminMoneyScreen';
@@ -99,6 +100,7 @@ export type RootStackParamList = {
   Settings: undefined;
   WhyMemo: undefined;
   ChangePassword: undefined;
+  DeleteAccount: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminMoney: undefined;
@@ -407,6 +409,7 @@ export function RootNavigator() {
           <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="WhyMemo" component={WhyMemoScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ animation: 'slide_from_bottom' }} />
+          <RootStack.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ animation: 'slide_from_bottom' }} />
           <RootStack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ animation: 'slide_from_right' }} />
           <RootStack.Screen name="AdminMoney" component={AdminMoneyScreen} options={{ animation: 'slide_from_right' }} />
